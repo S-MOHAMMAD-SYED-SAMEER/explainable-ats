@@ -1,0 +1,15 @@
+# Project 3 local artefacts.
+#
+# The root .gitignore already covers node_modules/, dist/, .env and *.sqlite.
+# What it does not cover is SQLite's WAL sidecar files, which exist only while
+# the database is open — long enough for a `git add -A` during a running server
+# to sweep a binary journal into a commit.
+
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+
+# Generated evaluation output. The dataset itself stays committed. Nothing
+# writes here until the eval harness lands; the rule exists first so the first
+# run cannot accidentally commit its results.
+server/eval-results/
