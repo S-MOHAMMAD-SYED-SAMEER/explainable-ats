@@ -58,10 +58,11 @@ export function Login({ onSignedIn }: { onSignedIn(): void }): ReactNode {
     <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6">
-          <p className="text-eyebrow uppercase tracking-wide text-ink-muted">AI Business Automation</p>
-          <h1 className="mt-1 text-section text-ink">Inbox-to-CRM Agent</h1>
+          <p className="text-eyebrow uppercase tracking-wide text-ink-muted">AI Recruitment Intelligence</p>
+          <h1 className="mt-1 text-section text-ink">Explainable ATS</h1>
           <p className="mt-2 text-small text-ink-muted">
-            The assistant prepares the work. A person stays in control of anything consequential.
+            Every candidate is ranked from evidence quoted out of their CV, and every placement can be explained
+            to the person it is about.
           </p>
         </div>
 

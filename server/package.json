@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "migrate": "node scripts/migrate.ts",
-    "hash-password": "node scripts/hash-password.ts"
+    "hash-password": "node scripts/hash-password.ts",
+    "seed:demo": "node scripts/seed-demo.ts"
   },
   "engines": {
     "node": ">=24.0.0"

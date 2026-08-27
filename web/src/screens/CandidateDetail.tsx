@@ -112,7 +112,23 @@ function Fairness({ detail }: { detail: EvaluationDetail }): ReactNode {
   );
 }
 
-function RequirementCard({ requirement }: { requirement: RequirementOutcome }): ReactNode {
+/**
+ * One requirement, its verdict, and the passages behind it.
+ *
+ * The contribution is shown in points rather than as a rounded percentage, and
+ * that is deliberate. The scorer distributes the total so the parts sum to it
+ * exactly; rounding each part to a whole percent independently breaks that sum
+ * back open — three requirements reading 43%, 0% and 29% against a headline of
+ * 71%. The one thing a reader checks is whether it adds up, so the number shown
+ * here is the one that does.
+ */
+function RequirementCard({
+  requirement,
+  totalBasisPoints,
+}: {
+  requirement: RequirementOutcome;
+  totalBasisPoints: number | null;
+}): ReactNode {
   const wording = verdictWording(requirement.verdict);
 
   return (
@@ -149,9 +165,9 @@ function RequirementCard({ requirement }: { requirement: RequirementOutcome }): 
         <p>{requirement.rationale ?? 'This requirement was not judged, because the assessment did not finish.'}</p>
         <p>
           Weight {requirement.weight}
-          {requirement.contributionPercent === null
+          {requirement.contributionBasisPoints === null
             ? '.'
-            : `, contributing ${requirement.contributionPercent} of the overall score.`}
+            : `, contributing ${requirement.contributionBasisPoints.toLocaleString()} points of this candidate's ${(totalBasisPoints ?? 0).toLocaleString()}.`}
           {requirement.confidence === null ? '' : ` Confidence: ${requirement.confidence}.`}
         </p>
       </Technical>
@@ -365,7 +381,11 @@ export function CandidateDetail({ evaluationId }: { evaluationId: string }): Rea
         </p>
         <ul className="space-y-3">
           {detail.requirements.map((requirement) => (
-            <RequirementCard key={requirement.requirementId} requirement={requirement} />
+            <RequirementCard
+              key={requirement.requirementId}
+              requirement={requirement}
+              totalBasisPoints={detail.scoreBasisPoints}
+            />
           ))}
         </ul>
       </section>

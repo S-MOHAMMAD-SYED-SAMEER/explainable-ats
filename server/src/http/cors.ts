@@ -18,10 +18,23 @@ import { AppError } from '../lib/errors.ts';
 //
 // SAME-ORIGIN REQUESTS ARE NOT CORS
 //
-// A browser sends no `Origin` on a same-origin GET, and the front end is served
-// from the same origin as the API. So the default configuration — an empty
-// allow-list — is not "CORS is broken", it is "there are no cross-origin
-// clients", which is the correct posture until there are.
+// The front end is served from the same origin as the API, so the default
+// configuration — an empty allow-list — is not "CORS is broken", it is "there
+// are no cross-origin clients", which is the correct posture until there are.
+//
+// Recognising a same-origin request takes more than checking for the ABSENCE of
+// `Origin`, and an earlier version of this file got that wrong. A browser omits
+// `Origin` on a same-origin GET, but per the Fetch specification it attaches one
+// to EVERY request whose method is not GET or HEAD — including same-origin ones.
+// So an empty allow-list rejected every POST the application's own front end
+// made, starting with sign-in, while every GET worked. Worse, no test caught it:
+// curl and Node's `fetch` send no `Origin` unless told to, so the entire suite
+// exercised a code path no browser ever takes.
+//
+// The fix is to compare the presented `Origin` against the origin of the request
+// itself. A cross-origin page still presents its own `Origin` against our `Host`
+// and still fails the comparison — the browser sets `Host` from the URL it is
+// actually contacting, so a page cannot forge the pair.
 //
 // CROSS-ORIGIN STATE CHANGES ARE REFUSED OUTRIGHT
 //
@@ -38,18 +51,40 @@ export type CorsOptions = {
 const ALLOWED_HEADERS = 'content-type, x-csrf-token';
 const ALLOWED_METHODS = 'GET, POST, OPTIONS';
 
-function isAllowed(origin: string | undefined, allowed: readonly string[]): boolean {
-  if (!origin) return true; // same-origin, or a non-browser client
-  return allowed.includes(origin);
+/**
+ * True when `Origin` names the very server the request was sent to.
+ *
+ * `req.protocol` honours the `trust proxy` setting, so behind a TLS-terminating
+ * proxy this needs `TRUST_PROXY` set to the number of hops — otherwise the
+ * request reads as `http` while the browser presents `https` and a genuine
+ * same-origin request stops matching.
+ *
+ * `req.headers.host` is used rather than `req.hostname` because it carries the
+ * port, and an origin without its port would treat `:3200` and `:3100` on the
+ * same host as one origin.
+ */
+export function isSameOrigin(req: Request, origin: string): boolean {
+  const host = req.headers.host;
+  if (typeof host !== 'string' || host === '') return false;
+  return origin === `${req.protocol}://${host}`;
 }
 
 export function cors({ allowedOrigins }: CorsOptions) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
-    const permitted = isAllowed(origin, allowedOrigins);
 
-    if (origin && permitted) {
-      // Echoed only after an allow-list match, never reflected blindly.
+    // Three separate questions, deliberately not collapsed: whether this is a
+    // browser speaking CORS at all, whether it is our own front end, and
+    // whether an operator has named it.
+    const allowListed = origin !== undefined && allowedOrigins.includes(origin);
+    const sameOrigin = origin !== undefined && isSameOrigin(req, origin);
+    const permitted = origin === undefined || sameOrigin || allowListed;
+
+    if (origin && allowListed) {
+      // Echoed only after an allow-list match, never reflected blindly. A
+      // same-origin request gets no CORS headers because it needs none — the
+      // browser does not apply CORS to its own origin, and emitting `Vary:
+      // Origin` for it would fragment caches for nothing.
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       // The response varies by Origin, so a shared cache must not serve one

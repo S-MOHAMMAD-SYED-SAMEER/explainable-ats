@@ -228,3 +228,121 @@ test('malformed JSON gets a clean envelope, not an HTML stack trace', async () =
     assert.equal(body.error.code, 'VALIDATION_ERROR');
   });
 });
+
+// ==================================================== same-origin POSTs
+//
+// The whole of the rest of this file — and every other suite — speaks to the
+// server the way curl does: with no `Origin` header. A browser does not.
+//
+// Per the Fetch specification a browser omits `Origin` on a same-origin GET but
+// attaches one to EVERY request whose method is not GET or HEAD, same-origin
+// included. That single header is the difference between the suite passing and
+// the application being unusable: with an empty allow-list, every POST the front
+// end made — starting with sign-in — was refused 403 by the CORS layer, and no
+// test could see it because no test sent the header.
+//
+// These three tests send it.
+
+test('a same-origin POST carrying an Origin header is allowed', async () => {
+  await withServer(async (base) => {
+    // Exactly what the browser sends: the origin it is already talking to.
+    const response = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: base },
+      body: JSON.stringify({ password: PASSWORD }),
+    });
+
+    assert.equal(response.status, 200, 'the front end cannot sign in to its own API');
+    assert.ok(
+      response.headers.getSetCookie().some((cookie) => cookie.startsWith(`${SESSION_COOKIE}=`)),
+      'no session cookie was issued',
+    );
+  });
+});
+
+test('a cross-origin POST is still refused, with the allow-list still empty', async () => {
+  // The negative control for the test above. Without it, "same-origin POSTs
+  // work" would also be satisfied by removing the origin check altogether.
+  await withServer(async (base) => {
+    const response = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://evil.example' },
+      body: JSON.stringify({ password: PASSWORD }),
+    });
+
+    assert.equal(response.status, 403);
+    const body = (await response.json()) as { error: { code: string; details: { reason: string } } };
+    assert.equal(body.error.code, 'FORBIDDEN');
+    assert.equal(body.error.details.reason, 'origin_not_allowed');
+  });
+});
+
+test('a cross-origin POST is refused even when the password is right', async () => {
+  // The refusal happens before authentication, which is the point: a write from
+  // an origin nobody approved must not execute and then be hidden from the
+  // caller. A 401 here would mean the credential had been checked.
+  await withServer(async (base) => {
+    const wrong = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://evil.example' },
+      body: JSON.stringify({ password: 'not-the-password' }),
+    });
+    const right = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://evil.example' },
+      body: JSON.stringify({ password: PASSWORD }),
+    });
+
+    assert.equal(wrong.status, 403);
+    assert.equal(right.status, 403, 'a disallowed origin must not reach the password check');
+  });
+});
+
+test('a same-origin GET carries no Origin, and is unaffected either way', async () => {
+  // Documents the asymmetry that hid the fault: GETs were always fine, which is
+  // why the app looked healthy right up until someone pressed a button.
+  await withServer(async (base) => {
+    const withHeader = await fetch(`${base}/api/health`, { headers: { origin: base } });
+    const without = await fetch(`${base}/api/health`);
+
+    assert.equal(withHeader.status, 200);
+    assert.equal(without.status, 200);
+  });
+});
+
+test('a same-origin POST on a different port is not the same origin', async () => {
+  // The port is part of an origin. Without it, another service on the same host
+  // would be treated as our own front end.
+  await withServer(async (base) => {
+    const url = new URL(base);
+    const otherPort = `${url.protocol}//${url.hostname}:${Number(url.port) + 1}`;
+
+    const response = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: otherPort },
+      body: JSON.stringify({ password: PASSWORD }),
+    });
+
+    assert.equal(response.status, 403);
+  });
+});
+
+test('an explicitly allowed cross-origin POST works, and is echoed back', async () => {
+  // The allow-list still does its job: naming an origin is how a genuine
+  // cross-origin client is admitted, and only then is the origin echoed.
+  await withServer(
+    async (base) => {
+      const response = await fetch(`${base}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://partner.example' },
+        body: JSON.stringify({ password: PASSWORD }),
+      });
+
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('access-control-allow-origin'), 'http://partner.example');
+      assert.equal(response.headers.get('access-control-allow-credentials'), 'true');
+      assert.match(response.headers.get('vary') ?? '', /Origin/i);
+    },
+    { corsAllowedOrigins: ['http://partner.example'] },
+  );
+});

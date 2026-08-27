@@ -34,7 +34,14 @@ export type Route = {
   id: string | null;
 };
 
-export const DEFAULT_ROUTE: Route = { name: 'overview', id: null };
+/**
+ * Where someone lands after signing in, and where a bad hash falls back to.
+ *
+ * Roles, not Status. The first screen a recruiter sees should be the work, not
+ * a diagnostics panel reporting which database driver is configured — that
+ * screen answers a question only the person who deployed this ever asks.
+ */
+export const DEFAULT_ROUTE: Route = { name: 'jobs', id: null };
 
 function isRouteName(value: string): value is RouteName {
   return (ROUTES as readonly string[]).includes(value);

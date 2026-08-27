@@ -14,7 +14,7 @@ import {
   verdictWording,
   outcomeWording,
 } from '../src/copy.ts';
-import { ROUTES, parseRoute, routeToHash } from '../src/router.ts';
+import { DEFAULT_ROUTE, ROUTES, parseRoute, routeToHash } from '../src/router.ts';
 
 // The recruiter workflow's client-side guarantees (P3-F).
 //
@@ -219,9 +219,12 @@ test('a candidate link round-trips through the hash', () => {
   assert.deepEqual(parseRoute(job), { name: 'jobs', id: 'job-abc' });
 });
 
-test('an unrecognised hash falls back rather than dead-ending', () => {
-  assert.deepEqual(parseRoute('#/nonsense'), { name: 'overview', id: null });
-  assert.deepEqual(parseRoute(''), { name: 'overview', id: null });
+test('an unrecognised hash falls back to the work, not to a dead end', () => {
+  // A stale link or a typo lands on Roles. Landing on the diagnostics screen
+  // would answer a question only the person who deployed this ever asks.
+  assert.deepEqual(parseRoute('#/nonsense'), DEFAULT_ROUTE);
+  assert.deepEqual(parseRoute(''), DEFAULT_ROUTE);
+  assert.equal(DEFAULT_ROUTE.name, 'jobs');
 });
 
 // --- the API client ----------------------------------------------------------
@@ -251,4 +254,32 @@ test('the decision call sends both an outcome and a reason', () => {
   assert.match(decide, /method: 'POST'/);
   assert.match(decide, /outcome/);
   assert.match(decide, /reason/);
+});
+
+test('per-requirement contributions are shown as points, not as rounded percentages', () => {
+  // The scorer distributes the total so the parts sum to it exactly. Rounding
+  // each part to a whole percent independently breaks that sum back open: the
+  // demo dataset produces 43% + 0% + 29% against a headline of 71%, and the one
+  // thing a reader checks is whether the column adds up.
+  const source = code(read(path.join(SRC, 'screens/CandidateDetail.tsx')));
+
+  assert.match(source, /contributionBasisPoints/, 'precondition: the screen shows a contribution at all');
+  assert.ok(
+    !/contributionPercent/.test(source),
+    'a per-requirement percentage is rounded independently and will not sum to the total',
+  );
+});
+
+test('NEGATIVE CONTROL — independent rounding really does break the sum', () => {
+  // Not a hypothetical. These are the actual stored contributions for the gated
+  // demo candidate, and the actual score they were apportioned from.
+  const parts = [4285, 0, 2857];
+  const total = 7142;
+
+  assert.equal(parts.reduce((a, b) => a + b, 0), total, 'the points add up exactly');
+
+  const rounded = parts.reduce((sum, part) => sum + Math.round(part / 100), 0);
+  assert.notEqual(rounded, Math.round(total / 100), 'rounding each part independently must diverge');
+  assert.equal(rounded, 72);
+  assert.equal(Math.round(total / 100), 71);
 });

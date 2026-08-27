@@ -34,7 +34,21 @@ type Client = {
   base: string;
   /** Signed-in GET. */
   get: <T>(path: string) => Promise<{ status: number; body: T }>;
-  post: <T>(path: string, body: unknown, options?: { csrf?: boolean }) => Promise<{ status: number; body: T }>;
+  /**
+   * Signed-in POST, shaped like a browser's.
+   *
+   * `origin` defaults to this server's own origin because that is what a
+   * browser attaches to every non-GET request, same-origin included. Sending
+   * nothing — as curl does — exercises a path no browser ever takes, and that
+   * gap once hid a CORS refusal that made the entire front end unusable while
+   * the whole suite stayed green. Pass `origin` explicitly to test a genuine
+   * cross-origin caller.
+   */
+  post: <T>(
+    path: string,
+    body: unknown,
+    options?: { csrf?: boolean; origin?: string | null },
+  ) => Promise<{ status: number; body: T }>;
   /** No cookies at all. */
   anonymous: (path: string) => Promise<Response>;
 };
@@ -189,11 +203,14 @@ async function withApi(
       return { status: response.status, body: (await response.json()) as never };
     },
     async post(path, body, options = {}) {
+      // `origin: null` drops the header entirely, for the non-browser case.
+      const origin = options.origin === undefined ? base : options.origin;
       const response = await fetch(`${base}${path}`, {
         method: 'POST',
         headers: {
           cookie: cookies,
           'content-type': 'application/json',
+          ...(origin === null ? {} : { origin }),
           ...(options.csrf === false ? {} : { [CSRF_HEADER]: csrf }),
         },
         body: JSON.stringify(body),
@@ -672,5 +689,56 @@ test('a decision does not disturb the ranking or the score', async () => {
     // Ranking is derived from evaluations, and a decision is not one. The list
     // does not reorder itself because someone made up their mind.
     assert.deepEqual(after.body, before.body);
+  });
+});
+
+// --- the decision route, shaped like a browser -------------------------------
+
+test('a same-origin decision POST is allowed', async () => {
+  // The other half of the demo path. Sign-in is not the only POST a recruiter
+  // makes, and a CORS refusal here would break the workflow at its final step —
+  // after the evidence had been read and the mind made up.
+  await withApi(async (client, seeded) => {
+    const { status, body } = await client.post<{ decision: { outcome: string } }>(
+      `/api/evaluations/${seeded.scored}/decision`,
+      { outcome: 'shortlist', reason: 'Meets both must-haves with quoted evidence for each.' },
+      { origin: client.base },
+    );
+
+    assert.equal(status, 201);
+    assert.equal(body.decision.outcome, 'shortlist');
+  });
+});
+
+test('a cross-origin decision POST is refused before it can write', async (t) => {
+  await withApi(async (client, seeded, ctx) => {
+    const { status, body } = await client.post<{ error: { code: string; details: { reason: string } } }>(
+      `/api/evaluations/${seeded.scored}/decision`,
+      { outcome: 'reject', reason: 'Recorded from somewhere that is not our front end.' },
+      { origin: 'http://evil.example' },
+    );
+
+    assert.equal(status, 403);
+    assert.equal(body.error.details.reason, 'origin_not_allowed');
+
+    // The refusal is server-side, so nothing was written. Withholding CORS
+    // headers alone would have let the decision land and only hidden the answer.
+    assert.equal(await ctx.repos.decisions.count(), 0, 'a decision was recorded from a disallowed origin');
+    t.diagnostic('cross-origin write refused with no row created');
+  });
+});
+
+test('the decision route still refuses a missing CSRF token on a same-origin POST', async () => {
+  // CORS and CSRF are separate layers and both must hold. Fixing the origin
+  // check must not have made the token optional.
+  await withApi(async (client, seeded, ctx) => {
+    const { status } = await client.post(
+      `/api/evaluations/${seeded.scored}/decision`,
+      { outcome: 'shortlist', reason: 'Meets both must-haves with quoted evidence for each.' },
+      { origin: client.base, csrf: false },
+    );
+
+    assert.equal(status, 403);
+    assert.equal(await ctx.repos.decisions.count(), 0);
   });
 });
