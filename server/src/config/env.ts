@@ -87,6 +87,15 @@ export type AppConfig = {
   anthropicApiKey: string | null;
   anthropicModel: string;
   operatorPasswordHash: string | null;
+  /**
+   * Whether anonymous callers may read the allow-listed demo routes.
+   *
+   * Default false, and false is the safe direction: an environment that
+   * forgets to set it behaves exactly as it did before this flag existed —
+   * fully gated. Turning it on opens reads over the invented dataset only.
+   * It creates no credential and grants no session.
+   */
+  demoPublicReadonly: boolean;
   sessionTtlHours: number;
   cookieSecure: boolean;
   corsAllowedOrigins: string[];
@@ -151,6 +160,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         // changed deliberately or not at all.
         anthropicModel: readString('ANTHROPIC_MODEL', 'claude-sonnet-5'),
         operatorPasswordHash,
+        // Off unless an operator turns it on, by name, in the environment.
+        demoPublicReadonly: readBool('DEMO_PUBLIC_READONLY', false),
         sessionTtlHours: readInt('SESSION_TTL_HOURS', 12, problems),
         cookieSecure,
         corsAllowedOrigins: corsAllowedOrigins.filter((origin) => origin !== '*' && /^https?:\/\/[^/]+$/.test(origin)),
@@ -181,6 +192,9 @@ export function configSummary(cfg: AppConfig = config): Record<string, string | 
     llmConfigured: cfg.llmProvider === 'mock' || cfg.anthropicApiKey !== null,
     database: cfg.dbDriver,
     authConfigured: cfg.operatorPasswordHash !== null,
+    // Surfaced so an operator can see from outside whether the public demo
+    // window is open, without having to read the deployment environment.
+    demoPublicReadonly: cfg.demoPublicReadonly,
     cookieSecure: cfg.cookieSecure,
     /** How many origins are allowed — never which. */
     corsAllowedOrigins: cfg.corsAllowedOrigins.length,

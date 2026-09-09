@@ -2,7 +2,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { createHealthRouter } from './routes/health.ts';
 import { createAuthRouter } from './routes/auth.ts';
 import { createRecruiterRouter } from './routes/recruiter.ts';
-import { attachSession, requireSession } from './auth/middleware.ts';
+import { attachSession, requireSessionOrPublicRead } from './auth/middleware.ts';
 import { requireCsrf } from './auth/csrf.ts';
 import { cors } from './http/cors.ts';
 import { rateLimit } from './http/rateLimit.ts';
@@ -99,7 +99,7 @@ export function createApp({
   app.use('/api', rateLimiter);
   app.use('/api', requireCsrf());
   app.use('/api', createAuthRouter({ repos, config, logger }));
-  app.use('/api', requireSession());
+  app.use('/api', requireSessionOrPublicRead({ publicReadsEnabled: config.demoPublicReadonly }));
 
   // Everything from here on is behind the gate.
   app.use('/api', createRecruiterRouter({ repos, logger }));

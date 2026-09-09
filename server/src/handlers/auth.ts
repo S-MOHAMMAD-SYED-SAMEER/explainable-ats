@@ -97,14 +97,30 @@ export async function handleLogout(
  * and never anything about the password. The CSRF token is safe to return: it
  * is worthless without the session cookie that accompanies it (M5-B).
  */
-export function handleSession(session: SessionRecord | null): HandlerResult<{
+/**
+ * Who the caller is, and whether the read-only demo window is open.
+ *
+ * `demoAvailable` is configuration, not a permission: it says the server
+ * would serve the allow-listed read routes to an anonymous caller. The front
+ * end uses it to decide whether to offer 'Browse the demo' beside the
+ * password field. It carries no token and grants nothing on its own — an
+ * anonymous caller who ignores it and asks for a write still gets a 401.
+ */
+export function handleSession(
+  session: SessionRecord | null,
+  demoAvailable = false,
+): HandlerResult<{
   authenticated: boolean;
   operator: string | null;
   expiresAt: string | null;
   csrfToken: string | null;
+  demoAvailable: boolean;
 }> {
   if (!session) {
-    return { status: 200, body: { authenticated: false, operator: null, expiresAt: null, csrfToken: null } };
+    return {
+      status: 200,
+      body: { authenticated: false, operator: null, expiresAt: null, csrfToken: null, demoAvailable },
+    };
   }
   return {
     status: 200,
@@ -113,6 +129,7 @@ export function handleSession(session: SessionRecord | null): HandlerResult<{
       operator: session.operator,
       expiresAt: session.expiresAt,
       csrfToken: session.csrfToken,
+      demoAvailable,
     },
   };
 }

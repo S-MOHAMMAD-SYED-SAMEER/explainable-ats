@@ -105,3 +105,65 @@ export function operatorOf(req: Request): string {
   }
   return operator;
 }
+
+/**
+ * The read-only surface the public demo may expose.
+ *
+ * A literal list, matched on method AND full path, and deliberately not derived
+ * from the routers. Deriving it would mean a GET added later joined the public
+ * surface the moment it was written; naming each one here means a new route is
+ * private until somebody edits this array on purpose.
+ *
+ * Paths are relative to the `/api` mount. Every entry is a projection the
+ * dashboard reads to draw itself, over the invented dataset in `src/demo`.
+ * `POST /evaluations/:id/decision` — the only write this server has — is
+ * absent from the list and is rejected twice over: it is not a GET, and no
+ * pattern here matches it.
+ */
+export const PUBLIC_DEMO_READS: readonly RegExp[] = [
+  /^\/jobs$/,
+  /^\/jobs\/[^/]+$/,
+  /^\/jobs\/[^/]+\/ranking$/,
+  /^\/evaluations\/[^/]+$/,
+  /^\/evaluations\/[^/]+\/audit$/,
+];
+
+/** Whether this exact request is one of the public reads. GET only. */
+export function isPublicDemoRead(method: string, path: string): boolean {
+  if (method.toUpperCase() !== 'GET') return false;
+  return PUBLIC_DEMO_READS.some((pattern) => pattern.test(path));
+}
+
+/**
+ * The gate, with an optional read-only window for the public demo.
+ *
+ * WHY THIS REPLACES `requireSession` RATHER THAN SITTING BESIDE IT
+ *
+ * The alternative was to mount the read routes above the gate when the flag is
+ * on. That splits the router in two and makes the mounting order in `app.ts`
+ * depend on configuration — and the property that file relies on is precisely
+ * that everything after one line is protected. Keeping one gate keeps that
+ * sentence true; the exception is visible inside it rather than hidden in a
+ * conditional route table.
+ *
+ * WHAT AN ALLOWED REQUEST DOES NOT GET
+ *
+ * A session. `req.session` and `req.operator` stay undefined, so `operatorOf`
+ * still throws for anyone who reaches it, every mutation still fails closed,
+ * and the recruiter decision route is unreachable without signing in. This
+ * opens a window onto invented data; it does not authenticate anybody, and it
+ * creates no second credential that could leak.
+ */
+export function requireSessionOrPublicRead(options: { publicReadsEnabled: boolean }) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (req.session) {
+      next();
+      return;
+    }
+    if (options.publicReadsEnabled && isPublicDemoRead(req.method, req.path)) {
+      next();
+      return;
+    }
+    next(new AppError('UNAUTHORIZED', 'Sign in to continue.'));
+  };
+}

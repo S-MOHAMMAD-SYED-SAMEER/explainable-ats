@@ -44,6 +44,10 @@ export function App(): ReactNode {
   // guards it here.
   const route = useRoute();
   const session = useSession();
+  // Viewing the dashboard without a session. A local view preference, not an
+  // authentication state — see the note on `SessionState`. It buys this browser
+  // nothing the server would not already give an anonymous caller.
+  const [browsingDemo, setBrowsingDemo] = useState(false);
 
   if (session.state.status === 'loading') {
     return (
@@ -53,19 +57,30 @@ export function App(): ReactNode {
     );
   }
 
-  // Nothing below can be reached by a browser the server has not confirmed a
-  // session for — and the server refuses every protected endpoint anyway, so
-  // this gate is the honest presentation of that boundary rather than the
-  // boundary itself.
-  if (session.state.status === 'anonymous') {
-    return <Login onSignedIn={() => void session.refresh()} />;
+  // This gate is the honest presentation of the server's boundary rather than
+  // the boundary itself — the server refuses every protected endpoint on its
+  // own. The demo branch below relies on exactly that: it draws the dashboard
+  // for a visitor with no session, and every write behind it still fails.
+  if (session.state.status === 'anonymous' && !browsingDemo) {
+    return (
+      <Login
+        onSignedIn={() => void session.refresh()}
+        demoAvailable={session.state.demoAvailable}
+        onBrowseDemo={() => setBrowsingDemo(true)}
+      />
+    );
   }
+
+  // Anonymous past that return means the visitor chose to browse the demo.
+  const demo = session.state.status === 'anonymous';
 
   return (
     <AppShell
       route={route}
-      operator={session.state.operator}
+      operator={session.state.status === 'authenticated' ? session.state.operator : null}
       onSignOut={() => void session.signOut()}
+      demo={demo}
+      onExitDemo={() => setBrowsingDemo(false)}
       notice={session.notice}
       onDismissNotice={session.dismissNotice}
     >
@@ -75,7 +90,7 @@ export function App(): ReactNode {
           to the list it belongs to rather than to an error. */}
       {route.name === 'overview' ? <Overview /> : null}
       {route.name === 'jobs' ? route.id === null ? <Jobs /> : <JobDetail jobId={route.id} /> : null}
-      {route.name === 'candidates' ? route.id === null ? <Jobs /> : <CandidateDetail evaluationId={route.id} /> : null}
+      {route.name === 'candidates' ? route.id === null ? <Jobs /> : <CandidateDetail evaluationId={route.id} demo={demo} /> : null}
     </AppShell>
   );
 }

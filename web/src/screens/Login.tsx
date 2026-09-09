@@ -25,7 +25,27 @@ import { api, ApiError } from '../api/client.ts';
 // "server has no password configured" would tell someone guessing which half of
 // the problem to work on.
 
-export function Login({ onSignedIn }: { onSignedIn(): void }): ReactNode {
+// THE DEMO BUTTON IS NOT A SECOND WAY IN
+//
+// It does not sign anybody in. There is no demo password, no demo account and
+// no demo token — nothing this component could leak even if it wanted to. The
+// button only tells the app to render the dashboard for a visitor who has no
+// session, which works because the server independently serves a short
+// allow-list of GET routes over invented data. Every write is still refused,
+// by the server, whatever this browser thinks.
+//
+// It is offered only when the server said the window is open. A build talking
+// to a fully-gated server shows the password box alone, exactly as before.
+
+export function Login({
+  onSignedIn,
+  demoAvailable = false,
+  onBrowseDemo,
+}: {
+  onSignedIn(): void;
+  demoAvailable?: boolean;
+  onBrowseDemo?(): void;
+}): ReactNode {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +125,28 @@ export function Login({ onSignedIn }: { onSignedIn(): void }): ReactNode {
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        {demoAvailable && onBrowseDemo ? (
+          <div className="mt-5 rounded-card border border-line bg-surface p-5">
+            <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">
+              No account?
+            </p>
+            <p className="mt-1 text-small text-ink">
+              Look around the real application without signing in. You will see the ranking, the
+              evidence behind every placement and the audit trail, over five invented candidates.
+            </p>
+            <button
+              type="button"
+              onClick={onBrowseDemo}
+              className="mt-4 h-control w-full rounded-control border border-line-strong px-4 text-small font-semibold text-ink hover:border-ink-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            >
+              Browse the read-only demo
+            </button>
+            <p className="mt-3 text-meta text-ink-muted">
+              Read-only: recording a decision needs an operator sign-in.
+            </p>
+          </div>
+        ) : null}
 
         <p className="mt-4 text-meta text-ink-muted">
           The password is checked on the server and never stored in this browser.

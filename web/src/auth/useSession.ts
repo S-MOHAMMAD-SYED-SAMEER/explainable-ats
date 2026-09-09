@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, setCsrfFailureHandler, setUnauthorizedHandler } from '../api/client.ts';
 import { sessionFromResponse, type SessionState } from './session.ts';
 
@@ -33,16 +33,25 @@ export type Session = {
 
 export function useSession(): Session {
   const [state, setState] = useState<SessionState>({ status: 'loading' });
+  // Whether the server offers the read-only window. Configuration, not a
+  // permission, so it is remembered across a sign-out or an expiry rather
+  // than re-fetched: losing it would strand a visitor at the password box
+  // with no way back into the demo they arrived for. A ref rather than
+  // state because nothing should re-render when only this changes, and
+  // because the 401 handler must not trigger a fetch (see below).
+  const demoAvailable = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      setState(sessionFromResponse(await api.session()));
+      const next = sessionFromResponse(await api.session());
+      if (next.status === 'anonymous') demoAvailable.current = next.demoAvailable;
+      setState(next);
     } catch {
       // Unreachable server, malformed answer — either way this browser cannot
       // be shown as signed in. Failing toward the sign-in screen is the only
       // safe direction.
-      setState({ status: 'anonymous' });
+      setState({ status: 'anonymous', demoAvailable: demoAvailable.current });
     }
   }, []);
 
@@ -55,13 +64,13 @@ export function useSession(): Session {
       // to stop showing the application and let the next request be refused.
     }
     setNotice(null);
-    setState({ status: 'anonymous' });
+    setState({ status: 'anonymous', demoAvailable: demoAvailable.current });
   }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setNotice(null);
-      setState({ status: 'anonymous' });
+      setState({ status: 'anonymous', demoAvailable: demoAvailable.current });
     });
 
     setCsrfFailureHandler(() => {

@@ -76,7 +76,7 @@ export function createAuthRouter(deps: AuthDeps): Router {
   // Safe to call unauthenticated: it answers "no" rather than 401, which is what
   // lets the front end decide between a sign-in screen and the app.
   router.get('/auth/session', (req: Request, res: Response) => {
-    const result = handleSession(req.session ?? null);
+    const result = handleSession(req.session ?? null, deps.config.demoPublicReadonly);
     res.status(result.status).json(result.body);
   });
 

@@ -16,8 +16,16 @@ const NAV: NavItem[] = [
 
 export type AppShellProps = {
   route: Route;
-  operator: string;
+  /** The signed-in operator, or null when this is the read-only demo. */
+  operator: string | null;
   onSignOut: () => void;
+  /**
+   * Viewing without a session. The banner below says so in the visitor's
+   * words; the server is what actually refuses the writes.
+   */
+  demo?: boolean;
+  /** Leaves the demo and returns to the sign-in screen. */
+  onExitDemo?: () => void;
   notice: string | null;
   onDismissNotice: () => void;
   children: ReactNode;
@@ -27,6 +35,8 @@ export function AppShell({
   route,
   operator,
   onSignOut,
+  demo = false,
+  onExitDemo,
   notice,
   onDismissNotice,
   children,
@@ -45,13 +55,13 @@ export function AppShell({
             <h1 className="text-subhead">Explainable ATS</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-meta text-ink-muted">{operator}</span>
+            <span className="text-meta text-ink-muted">{demo ? 'Read-only demo' : operator}</span>
             <button
               type="button"
-              onClick={onSignOut}
+              onClick={demo ? onExitDemo : onSignOut}
               className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
-              Sign out
+              {demo ? 'Sign in' : 'Sign out'}
             </button>
           </div>
         </div>
@@ -78,6 +88,19 @@ export function AppShell({
           </ul>
         </nav>
       </header>
+
+      {demo ? (
+        <div className="mx-auto mt-4 max-w-6xl rounded-card border border-line bg-surface px-4 py-3">
+          <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">
+            Read-only demo · not signed in
+          </p>
+          <p className="mt-1 text-small text-ink">
+            This is the real application, running on five invented candidates. Everything here can be
+            read. Recording a decision needs an operator sign-in, and the server refuses it either
+            way — nothing you do here can change anything.
+          </p>
+        </div>
+      ) : null}
 
       {notice ? (
         <div className="mx-auto mt-4 flex max-w-6xl items-start justify-between gap-4 rounded-card border border-signal bg-signal-tint px-4 py-3">

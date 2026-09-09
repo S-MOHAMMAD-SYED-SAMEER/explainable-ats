@@ -355,7 +355,19 @@ function History({ evaluationId }: { evaluationId: string }): ReactNode {
   );
 }
 
-export function CandidateDetail({ evaluationId }: { evaluationId: string }): ReactNode {
+export function CandidateDetail({
+  evaluationId,
+  demo = false,
+}: {
+  evaluationId: string;
+  /**
+   * Viewing without a session. The form is not drawn, because a control that
+   * looked usable and then failed with a 401 would teach a visitor that the
+   * product is broken rather than that they are not signed in. The server
+   * refuses the write regardless of this prop.
+   */
+  demo?: boolean;
+}): ReactNode {
   // Every hook above every return — see the note in App.tsx.
   const { state, set } = useLoad(() => api.evaluation(evaluationId), [evaluationId]);
 
@@ -365,7 +377,8 @@ export function CandidateDetail({ evaluationId }: { evaluationId: string }): Rea
   const detail = state.data;
   // Both conditions are enforced by the server, which answers 409 either way.
   // Hiding the form is the honest presentation of that rule, not the rule.
-  const decidable = detail.decision === null && detail.isCurrent && detail.status === 'scored';
+  const decidable =
+    !demo && detail.decision === null && detail.isCurrent && detail.status === 'scored';
 
   return (
     <div className="space-y-5">
@@ -393,6 +406,16 @@ export function CandidateDetail({ evaluationId }: { evaluationId: string }): Rea
       <DecisionRecorded detail={detail} />
 
       {decidable ? <DecisionForm detail={detail} onDecided={set} /> : null}
+
+      {demo && detail.decision === null ? (
+        <section className="rounded-card border border-dashed border-line-strong p-5">
+          <p className="text-small text-ink-muted">
+            Recording a decision is where this stops being read-only, so it needs an operator
+            sign-in. Everything that produced the ranking above — the quoted evidence, the
+            verification and the scoring — is on this page already.
+          </p>
+        </section>
+      ) : null}
 
       {!decidable && detail.decision === null ? (
         <section className="rounded-card border border-dashed border-line-strong p-5">
