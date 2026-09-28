@@ -175,4 +175,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ outcome, reason }),
     }),
+
+  // --- the public demo runner (Option B) -------------------------------------
+  //
+  // `scenario` is a UX label only — one of the five fixed ids the server
+  // already enforces (`server/src/demo/runScenario.ts::DEMO_SCENARIO_IDS`).
+  // No other data is ever sent: the endpoint refuses any request body, so an
+  // empty one is sent explicitly, the same way `logout` does.
+  runDemoScenario: (scenario: string): Promise<{ evaluationId: string }> =>
+    request<{ evaluationId: string }>(`/demo/scenarios/${encodeURIComponent(scenario)}/run`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 };
