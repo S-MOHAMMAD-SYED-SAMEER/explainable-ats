@@ -1,6 +1,7 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { createHealthRouter } from './routes/health.ts';
 import { createAuthRouter } from './routes/auth.ts';
+import { createDemoRouter } from './routes/demo.ts';
 import { createRecruiterRouter } from './routes/recruiter.ts';
 import { attachSession, requireSessionOrPublicRead } from './auth/middleware.ts';
 import { requireCsrf } from './auth/csrf.ts';
@@ -90,6 +91,12 @@ export function createApp({
   //   4. CSRF           — between "who is this?" and "may they?".
   //   5. auth routes    — sign in and out. The only endpoints reachable without
   //                       a session, which is why they sit above the gate.
+  //   5b. demo routes   — the public demo-run endpoint. Also reachable without
+  //                       a session, by the same reasoning as auth routes, but
+  //                       it is its own router with its own scenario allow-list
+  //                       (demo/runScenario.ts) rather than an extension of
+  //                       either the auth routes or the read-only public-demo
+  //                       allow-list below.
   //   6. requireSession — the gate. Everything past it is authenticated.
   //
   // Anything added after step 6 is protected by default. That is deliberate:
@@ -99,6 +106,7 @@ export function createApp({
   app.use('/api', rateLimiter);
   app.use('/api', requireCsrf());
   app.use('/api', createAuthRouter({ repos, config, logger }));
+  app.use('/api', createDemoRouter({ repos, logger }));
   app.use('/api', requireSessionOrPublicRead({ publicReadsEnabled: config.demoPublicReadonly }));
 
   // Everything from here on is behind the gate.

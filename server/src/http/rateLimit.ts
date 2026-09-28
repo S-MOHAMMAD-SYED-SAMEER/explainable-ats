@@ -107,16 +107,26 @@ export class FixedWindowLimiter {
 }
 
 /**
- * The three classes of traffic, per spec §11.
+ * The classes of traffic, per spec §11 plus the public demo-run endpoint.
  *
- * `expensive` is the one that matters most: those endpoints call a model, so
- * exceeding them costs real money rather than merely load. That is why its
- * limit is the tightest of the three.
+ * `expensive` is the one that matters most among the original three: those
+ * endpoints call a model, so exceeding them costs real money rather than
+ * merely load. That is why its limit is the tightest of the three.
+ *
+ * `demoRun` is its own class rather than falling through to `mutation`. It
+ * performs a real pipeline execution — ingest, extraction, verification,
+ * matching, scoring, several audit writes — on every call, and unlike every
+ * other write in this API it needs no session to reach at all. Sizing it at
+ * `mutation`'s 120/minute would let an anonymous script run the pipeline two
+ * orders of magnitude more often than a person clicking through five demo
+ * scenarios ever would. It is set to the same cadence as `login` (10/minute):
+ * conservative, and paced for a human, not a session.
  */
 export const RATE_LIMITS = Object.freeze({
   login: { limit: 10, windowMs: 60_000 },
   expensive: { limit: 20, windowMs: 60_000 },
   mutation: { limit: 120, windowMs: 60_000 },
+  demoRun: { limit: 10, windowMs: 60_000 },
 } satisfies Record<string, RateLimitRule>);
 
 export type RateLimitClass = keyof typeof RATE_LIMITS;
@@ -124,8 +134,12 @@ export type RateLimitClass = keyof typeof RATE_LIMITS;
 /** Endpoints that trigger a model call, and therefore spend. */
 const EXPENSIVE_PATHS = [/^\/emails\/understand$/, /^\/emails\/[^/]+\/understand$/, /^\/emails\/decide$/, /^\/emails\/[^/]+\/decide$/];
 
+/** The one public demo-run endpoint (`routes/demo.ts`). POST only. */
+const DEMO_RUN_PATH = /^\/demo\/scenarios\/[^/]+\/run$/;
+
 export function classify(method: string, path: string): RateLimitClass | null {
   if (path === '/auth/login') return 'login';
+  if (method === 'POST' && DEMO_RUN_PATH.test(path)) return 'demoRun';
   // Reads are not limited: they are cheap, and limiting them would make a busy
   // dashboard look like an attack.
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return null;
