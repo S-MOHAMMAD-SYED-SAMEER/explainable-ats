@@ -300,17 +300,28 @@ credential or secret value is included in this README.
 
 ## 11. Testing
 
-The repository contains a test suite: 24 test files across
-`server/test/` (21 files) and `web/test/` (3 files), using Node's built-in test
-runner (`node --test`) on both sides.
+The repository contains a test suite: 25 test files across
+`server/test/` (21 files) and `web/test/` (4 files: `demo-runner.test.ts`,
+`demo-session.test.ts`, `hook-order.test.ts`, `recruiter-ui.test.ts`), using
+Node's built-in test runner (`node --test`) on both sides.
 
-Portfolio/project history documents **346 tests** (per commit `1952f30` and the
-portfolio's project data); **this figure has not been independently reproduced
-in the current environment because dependencies were unavailable** — no
-`node_modules` are installed for either `server` or `web`, and this milestone
-did not install them or run the suite. A source-level count of `test(` call
-sites across the 24 files finds a number close to, but not confirmed identical
-to, the documented figure.
+**Independently executed and reproduced**: **389 tests total — 337 server +
+52 web — 389 passed, 0 failed, 0 skipped**, with `PORTFOLIO_DEMO_DIR` set to
+the portfolio's `src/demo/p3` directory so the cross-repo parity suite
+(`server/test/demo-parity.test.ts`) actually runs rather than skipping. Without
+that variable set, the same 11 parity tests report as skipped (not failed) —
+`server/test/demo-parity.test.ts` documents the exact variable and the path it
+expects. The previously-documented figure of 346 tests, from earlier
+portfolio/project history, is superseded by this directly-executed count.
+
+**Server typecheck (`npm run typecheck`) currently reports 14 TypeScript
+errors — all confined to test files, not application source.**
+`server/src/` typechecks cleanly; the errors are entirely in
+`server/test/demo-parity.test.ts` (2 implicit-`any` parameters) and
+`server/test/demo-run.test.ts` (12 uses of a value typed `unknown`). These are
+static-analysis findings in test code, not runtime failures: the 389 tests
+above, including every test in both of those files, pass at runtime regardless.
+`npm run typecheck` on `server/` should not be read as passing cleanly today.
 
 There is **no formal evaluation harness** in this project (no `eval:*` scripts,
 no `src/eval/` directory) — unlike the documented-scoring claim in the
