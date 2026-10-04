@@ -38,7 +38,7 @@ export function App(): ReactNode {
   // React counts hooks per render. A hook placed after one of the early returns
   // below would run on some renders and not others, which is React error #310
   // ("Rendered more hooks than during the previous render") — and with no error
-  // boundary that unmounts the tree and leaves a blank page. Project 2 shipped
+  // boundary that unmounts the tree and leaves a blank page. inbox-crm-agent shipped
   // exactly that fault and it survived 800 passing tests, because nothing in a
   // node:test suite renders a component. `test/hook-order.test.ts` is what
   // guards it here.

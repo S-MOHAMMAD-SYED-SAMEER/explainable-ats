@@ -11,7 +11,7 @@
 // npm run seed` works and the repository tests pass with zero credentials.
 //
 // So there are two drivers behind one `Database` interface: Node's built-in
-// `node:sqlite` (zero dependencies — the same choice Project 1 made for its
+// `node:sqlite` (zero dependencies — the same choice sales-recovery-agent made for its
 // conversation memory) for local development and tests, and `pg` for a hosted
 // Postgres. The spec's portability rules were written to permit exactly this,
 // and honouring them is what keeps D1 reversible.

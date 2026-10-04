@@ -2,14 +2,14 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client.ts';
 import type { Health } from '../api/types.ts';
 
-// Overview — the first screen after signing in, and in P3-A the only one.
+// Overview — a status screen: what the server reports about itself.
 //
 // It reports live status from `GET /api/health`, which makes it the end-to-end
 // proof that the foundation is wired together: browser → Express → handler →
 // repository → migrated schema, with a real answer coming back.
 //
 // It states facts in sentences rather than printing the configuration object.
-// Project 2 shipped a raw key/value dump here and it read as a diagnostics
+// inbox-crm-agent shipped a raw key/value dump here and it read as a diagnostics
 // console to the one audience that matters. Every fact below is the same fact
 // health reports; none of them is hidden to make the system look more finished
 // than it is.

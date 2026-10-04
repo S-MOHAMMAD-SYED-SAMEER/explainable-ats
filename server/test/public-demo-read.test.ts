@@ -14,7 +14,7 @@ import { createTestContext } from './helpers.ts';
 //
 // Two of the three deployed projects can be looked at without an account. This
 // server was the odd one out: a prospective client met an operator password and
-// stopped there. The window opened here is the same one Project 2 already
+// stopped there. The window opened here is the same one inbox-crm-agent already
 // ships — an allow-list of GET routes over the invented dataset, granting NO
 // session.
 //

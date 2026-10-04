@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 // Hook order — on day one, deliberately.
 //
-// Project 2 shipped a screen that had never once rendered successfully in a
+// inbox-crm-agent shipped a screen that had never once rendered successfully in a
 // browser. A `useState` sat below an early return, so the first render
 // registered five hooks and the second registered six: React error #310,
 // uncaught, no error boundary, blank white page. It survived 800 passing tests
@@ -25,7 +25,7 @@ type Finding = { component: string; returnLine: number; hookLine: number };
  * Finds a hook called after an early return.
  *
  * Deliberately callable on a string as well as a file, so the negative controls
- * below can prove it fires. The first version of this scan in Project 2
+ * below can prove it fires. The first version of this scan in inbox-crm-agent
  * reported a clean result against code that was already broken, because its
  * pattern required `useState(` to be adjacent — and `useState<string | null>(`
  * is not. A scan that cannot fail is worse than no scan.
@@ -78,7 +78,7 @@ function componentFiles(): string[] {
   return found;
 }
 
-test('NEGATIVE CONTROL — the scan catches the exact shape that shipped in Project 2', () => {
+test('NEGATIVE CONTROL — the scan catches the exact shape that shipped in inbox-crm-agent', () => {
   const broken = [
     'export function Broken({ id }: { id: string }): ReactNode {',
     "  const [state, setState] = useState<LoadState>({ status: 'loading' });",

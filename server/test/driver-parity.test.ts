@@ -11,7 +11,7 @@ import { loadConfig } from '../src/config/env.ts';
 
 // Driver parity — on day one, deliberately.
 //
-// Project 2 ran every test on SQLite and deployed on PostgreSQL. The two
+// inbox-crm-agent ran every test on SQLite and deployed on PostgreSQL. The two
 // drivers disagreed about how a JSON column comes back: `node:sqlite` returns
 // the text it stored, `pg` returns a parsed value. For objects and arrays that
 // difference is invisible, because the row mapper passes those straight
@@ -35,7 +35,7 @@ test('every JSON shape survives the round trip a column takes', () => {
   assert.deepEqual(toJson(fromJson([]), null), []);
   assert.deepEqual(toJson(fromJson({}), null), {});
 
-  // The scalars. These are the ones that broke Project 2.
+  // The scalars. These are the ones that broke inbox-crm-agent.
   assert.equal(toJson(fromJson(24), null), 24);
   assert.equal(toJson(fromJson(0), null), 0);
   assert.equal(toJson(fromJson(false), null), false);
@@ -55,7 +55,7 @@ test('an absent value falls back instead of throwing', () => {
 
 test('NEGATIVE CONTROL — an already-parsed scalar is exactly what broke before', () => {
   // `toJson` refuses a bare number, and that is correct: the contract is that a
-  // JSON column arrives as text. The fix in Project 2 was to make PostgreSQL
+  // JSON column arrives as text. The fix in inbox-crm-agent was to make PostgreSQL
   // honour that contract, not to make this helper permissive — a helper that
   // accepted anything would have hidden the divergence instead of surfacing it.
   assert.throws(() => toJson(24 as unknown, null), /Expected a JSON column value, received number/);
@@ -193,8 +193,8 @@ test('a failed transaction rolls back every repository it touched', async () => 
 
   // Assert the body ran and failed for the reason given. Without this a
   // TypeError from a mistyped method name would be caught here and read as a
-  // successful rollback — a test that never opened a transaction. Project 2
-  // shipped exactly that.
+  // successful rollback — a test that never opened a transaction.
+  // inbox-crm-agent shipped exactly that.
   assert.ok(threw, 'the transaction did not throw at all');
   assert.match(threw.message, new RegExp(MARKER), 'it failed for some other reason');
 

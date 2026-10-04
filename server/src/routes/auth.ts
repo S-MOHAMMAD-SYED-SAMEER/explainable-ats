@@ -9,12 +9,12 @@ import { buildCookie, clearCookie, readCookie, CSRF_COOKIE, SESSION_COOKIE } fro
 //
 // THE COOKIE PAIR
 //
-//   inbox_session  HttpOnly — the bearer credential. JavaScript must never be
-//                  able to read it, so an XSS bug cannot exfiltrate a session.
-//   inbox_csrf     readable — the CSRF token (M5-B). Deliberately NOT HttpOnly,
-//                  because the front end has to echo it back in a header. It is
-//                  worthless on its own: a cross-site page can cause the session
-//                  cookie to be sent but cannot read this one to copy it.
+//   ats_session  HttpOnly — the bearer credential. JavaScript must never be
+//                able to read it, so an XSS bug cannot exfiltrate a session.
+//   ats_csrf     readable — the CSRF token (M5-B). Deliberately NOT HttpOnly,
+//                because the front end has to echo it back in a header. It is
+//                worthless on its own: a cross-site page can cause the session
+//                cookie to be sent but cannot read this one to copy it.
 //
 // Both are `SameSite=Strict`. This application is its own front end with no
 // third-party sign-in flow, so there is no cross-site navigation that needs to

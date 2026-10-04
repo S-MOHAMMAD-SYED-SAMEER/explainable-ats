@@ -97,7 +97,7 @@ export function createCandidateRepository({ db, clock, newId }: RepoDeps) {
      * Many candidates in one query.
      *
      * Ranking needs a name for every row it is about to show. Fetching them one
-     * at a time is how a list screen quietly becomes N+1 — Project 2 shipped
+     * at a time is how a list screen quietly becomes N+1 — inbox-crm-agent shipped
      * exactly that and it cost ten seconds a page.
      */
     async listByIds(ids: readonly string[]): Promise<Candidate[]> {

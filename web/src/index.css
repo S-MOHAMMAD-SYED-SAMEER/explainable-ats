@@ -7,10 +7,10 @@
    The single source of truth is `portfolio/src/index.css` ("precise
    instrument"). This dashboard is a separate Vite application and cannot
    import that file, so it mirrors the token values here — exactly as
-   `sales-recovery-agent/web/index.html` already does for the Project 1 demo.
+   `sales-recovery-agent/web/index.html` already does for the sales-recovery-agent demo.
 
    **When a token changes in the portfolio, change it here too.** There are now
-   three surfaces mirroring these values: the portfolio, the Project 1 demo,
+   three surfaces mirroring these values: the portfolio, the sales-recovery-agent demo,
    and this dashboard. The reason to keep them in step is not tidiness — it is
    that a prospect clicks from the portfolio into a demo, and two surfaces that
    look like different companies undo the work the portfolio just did.

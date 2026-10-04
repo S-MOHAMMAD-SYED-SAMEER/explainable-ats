@@ -3,7 +3,7 @@
 // One envelope shape for every non-2xx response:
 //   { "error": { "code": "...", "message": "...", "details": {} } }
 //
-// Two rules carried over from Project 1, both learned the same way — an error
+// Two rules carried over from sales-recovery-agent, both learned the same way — an error
 // path is the easiest place to leak something you did not mean to:
 //
 //   1. `message` is safe to show a user. Provider names, env-var names, file

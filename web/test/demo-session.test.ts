@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sessionFromResponse, isAuthenticated } from '../src/auth/session.ts';
+import { sessionFromResponse, isAuthenticated, CSRF_COOKIE } from '../src/auth/session.ts';
 
 // The browser's half of the read-only demo.
 //
@@ -121,4 +121,22 @@ test('the demo entry point sends no credentials of its own', () => {
   const calls = login.split('api.login(').length - 1;
   assert.equal(calls, 1, `expected a single api.login call, found ${calls}`);
   assert.ok(login.includes('await api.login(password)'), 'the sign-in path changed shape');
+});
+
+// ============================================ the cookie the browser echoes
+
+test('the CSRF cookie the browser reads is the one the server sets', () => {
+  // The browser's CSRF_COOKIE is a literal, because it cannot import server
+  // code. If the two ever differ, every sign-in succeeds and every decision is
+  // then refused with a CSRF failure — which looks like a server bug.
+  const serverSource = fs.readFileSync(path.resolve(SRC, '../../server/src/auth/cookies.ts'), 'utf8');
+  const serverName = /export const CSRF_COOKIE = '([^']+)'/.exec(serverSource)?.[1];
+  assert.ok(serverName, 'could not find CSRF_COOKIE in the server source — this check would be vacuous');
+  assert.equal(CSRF_COOKIE, serverName);
+});
+
+test('no source file refers to a cookie from another project', () => {
+  for (const file of sourceFiles(SRC)) {
+    assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /inbox_(session|csrf)/, `${file} names an inbox cookie`);
+  }
 });

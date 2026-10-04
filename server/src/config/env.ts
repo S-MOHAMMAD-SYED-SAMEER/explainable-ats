@@ -155,9 +155,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         webDistDir: readString('WEB_DIST_DIR', path.join(SERVER_ROOT, '..', 'web', 'dist')),
         llmProvider,
         anthropicApiKey,
-        // Sonnet 5 for ranking is fixed by CLAUDE.md and is not a default to
-        // drift from: API spend is real money, so the tier is stated here and
-        // changed deliberately or not at all.
+        // Sonnet 5 is the intended tier for resume ranking, and is not a default
+        // to drift from: API spend is real money, so the tier is stated here and
+        // changed deliberately or not at all. Nothing reads this value yet — the
+        // Anthropic provider is not implemented.
         anthropicModel: readString('ANTHROPIC_MODEL', 'claude-sonnet-5'),
         operatorPasswordHash,
         // Off unless an operator turns it on, by name, in the environment.

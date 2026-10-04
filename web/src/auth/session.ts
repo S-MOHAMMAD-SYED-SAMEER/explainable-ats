@@ -20,14 +20,14 @@
 // construct an authenticated-looking state without the server having said so.
 
 /** The CSRF cookie M5-B sets alongside the session. Readable on purpose. */
-export const CSRF_COOKIE = 'inbox_csrf';
+export const CSRF_COOKIE = 'ats_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
 /**
  * Reads one cookie out of a `document.cookie` string.
  *
  * Pure, so it can be tested without a browser. Matches the whole name only —
- * a prefix match would let `inbox_csrf_other` masquerade as the real thing.
+ * a prefix match would let `ats_csrf_other` masquerade as the real thing.
  */
 export function readCookie(cookieString: string, name: string): string | null {
   for (const part of cookieString.split(';')) {

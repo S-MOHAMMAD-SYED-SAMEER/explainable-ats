@@ -1,12 +1,18 @@
 // PII redaction for logs (NFR-12).
 //
-// This system's inputs are other people's emails. That makes the log the most
-// likely place for customer data to end up somewhere nobody intended — and a
-// log file is the one artefact that gets copied into a terminal, a screenshot,
+// This system's inputs are other people's CVs. That makes the log a likely
+// place for personal data to end up somewhere nobody intended — and a log
+// file is the one artefact that gets copied into a terminal, a screenshot,
 // or a support ticket without anyone thinking about it.
 //
-// The rule enforced by convention and by `logger.ts`: email bodies are never
-// logged at all, and anything that *is* logged goes through here first.
+// The rule enforced by convention and by `logger.ts`: resume text is never
+// logged at all (the pipeline logs ids and counts), and anything that *is*
+// logged goes through here first.
+//
+// Note what this is not: it is the LOG filter, a separate thing from
+// `agent/redact.ts`, which masks protected attributes in resumes before a
+// model reads them. The key list below was written for an earlier, email-based
+// project and does not name this project's resume fields.
 
 const EMAIL_RE = /\b[^\s@,;<>()[\]]+@[^\s@,;<>()[\]]+\.[a-z]{2,}\b/gi;
 // Loose on purpose: catching a stray order number as a phone number is a
@@ -14,10 +20,10 @@ const EMAIL_RE = /\b[^\s@,;<>()[\]]+@[^\s@,;<>()[\]]+\.[a-z]{2,}\b/gi;
 const PHONE_RE = /(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,4}\)[\s.-]?)?\d{3,4}[\s.-]?\d{3,4}(?:[\s.-]?\d{2,4})?/g;
 
 /**
- * Masks an email address to `s***h@acmecommerce.io`.
+ * Masks an email address to `s***h@example.com`.
  *
  * The domain survives deliberately — it is the part that makes a log line
- * useful for debugging ("the acmecommerce.io message failed"), and it is not
+ * useful for debugging ("mail to example.com failed"), and it is not
  * personal data in the way the local part is.
  */
 export function maskEmail(email: string): string {
@@ -57,9 +63,9 @@ export function redactText(text: string): string {
   return redacted.replace(new RegExp(UUID_PLACEHOLDER, 'g'), () => preserved[index++] ?? '');
 }
 
-// Keys whose values are never logged, whatever they contain. `bodyText` is here
-// because an email body is the payload this whole product handles: there is no
-// version of "just log a bit of it" that is safe.
+// Keys whose values are never logged, whatever they contain. The body-style keys
+// are inherited from the email project this module came from; for a large free-
+// text payload there is no version of "just log a bit of it" that is safe.
 const NEVER_LOG_KEYS = new Set([
   'bodytext',
   'body',

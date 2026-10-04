@@ -2,7 +2,7 @@ import { ValidationError } from './errors.ts';
 
 // Hand-written validation, no schema library.
 //
-// Project 1 made this call for its eval dataset and the reasoning holds here:
+// sales-recovery-agent made this call for its eval dataset and the reasoning holds here:
 // for shapes this small and this stable, a validation library is a dependency,
 // a bundle, and a DSL to learn, in exchange for something forty lines of
 // TypeScript already do — while a hand-written validator can produce error

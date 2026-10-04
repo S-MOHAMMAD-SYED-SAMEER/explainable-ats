@@ -6,6 +6,7 @@ import { loadConfig, type AppConfig } from '../src/config/env.ts';
 import { createMemoryLogger } from '../src/lib/logger.ts';
 import { hashPassword } from '../src/lib/password.ts';
 import { CSRF_HEADER } from '../src/auth/csrf.ts';
+import { CSRF_COOKIE } from '../src/auth/cookies.ts';
 import { createJob, ingestResume } from '../src/agent/ingest.ts';
 import { extractEvidence, openEvaluation } from '../src/agent/extract.ts';
 import { createMockLlmProvider } from '../src/adapters/llm/mock.ts';
@@ -193,7 +194,7 @@ async function withApi(
   assert.equal(login.status, 200, 'precondition: the harness could sign in');
 
   const cookies = (login.headers.getSetCookie?.() ?? []).map((entry) => entry.split(';')[0] ?? '').join('; ');
-  const csrf = /inbox_csrf=([^;]+)/.exec(cookies)?.[1] ?? '';
+  const csrf = new RegExp(`${CSRF_COOKIE}=([^;]+)`).exec(cookies)?.[1] ?? '';
   assert.notEqual(csrf, '', 'precondition: a CSRF token was issued');
 
   const client: Client = {

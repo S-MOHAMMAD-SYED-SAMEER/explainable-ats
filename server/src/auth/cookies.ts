@@ -4,8 +4,8 @@
 // and this project has three server dependencies on purpose. Parsing a Cookie
 // header is not the hard part of authentication.
 
-export const SESSION_COOKIE = 'inbox_session';
-export const CSRF_COOKIE = 'inbox_csrf';
+export const SESSION_COOKIE = 'ats_session';
+export const CSRF_COOKIE = 'ats_csrf';
 
 /**
  * Reads one cookie from a raw `Cookie` header.

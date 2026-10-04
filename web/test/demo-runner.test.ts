@@ -245,3 +245,31 @@ test('NEGATIVE CONTROL — the parity check would fail on a genuinely mismatched
   const drifted = ['demo-001', 'demo-002', 'demo-003', 'demo-004', 'demo-006'];
   assert.notDeepEqual([...drifted].sort(), [...serverIds].sort());
 });
+
+// --- the result is temporary, and the page says so ---------------------------
+//
+// The server runs a demo scenario in an isolated in-memory sandbox. The result
+// is not a saved evaluation, never reaches the ranking, and can vanish on a
+// restart. A screen that looked like any other assessment would invite the
+// opposite belief, so the runner states it where the visitor clicks.
+
+/** The runner's visible text, with JSX line-wrapping collapsed. */
+function visibleCopy(): string {
+  return RUNNER().replace(/\s+/g, ' ');
+}
+
+test('the runner tells the visitor that demo results are temporary and change nothing saved', () => {
+  assert.match(
+    visibleCopy(),
+    /Demo results are temporary and do not change the recruiter's saved evaluations/,
+    'the ephemeral-demo note is missing from the demo runner',
+  );
+});
+
+test('the runner never claims a demo result is saved, stored or ranked', () => {
+  // The note above is the one place "saved" may appear, and only in the negative.
+  const withoutNote = visibleCopy().replace(/Demo results are temporary[^.]*\./, '');
+  for (const claim of [/\bsaved\b/i, /\bstored\b/i, /\bpersist/i, /\brecorded\b/i, /added to the ranking/i]) {
+    assert.equal(claim.test(withoutNote), false, `the runner's copy matches ${claim}`);
+  }
+});

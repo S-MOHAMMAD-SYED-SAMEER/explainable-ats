@@ -30,7 +30,8 @@ export type AppDeps = {
 };
 
 // Large enough for a long resume pasted as text, small enough that a request
-// cannot be used to exhaust memory. Uploads get their own, tighter cap in P3-C.
+// cannot be used to exhaust memory. A resume-upload endpoint, if one is ever
+// added, will need its own, tighter cap.
 const MAX_BODY_BYTES = 512 * 1024;
 
 export function createApp({
@@ -46,7 +47,8 @@ export function createApp({
   const sandbox = createDemoSandbox({ migrationsDir: config.migrationsDir, logger });
 
   // Built here so a misconfigured provider fails at startup rather than on the
-  // first request. Nothing calls it until P3-C.
+  // first request. Nothing calls it yet: there is no HTTP route that runs
+  // extraction, and the public demo builds its own deterministic provider.
   const llm = provider ?? createLlmProvider(config);
   void llm;
 

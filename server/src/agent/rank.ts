@@ -6,7 +6,7 @@ import type { Logger } from '../lib/logger.ts';
 // Loading the inputs a ranking needs, and nothing else.
 //
 // This function performs FIVE queries whatever the number of candidates. That
-// is deliberate rather than incidental: Project 2 shipped a list screen that
+// is deliberate rather than incidental: inbox-crm-agent shipped a list screen that
 // issued 57 round trips and took ten seconds, and the fix was the same shape as
 // the batch calls below. A ranking is the screen a recruiter opens first.
 //

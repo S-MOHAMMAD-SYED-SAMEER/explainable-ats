@@ -24,6 +24,6 @@ export function createLlmProvider(config: AppConfig): LlmProvider {
 
   throw new LlmError(
     config.llmProvider,
-    `The "${config.llmProvider}" provider is not implemented yet (it arrives with extraction in P3-C). Set LLM_PROVIDER=mock.`,
+    `The "${config.llmProvider}" provider is not implemented yet. Set LLM_PROVIDER=mock.`,
   );
 }

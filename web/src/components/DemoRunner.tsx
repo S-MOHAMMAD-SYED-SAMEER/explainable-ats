@@ -8,7 +8,13 @@ import { routeToHash } from '../router.ts';
 // fixed demo candidates and send that selection, and nothing else, to the
 // server's controlled endpoint. It never computes, guesses, or falls back to
 // a result of its own — every number a visitor eventually sees comes from
-// `CandidateDetail`, reading the real evaluation the server just created.
+// `CandidateDetail`, reading the evaluation the server just ran.
+//
+// THAT EVALUATION IS TEMPORARY. The server runs it in an isolated, in-memory
+// sandbox, so it is not one of the recruiter's saved evaluations, never appears
+// in the ranking, and can disappear when the server restarts. The copy below
+// says so, because a result that looks like any other assessment invites the
+// belief that it was recorded.
 //
 // THE SCENARIO LIST IS DISPLAY METADATA, NOT AUTHORITY
 //
@@ -73,6 +79,10 @@ export function DemoRunner(): ReactNode {
         Pick one of the fixed demo candidates below. Running it sends that candidate's CV through the
         real screening pipeline — the same ingestion, redaction, evidence extraction and scoring
         every assessment on this page went through — and opens the result.
+      </p>
+      <p className="mt-2 text-small text-ink-muted">
+        Demo results are temporary and do not change the recruiter's saved evaluations or the ranking on
+        this page.
       </p>
 
       <fieldset className="mt-4">

@@ -150,7 +150,7 @@ test('a sequence of zero is refused', async () => {
 // ================================================================ the payload
 
 test('a payload survives the round trip with its types intact', async () => {
-  // The payload is a JSON column, and this is where Project 2's driver
+  // The payload is a JSON column, and this is where inbox-crm-agent's driver
   // divergence surfaced: a boolean or a number that came back as something
   // else. Asserted by type, not merely by value.
   const { repos, close } = await createTestContext();

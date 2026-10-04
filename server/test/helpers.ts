@@ -22,7 +22,7 @@ export type TestContext = {
  * A migrated, private, in-memory database.
  *
  * The clock and the id generator are fixed so a test can assert an exact value
- * without freezing the process. Note the consequence, because Project 2 lost an
+ * without freezing the process. Note the consequence, because inbox-crm-agent lost an
  * hour to it: handlers that default to `systemClock` will see a date months
  * away from the repositories' date, so a test that cares about expiry has to
  * pass this same clock in rather than let the two drift apart.

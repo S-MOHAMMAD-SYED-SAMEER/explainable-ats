@@ -4,42 +4,40 @@ import type { Database, QueryResult, SqlParam } from './types.ts';
 
 // PostgreSQL driver (D1) — the hosted path, Neon or otherwise.
 //
-// STATUS: verified against a live PostgreSQL 18.6 server (M5-E, M7-C) and
-// running in production since M7-D. The note that used to sit here said the
-// driver was unverified and that the first job of whichever milestone
-// provisioned a database was to run the suites against it. That happened, and
-// it was not enough: the suites are driver-agnostic in their SQL but they all
-// run on SQLite, so a divergence in how a driver *returns* a value passed every
-// one of them. See the JSON note below for the one that reached production.
+// STATUS: NOT verified against a live PostgreSQL server for THIS project's
+// schema. This driver was inherited from the inbox-crm-agent project, where it
+// ran against hosted PostgreSQL; that history does not transfer to a different
+// schema. Every test here runs on SQLite, and `test/driver-parity.test.ts` pins
+// the contract from the SQLite side only. The suites are driver-agnostic in
+// their SQL, but a divergence in how a driver *returns* a value would pass all
+// of them — see the JSON note below. Running the suites against a real server
+// is still to do.
 //
 // This module is loaded lazily by `db/index.ts` so that a machine without a
 // database URL never imports `pg` at all.
 
 const { Pool } = pg;
 
-// --- JSON columns must look the same from both drivers (M7-F) ---------------
+// --- JSON columns must look the same from both drivers -----------------------
 //
 // `node:sqlite` returns a JSON column as the text it stored. `pg` parses JSONB
-// and hands back a real JavaScript value. For an object or an array that made
-// no difference — `toJson` passes those through untouched — so this divergence
-// stayed invisible for as long as every JSON column held one.
+// and hands back a real JavaScript value. For an object or an array that makes
+// no difference — `toJson` passes those through untouched — and this schema's
+// only JSON column, `audit_events.payload`, always holds an object.
 //
-// `settings.value` is the exception, and the only column in the schema storing
-// JSON *scalars*: 24, false, "assisted". Through pg those arrive as a number, a
-// boolean and an already-unwrapped string, and `toJson` threw on the first two
-// and tried to `JSON.parse('assisted')` on the third. Every caller of
-// `settings.getAll()` therefore failed on PostgreSQL and only on PostgreSQL —
-// DECIDE, the executor's verification, and the revise engine among them — while
-// every test and the whole walkthrough passed on SQLite.
+// The divergence bit the inbox-crm-agent project, whose schema also stored JSON
+// *scalars* (24, false, "assisted"): through pg those arrive as a number, a
+// boolean and an already-unwrapped string, and `toJson` threw or parsed twice,
+// on PostgreSQL only, while every test passed on SQLite. This project has no
+// such column, but the override stays so both drivers hand `toJson` the same
+// thing — text — if one is ever added.
 //
-// Asking pg for the raw text puts both drivers back on the same contract, so
-// `toJson` parses exactly once no matter where the row came from. Fixing it
-// here rather than in `toJson` is deliberate: teaching `toJson` to accept a
-// number and a boolean would still leave the string case wrong, because a JSON
-// string that happens to contain valid JSON (`"123"`) would be parsed twice.
+// Fixing it here rather than in `toJson` is deliberate: teaching `toJson` to
+// accept a number and a boolean would still leave the string case wrong,
+// because a JSON string that happens to contain valid JSON (`"123"`) would be
+// parsed twice.
 //
-// Safe because every JSONB read in the codebase goes through `toJson`; the one
-// direct access, in `approvals.ts`, is a null comparison rather than a parse.
+// Safe because every JSONB read in the codebase goes through `toJson`.
 pg.types.setTypeParser(pg.types.builtins.JSON, (value) => value);
 pg.types.setTypeParser(pg.types.builtins.JSONB, (value) => value);
 

@@ -30,7 +30,7 @@ export type RouteName = (typeof ROUTES)[number];
 
 export type Route = {
   name: RouteName;
-  /** The record id in `#/inbox/abc123`, when there is one. */
+  /** The record id in `#/candidates/abc123`, when there is one. */
   id: string | null;
 };
 

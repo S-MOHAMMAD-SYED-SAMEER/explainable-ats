@@ -1,8 +1,6 @@
-# Merged by local restructuring (Milestone 1, prepared not committed):
-# previously this project relied on ai-business-automation's root
-# .gitignore for the generic rules below. Now standalone, it needs its
-# own copy of them. The project-specific rules beneath are unchanged
-# from the monorepo version.
+# This project is a standalone repository. The generic rules below used to come
+# from a monorepo's root .gitignore; the project-specific rules beneath them
+# are the ones that are particular to Explainable ATS.
 
 # Dependencies
 node_modules/
@@ -40,7 +38,7 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 
-# --- Project-specific (unchanged from the monorepo) ---
+# --- Project-specific ---
 # SQLite's WAL sidecar files, which exist only while the database is
 # open — long enough for a `git add -A` during a running server to
 # sweep a binary journal into a commit.
@@ -48,5 +46,6 @@ Thumbs.db
 *.sqlite-shm
 *.sqlite-journal
 
-# Generated evaluation output. The dataset itself stays committed.
+# Reserved for generated evaluation output. No evaluation harness exists yet, so
+# nothing writes here today.
 server/eval-results/

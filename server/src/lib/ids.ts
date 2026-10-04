@@ -58,7 +58,7 @@ export function createSequentialIds(prefix = 'id'): IdGenerator {
  * is random and used for everything the system creates at runtime.
  */
 export function deterministicId(name: string): string {
-  const hex = createHash('sha256').update(`inbox-crm-agent:${name}`).digest('hex');
+  const hex = createHash('sha256').update(`explainable-ats:${name}`).digest('hex');
   const version = `5${hex.slice(13, 16)}`;
   const variantNibble = ((parseInt(hex[16] as string, 16) & 0x3) | 0x8).toString(16);
   const variant = `${variantNibble}${hex.slice(17, 20)}`;

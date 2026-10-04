@@ -6,8 +6,8 @@ import type { LlmRequest } from '../src/adapters/llm/types.ts';
 
 // The model boundary.
 //
-// Nothing calls a model until P3-C. What is being pinned here is the contract
-// the extraction stage will depend on — above all, that the mock fails loudly
+// No real model is called anywhere yet. What is being pinned here is the contract
+// the extraction stage depends on — above all, that the mock fails loudly
 // rather than inventing a reply. A mock that returns a plausible empty
 // structure would let the pipeline carry on, and the fault would surface three
 // stages later as "the evidence verifier rejected a quote", which is a long way
@@ -76,8 +76,9 @@ test('every call is recorded, in order', async () => {
 });
 
 test('the fixture key is derived in one place', () => {
-  // P3-C appends a per-candidate discriminator. Keeping the derivation in one
-  // function means that change lands in one place rather than in every caller.
+  // A future discriminator (per candidate, say) would change this derivation.
+  // Keeping it in one function means that change lands in one place rather
+  // than in every caller.
   assert.equal(fixtureKey(request('extract')), 'extract');
 });
 
@@ -92,7 +93,7 @@ test('asking for an unimplemented provider fails loudly', () => {
 });
 
 test('the configured model tier is Sonnet 5 and does not drift', () => {
-  // CLAUDE.md fixes Sonnet 5 for ranking, and API spend is real money. The
+  // Sonnet 5 is the intended tier for ranking, and API spend is real money. The
   // default is asserted so a change to it has to be deliberate.
   assert.equal(loadConfig({}).config.anthropicModel, 'claude-sonnet-5');
   assert.equal(loadConfig({}).config.llmProvider, 'mock', 'the default provider should cost nothing to run');

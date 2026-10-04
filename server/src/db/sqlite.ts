@@ -5,7 +5,7 @@ import type { Database, QueryResult, SqlParam } from './types.ts';
 
 // SQLite driver, built on Node's own `node:sqlite`.
 //
-// Same reasoning Project 1 used for its conversation memory: `node:sqlite`
+// Same reasoning sales-recovery-agent used for its conversation memory: `node:sqlite`
 // ships with Node, needs no `npm install`, and has no native build step —
 // which is why the whole M0 foundation can be migrated, seeded, and tested on
 // a machine with no database server and no credentials.

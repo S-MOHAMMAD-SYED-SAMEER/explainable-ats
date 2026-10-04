@@ -109,9 +109,10 @@ export class FixedWindowLimiter {
 /**
  * The classes of traffic, per spec §11 plus the public demo-run endpoint.
  *
- * `expensive` is the one that matters most among the original three: those
- * endpoints call a model, so exceeding them costs real money rather than
- * merely load. That is why its limit is the tightest of the three.
+ * There is no class for endpoints that call a model, because there is no such
+ * endpoint yet: extraction is a deterministic mock. When one exists it needs
+ * its own, tighter class — API spend is real money, not merely load — rather
+ * than falling through to `mutation`.
  *
  * `demoRun` is its own class rather than falling through to `mutation`. It is
  * reachable with no session at all, and although it writes nothing canonical
@@ -122,15 +123,11 @@ export class FixedWindowLimiter {
  */
 export const RATE_LIMITS = Object.freeze({
   login: { limit: 10, windowMs: 60_000 },
-  expensive: { limit: 20, windowMs: 60_000 },
   mutation: { limit: 120, windowMs: 60_000 },
   demoRun: { limit: 10, windowMs: 60_000 },
 } satisfies Record<string, RateLimitRule>);
 
 export type RateLimitClass = keyof typeof RATE_LIMITS;
-
-/** Endpoints that trigger a model call, and therefore spend. */
-const EXPENSIVE_PATHS = [/^\/emails\/understand$/, /^\/emails\/[^/]+\/understand$/, /^\/emails\/decide$/, /^\/emails\/[^/]+\/decide$/];
 
 /** The one public demo-run endpoint (`routes/demo.ts`). POST only. */
 const DEMO_RUN_PATH = /^\/demo\/scenarios\/[^/]+\/run$/;
@@ -141,7 +138,6 @@ export function classify(method: string, path: string): RateLimitClass | null {
   // Reads are not limited: they are cheap, and limiting them would make a busy
   // dashboard look like an attack.
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return null;
-  if (EXPENSIVE_PATHS.some((pattern) => pattern.test(path))) return 'expensive';
   return 'mutation';
 }
 
