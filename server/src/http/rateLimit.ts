@@ -113,14 +113,12 @@ export class FixedWindowLimiter {
  * endpoints call a model, so exceeding them costs real money rather than
  * merely load. That is why its limit is the tightest of the three.
  *
- * `demoRun` is its own class rather than falling through to `mutation`. It
- * performs a real pipeline execution — ingest, extraction, verification,
- * matching, scoring, several audit writes — on every call, and unlike every
- * other write in this API it needs no session to reach at all. Sizing it at
- * `mutation`'s 120/minute would let an anonymous script run the pipeline two
- * orders of magnitude more often than a person clicking through five demo
- * scenarios ever would. It is set to the same cadence as `login` (10/minute):
- * conservative, and paced for a human, not a session.
+ * `demoRun` is its own class rather than falling through to `mutation`. It is
+ * reachable with no session at all, and although it writes nothing canonical
+ * (it runs in an in-memory sandbox, built once per scenario), an anonymous
+ * caller still should not get `mutation`'s 120/minute on an endpoint that can
+ * trigger a pipeline run. It is set to the same cadence as `login`
+ * (10/minute): conservative, and paced for a human, not a session.
  */
 export const RATE_LIMITS = Object.freeze({
   login: { limit: 10, windowMs: 60_000 },

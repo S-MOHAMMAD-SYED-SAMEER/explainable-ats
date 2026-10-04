@@ -8,19 +8,25 @@ import { hashPassword } from '../src/lib/password.ts';
 import { rateLimit, RATE_LIMITS, classify } from '../src/http/rateLimit.ts';
 import { createJob } from '../src/agent/ingest.ts';
 import { DEMO_JOB, DEMO_CANDIDATES } from '../src/demo/dataset.ts';
-import { isDemoScenarioId, runDemoScenario, DEMO_SCENARIO_IDS } from '../src/demo/runScenario.ts';
-import { createTestContext } from './helpers.ts';
+import { isDemoScenarioId, DEMO_SCENARIO_IDS } from '../src/demo/runScenario.ts';
+import { createDemoSandbox } from '../src/demo/sandbox.ts';
+import { createTestContext, MIGRATIONS_DIR } from './helpers.ts';
 import type { Repositories } from '../src/db/repositories/index.ts';
 
 // The public demo-run endpoint: `POST /api/demo/scenarios/:scenario/run`.
 //
 // WHAT THIS FILE IS DEFENDING
 //
-// This is the one write route in the whole API an anonymous stranger can
-// reach. Every test below is written the way an attacker would read them: not
-// "does the happy path work?" but "what is the complete set of things a caller
-// can make this route do, and is any of it something other than 'run one of
-// exactly five fixed scenarios against the fixed demo job'?"
+// This is the one POST in the whole API an anonymous stranger can reach. Every
+// test below is written the way an attacker would read them: not "does the
+// happy path work?" but "what is the complete set of things a caller can make
+// this route do, and is any of it something other than 'run one of exactly
+// five fixed scenarios in an isolated sandbox'?"
+//
+// The route writes nothing to the canonical database: the scenario runs in an
+// in-memory sandbox (src/demo/sandbox.ts). The isolation guarantees themselves
+// — a recruiter's evaluation and decision cannot be displaced by a public run —
+// are asserted in demo-isolation.test.ts.
 
 const PASSWORD = 'demo-run-test-operator-password';
 
@@ -67,6 +73,25 @@ async function serve(
   };
 }
 
+/** The parts of an evaluation response these tests read. */
+type EvaluationBody = {
+  status: string;
+  scoreBasisPoints: number | null;
+  isCurrent: boolean;
+  evidenceRejectedCount: number;
+  job: { id: string; title: string };
+  requirements: Array<{ label: string; verdict: string | null; evidence: unknown[] }>;
+};
+
+/** `Response.json()` is `unknown` under strict typing; say what is expected. */
+async function readJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T;
+}
+
+async function readEvaluation(base: string, evaluationId: string): Promise<EvaluationBody> {
+  return readJson<EvaluationBody>(await fetch(`${base}/api/evaluations/${evaluationId}`));
+}
+
 function run(base: string, scenario: string, init?: RequestInit): Promise<Response> {
   return fetch(`${base}/api/demo/scenarios/${scenario}/run`, {
     method: 'POST',
@@ -102,10 +127,14 @@ test('a valid scenario executes and returns a real, scored evaluation id', async
     // The evaluation is real: fetched back through the ordinary read API (the
     // public-demo read window is open in this test, matching a real
     // deployment that offers both features together).
-    const detail = await (await fetch(`${server.url}/api/evaluations/${body.evaluationId}`)).json();
+    const detail = await readEvaluation(server.url, body.evaluationId);
     assert.equal(detail.status, 'scored');
     assert.equal(typeof detail.scoreBasisPoints, 'number');
     assert.equal(detail.job.title, DEMO_JOB.title);
+
+    // And the canonical database was never written: the run lives in the sandbox.
+    assert.equal(await server.repos.evaluations.count(), 0);
+    assert.equal(await server.repos.candidates.count(), 0);
   } finally {
     await server.stop();
   }
@@ -116,7 +145,7 @@ test('the real pipeline was exercised, not faked: verified evidence backs the re
   try {
     const response = await run(server.url, 'demo-001');
     const { evaluationId } = (await response.json()) as { evaluationId: string };
-    const detail = await (await fetch(`${server.url}/api/evaluations/${evaluationId}`)).json();
+    const detail = await readEvaluation(server.url, evaluationId);
 
     // demo-001 (Rowan Ashfield) is documented in dataset.ts as meeting every
     // requirement with a quoted line each — so every requirement must carry
@@ -134,16 +163,20 @@ test('the same scenario produces byte-identical scores across two fresh runs', a
   const a = await serve();
   const b = await serve();
   try {
-    const evalA = (await (await run(a.url, 'demo-003')).json()) as { evaluationId: string };
-    const evalB = (await (await run(b.url, 'demo-003')).json()) as { evaluationId: string };
+    const evalA = await readJson<{ evaluationId: string }>(await run(a.url, 'demo-003'));
+    const evalB = await readJson<{ evaluationId: string }>(await run(b.url, 'demo-003'));
 
-    const detailA = await (await fetch(`${a.url}/api/evaluations/${evalA.evaluationId}`)).json();
-    const detailB = await (await fetch(`${b.url}/api/evaluations/${evalB.evaluationId}`)).json();
+    // Not just the same scores: the same ids, because the sandbox derives them
+    // from the scenario name rather than from a random source.
+    assert.equal(evalA.evaluationId, evalB.evaluationId);
+
+    const detailA = await readEvaluation(a.url, evalA.evaluationId);
+    const detailB = await readEvaluation(b.url, evalB.evaluationId);
 
     assert.equal(detailA.scoreBasisPoints, detailB.scoreBasisPoints);
     assert.deepEqual(
-      detailA.requirements.map((r: { verdict: string }) => r.verdict),
-      detailB.requirements.map((r: { verdict: string }) => r.verdict),
+      detailA.requirements.map((r) => r.verdict),
+      detailB.requirements.map((r) => r.verdict),
     );
   } finally {
     await a.stop();
@@ -158,7 +191,7 @@ test('a "queued" scenario opens an evaluation and leaves it unscored, exactly li
     assert.equal(response.status, 201);
     const { evaluationId } = (await response.json()) as { evaluationId: string };
 
-    const detail = await (await fetch(`${server.url}/api/evaluations/${evaluationId}`)).json();
+    const detail = await readEvaluation(server.url, evaluationId);
     assert.equal(detail.status, 'pending');
     assert.equal(detail.scoreBasisPoints, null);
   } finally {
@@ -229,7 +262,7 @@ test('provider selection cannot be requested by the caller', async () => {
 
 // --- 8: demo isolation — only the demo namespace is ever touched -----------
 
-test('a demo run creates only demo-namespaced data, and never touches an existing non-demo job or candidate', async () => {
+test('a demo run writes nothing to the canonical database and never touches an existing job or candidate', async () => {
   const server = await serve();
   try {
     // A real, non-demo job and candidate, seeded independently of anything
@@ -240,12 +273,16 @@ test('a demo run creates only demo-namespaced data, and never touches an existin
     );
     const realCandidate = await server.repos.candidates.create({ reference: 'real-applicant-1', source: 'upload' });
 
-    await run(server.url, 'demo-001');
+    const auditBefore = await server.repos.audit.count();
+    const response = await run(server.url, 'demo-001');
+    assert.equal(response.status, 201);
 
+    // Canonical state: exactly the candidate seeded above — no demo candidate,
+    // no evaluation, no audit event.
     const candidates = await server.repos.candidates.list({ limit: 50 });
-    const demoCandidates = candidates.filter((c) => c.reference.startsWith('demo-'));
-    assert.equal(demoCandidates.length, 1);
-    assert.equal(demoCandidates[0]?.source, 'demo');
+    assert.deepEqual(candidates.map((c) => c.reference), ['real-applicant-1']);
+    assert.equal(await server.repos.evaluations.count(), 0);
+    assert.equal(await server.repos.audit.count(), auditBefore);
 
     // The real candidate and job are exactly as they were.
     assert.equal(await server.repos.evaluations.getCurrent(realJob.id, realCandidate.id), null);
@@ -332,32 +369,23 @@ test('the dedicated demo-run budget is real and separate from the mutation budge
   }
 });
 
-// --- 11: repeated execution supersedes rather than overwrites ---------------
+// --- 11: repeated execution is idempotent, and supersedes nothing -----------
 
-test('running the same scenario twice creates a new evaluation and supersedes the previous one', async () => {
+test('running the same scenario twice returns the same sandboxed evaluation and stacks nothing', async () => {
   const server = await serve();
   try {
-    const first = (await (await run(server.url, 'demo-002')).json()) as { evaluationId: string };
-    const second = (await (await run(server.url, 'demo-002')).json()) as { evaluationId: string };
+    const first = await readJson<{ evaluationId: string }>(await run(server.url, 'demo-002'));
+    const second = await readJson<{ evaluationId: string }>(await run(server.url, 'demo-002'));
 
-    assert.notEqual(first.evaluationId, second.evaluationId);
+    assert.equal(first.evaluationId, second.evaluationId);
 
-    const firstRow = await server.repos.evaluations.getById(first.evaluationId);
-    const secondRow = await server.repos.evaluations.getById(second.evaluationId);
-    assert.equal(firstRow?.supersededBy, second.evaluationId);
-    assert.equal(secondRow?.supersededBy, null);
-
-    // The old evaluation's own history is intact and independently readable —
-    // nothing was deleted or overwritten.
-    const oldDetail = await (await fetch(`${server.url}/api/evaluations/${first.evaluationId}`)).json();
-    assert.equal(oldDetail.isCurrent, false);
-    assert.equal(oldDetail.status, 'scored');
-
-    // Only one candidate exists — re-running did not create a second person.
-    const demoCandidates = (await server.repos.candidates.list({ limit: 50 })).filter((c) =>
-      c.reference.startsWith('demo-'),
-    );
-    assert.equal(demoCandidates.length, 1);
+    // The evaluation is current, scored and readable — and absent from the
+    // canonical database, where a repeat run would once have superseded it.
+    const detail = await readEvaluation(server.url, first.evaluationId);
+    assert.equal(detail.isCurrent, true);
+    assert.equal(detail.status, 'scored');
+    assert.equal(await server.repos.evaluations.getById(first.evaluationId), null);
+    assert.equal(await server.repos.candidates.count(), 0);
   } finally {
     await server.stop();
   }
@@ -365,34 +393,24 @@ test('running the same scenario twice creates a new evaluation and supersedes th
 
 // --- concurrency: two simultaneous runs of the same scenario ----------------
 
-test('two concurrent runs of the same scenario do not crash and do not duplicate the candidate', async () => {
+test('two concurrent runs of the same scenario resolve to one sandboxed evaluation', async () => {
   const server = await serve();
   try {
     const [a, b] = await Promise.all([run(server.url, 'demo-004'), run(server.url, 'demo-004')]);
 
     // Both requests must resolve to a real outcome — no 500, no hang.
-    assert.ok([200, 201].includes(a.status), `first concurrent call returned ${a.status}`);
-    assert.ok([200, 201].includes(b.status), `second concurrent call returned ${b.status}`);
+    assert.equal(a.status, 201, `first concurrent call returned ${a.status}`);
+    assert.equal(b.status, 201, `second concurrent call returned ${b.status}`);
 
-    const demoCandidates = (await server.repos.candidates.list({ limit: 50 })).filter((c) =>
-      c.reference.startsWith('demo-'),
-    );
-    assert.equal(demoCandidates.length, 1, 'a concurrent run duplicated the candidate');
+    const bodyA = await readJson<{ evaluationId: string }>(a);
+    const bodyB = await readJson<{ evaluationId: string }>(b);
+    assert.equal(bodyA.evaluationId, bodyB.evaluationId, 'concurrent runs built two different sandboxes');
 
+    // Nothing canonical was created by either.
+    assert.equal(await server.repos.candidates.count(), 0);
+    assert.equal(await server.repos.evaluations.count(), 0);
     const jobs = await server.repos.jobs.list({ limit: 50 });
     assert.equal(jobs.filter((j) => j.title === DEMO_JOB.title).length, 1, 'a concurrent run duplicated the job');
-
-    // Documenting the known supersession race (see runScenario.ts and the
-    // Option B inspection) rather than asserting a specific winner: exactly
-    // one of the two evaluations ends up current, and that is all that is
-    // guaranteed by the existing evaluations.create() semantics, which this
-    // milestone does not change.
-    const bodyA = (await a.json()) as { evaluationId: string };
-    const bodyB = (await b.json()) as { evaluationId: string };
-    const rowA = await server.repos.evaluations.getById(bodyA.evaluationId);
-    const rowB = await server.repos.evaluations.getById(bodyB.evaluationId);
-    const currentCount = [rowA, rowB].filter((row) => row?.supersededBy === null).length;
-    assert.equal(currentCount, 1, 'concurrent runs left zero or two evaluations current');
   } finally {
     await server.stop();
   }
@@ -468,19 +486,32 @@ test('every error from this endpoint uses the existing safe envelope and leaks n
   }
 });
 
-// --- runDemoScenario as a unit, independent of HTTP -------------------------
+// --- the sandbox as a unit, independent of HTTP -----------------------------
 
-test('runDemoScenario is directly callable and independently produces the same isolation guarantees', async () => {
-  const ctx = await createTestContext({ idPrefix: 'unit' });
+test('the sandbox runs a scenario in isolation and is bounded by the scenario count', async () => {
+  const sandbox = createDemoSandbox({ migrationsDir: MIGRATIONS_DIR });
   try {
-    await seedDemoJobOnly(ctx.repos);
-    const evaluation = await runDemoScenario({ repos: ctx.repos }, 'demo-001');
-    assert.equal(evaluation.status, 'scored');
+    assert.equal(sandbox.size, 0);
 
-    const candidate = await ctx.repos.candidates.getById(evaluation.candidateId);
+    const entry = await sandbox.run('demo-001', 'canonical-job-id');
+    const evaluation = await entry.repos.evaluations.getById(entry.evaluationId);
+    assert.equal(evaluation?.status, 'scored');
+
+    const candidate = evaluation ? await entry.repos.candidates.getById(evaluation.candidateId) : null;
     assert.equal(candidate?.reference, 'demo-001');
     assert.equal(candidate?.source, 'demo');
+
+    // Repeats return the same entry; only new scenarios add to the size.
+    assert.equal(await sandbox.run('demo-001', 'canonical-job-id'), entry);
+    assert.equal(sandbox.size, 1);
+    for (const scenario of DEMO_SCENARIO_IDS) await sandbox.run(scenario, 'canonical-job-id');
+    assert.equal(sandbox.size, DEMO_SCENARIO_IDS.length);
+    for (let i = 0; i < 20; i++) await sandbox.run('demo-003', 'canonical-job-id');
+    assert.equal(sandbox.size, DEMO_SCENARIO_IDS.length, 'repeat runs grew the sandbox');
+
+    assert.equal(sandbox.find(entry.evaluationId), entry);
+    assert.equal(sandbox.find('not-a-sandbox-id'), null);
   } finally {
-    await ctx.close();
+    await sandbox.close();
   }
 });

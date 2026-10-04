@@ -4,41 +4,34 @@ import { matchAndScore } from '../agent/match.ts';
 import { createMockLlmProvider } from '../adapters/llm/mock.ts';
 import { installDeterministicExtractor } from '../agent/mockExtractor.ts';
 import { DEMO_JOB, DEMO_CANDIDATES, ingestInputFor, type DemoCandidate } from './dataset.ts';
-import { AppError } from '../lib/errors.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
 import type { Evaluation, Job } from '../domain/ats.ts';
 
-// The demo execution boundary (Option B).
+// The demo execution boundary.
 //
-// This is the one place allowed to say "run the real pipeline against exactly
-// this fixed candidate, against exactly the fixed demo job." It calls the same
-// functions `demo/seed.ts::seedCandidate` calls — ingestResume, openEvaluation,
-// extractEvidence, matchAndScore — in the same order, with the same
-// deterministic-provider setup. No business logic is duplicated: everything
-// that decides redaction, extraction, verification, matching or scoring still
-// lives exactly where it already lived.
+// Two things live here: the allow-list of scenarios a public caller may name,
+// and the function that runs one of them through the real pipeline. It calls the
+// same functions `demo/seed.ts::seedCandidate` calls — ingestResume,
+// openEvaluation, extractEvidence, matchAndScore — in the same order, with the
+// same deterministic-provider setup. No business logic is duplicated.
 //
-// WHY THIS FILE EXISTS SEPARATELY FROM `seed.ts`
+// WHERE IT RUNS IS NOT DECIDED HERE
 //
-// `seed.ts` is an operator's tool: it creates the demo job, loops over every
-// demo candidate, and is meant to be run once, deliberately, from a trusted
-// shell. This file is the opposite: it is reachable by an anonymous visitor,
-// repeatedly, concurrently, and it must be able to do exactly one thing and
-// nothing else. Sharing the same job-creation code between them would mean an
-// HTTP request could end up on the path that creates a job — which is
-// precisely what must never happen here (see `findDemoJob` below). Keeping the
-// two orchestration paths separate, thin, and independently readable was
-// judged safer than forcing one shared function to serve both a trusted
-// operator script and an anonymous public endpoint.
+// `executeDemoScenario` writes into whatever repositories it is handed, so it
+// must only ever be handed a private database. The public endpoint reaches it
+// exclusively through `demo/sandbox.ts`, which owns an in-memory database per
+// scenario. Nothing on the HTTP path passes it the canonical repositories: that
+// is how an anonymous request is kept from superseding a recruiter's assessment.
+// The only reason it reads the canonical database at all is `findDemoJob`, below,
+// which is read-only.
 //
-// ISOLATION IS ENFORCED HERE, NOT IN THE PIPELINE
+// THE SCENARIO IS THE ONLY INPUT
 //
 // `ingestResume`, `openEvaluation`, `extractEvidence` and `matchAndScore` stay
-// exactly as generic as they were — none of them knows what "demo" means. The
-// guarantee that a request can only ever touch the fixed demo job and one of
-// five fixed demo candidates is enforced entirely in this module, by never
-// accepting a job id or a candidate id from outside it.
+// exactly as generic as they were. The guarantee that a request can only ever
+// run one of five fixed demo candidates is enforced by never accepting a job id,
+// a candidate id or any resume text from outside this module.
 
 /** The only scenario identifiers this endpoint will ever run. */
 export const DEMO_SCENARIO_IDS = ['demo-001', 'demo-002', 'demo-003', 'demo-004', 'demo-005'] as const;
@@ -57,26 +50,15 @@ export function isDemoScenarioId(value: unknown): value is DemoScenarioId {
   return typeof value === 'string' && (DEMO_SCENARIO_IDS as readonly string[]).includes(value);
 }
 
-export type RunScenarioDeps = {
-  repos: Repositories;
-  logger?: Logger;
-};
-
 /**
- * Finds the demo job by its fixed title. Read-only.
+ * Finds the canonical demo job by its fixed title. Read-only.
  *
- * Deliberately NOT a find-or-create. `agent/ingest.ts::createJob` has no
- * uniqueness guard — calling it twice makes two rows titled "Senior Backend
- * Engineer" — and an anonymous, repeatable, concurrently-callable HTTP route
- * must never be the thing that decides whether the demo job gets created.
- * That stays a deliberate, single, operator act (`npm run seed:demo`). If the
- * job is missing, `runDemoScenario` fails closed rather than creating one, so
- * two concurrent first visitors can never race into producing a duplicate job.
+ * It is the gate for the public endpoint: a database nobody seeded with the
+ * demo dataset — a production one, say — does not offer a public demo, and the
+ * endpoint answers "not available" instead of running. It is NOT a
+ * find-or-create, and nothing is written to the database it reads.
  */
-async function findDemoJob(repos: Repositories): Promise<Job | null> {
-  // `list` already exists and is read-only; no repository change was needed
-  // to add this lookup. The limit matches the repository's own maximum, which
-  // is generous for a dataset that should only ever contain one demo job.
+export async function findDemoJob(repos: Repositories): Promise<Job | null> {
   const jobs = await repos.jobs.list({ limit: 500 });
   return jobs.find((job) => job.title === DEMO_JOB.title) ?? null;
 }
@@ -93,36 +75,34 @@ function demoCandidateFor(scenario: DemoScenarioId): DemoCandidate {
   return candidate;
 }
 
+export type ExecuteScenarioDeps = {
+  /** MUST be a private database. See the note at the top of this file. */
+  repos: Repositories;
+  logger?: Logger;
+};
+
 /**
  * Runs one fixed demo scenario through the real pipeline and returns the
  * resulting evaluation.
  *
- * `scenario` must already be a `DemoScenarioId` — callers are expected to have
- * checked `isDemoScenarioId` first (the HTTP handler does). Nothing about the
- * job or the candidate is ever taken from a caller: both are resolved from
- * fixed, hardcoded sources inside this module, and each is asserted to be the
- * expected demo record immediately before anything is written, as a second,
- * structural check beyond "the registry currently only contains these five."
+ * `scenario` must already be a `DemoScenarioId`, and `job` is the demo job in
+ * the repositories being written to. Nothing about either is taken from a
+ * caller's request.
  */
-export async function runDemoScenario(deps: RunScenarioDeps, scenario: DemoScenarioId): Promise<Evaluation> {
+export async function executeDemoScenario(
+  deps: ExecuteScenarioDeps,
+  job: Job,
+  scenario: DemoScenarioId,
+): Promise<Evaluation> {
   const { repos, logger } = deps;
 
-  const job = await findDemoJob(repos);
-  if (!job) {
-    throw new AppError('INVALID_STATE', 'The demo is not available right now.', {
-      internal: 'Demo job not found — has `npm run seed:demo` been run against this database?',
-    });
-  }
-  // Belt-and-suspenders: `findDemoJob` already filtered on this title, so this
-  // can only fail if that function's own filter is changed incorrectly later.
   if (job.title !== DEMO_JOB.title) {
     throw new Error('Resolved job does not match the expected demo job.');
   }
 
   const candidate = demoCandidateFor(scenario);
-  // Same reasoning as above: today this can only be true, and the check stays
-  // here so a future edit to the registry or the dataset cannot silently widen
-  // what this function is willing to run.
+  // Today this can only be true, and the check stays so a future edit to the
+  // registry or the dataset cannot silently widen what this function runs.
   if (!candidate.reference.startsWith('demo-')) {
     throw new Error('Resolved candidate is outside the demo namespace.');
   }
@@ -143,11 +123,7 @@ export async function runDemoScenario(deps: RunScenarioDeps, scenario: DemoScena
   }
 
   // A fresh provider per call, exactly as `seed.ts::seedCandidate` builds one
-  // per candidate — never a shared, module-level instance. That keeps two
-  // concurrent runs (see the concurrency test) from being able to interfere
-  // with each other's registered fixtures, and it is what makes this endpoint
-  // "no dependencies, no state to leak between requests" true rather than
-  // merely intended.
+  // per candidate — never a shared, module-level instance.
   const provider = createMockLlmProvider();
   installDeterministicExtractor(provider);
 

@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { seedDemoData } from '../src/demo/seed.ts';
@@ -9,6 +8,12 @@ import type { AuditEvent } from '../src/domain/ats.ts';
 import { rankJob } from '../src/agent/rank.ts';
 import { handleEvaluationDetail } from '../src/handlers/evaluations.ts';
 import { createTestContext, type TestContext } from './helpers.ts';
+import {
+  PORTFOLIO_FIXTURE_ENV,
+  resolvePortfolioFixture,
+  skipReason,
+  type PortfolioDemoModule,
+} from './portfolioFixture.ts';
 
 // The portfolio demo must agree with this project, or it is advertising
 // something else.
@@ -27,31 +32,32 @@ import { createTestContext, type TestContext } from './helpers.ts';
 // WHY IT REACHES INTO A SIBLING CHECKOUT
 //
 // The runner lives in the portfolio repository, because that is where it is
-// deployed from. There is no package to depend on, so the import is a relative
-// path, and the test explains itself and skips rather than exploding when the
-// sibling checkout is not there. It never skips a comparison it was able to
-// make — an environment that cannot run it says so; one that can, must pass.
+// deployed from. There is no package to depend on, so it is located on disk —
+// `portfolioFixture.ts` owns where to look (the portfolio checked out beside
+// this repository, or $PORTFOLIO_DEMO_DIR) and is itself tested. The suite
+// skips, naming every place it looked, when the runner is genuinely absent. It
+// never skips a comparison it was able to make — an environment that cannot run
+// it says so; one that can, must pass.
+//
+// A $PORTFOLIO_DEMO_DIR that is set but wrong is not "absent": it fails, below,
+// instead of skipping, so a typo cannot masquerade as a passing suite.
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-/** Overridable, so a differently-arranged working copy can still run this. */
-const PORTFOLIO_DEMO_DIR =
-  process.env.PORTFOLIO_DEMO_DIR ??
-  path.resolve(HERE, '../../../..', 'sameer-3d-portfolio', 'sameer-3d-portfolio', 'src', 'demo', 'p3');
+const lookup = resolvePortfolioFixture({ repoRoot: path.resolve(HERE, '..', '..') });
+const skip = lookup.runner !== null ? false : skipReason(lookup);
 
-const RUNNER = path.join(PORTFOLIO_DEMO_DIR, 'run.ts');
-const available = fs.existsSync(RUNNER);
-const skip = available
-  ? false
-  : `The portfolio demo runner was not found at ${RUNNER}. ` +
-    'Set PORTFOLIO_DEMO_DIR to the portfolio\'s src/demo/p3 directory to run the parity check.';
+if (lookup.explicitButMissing) {
+  test(`${PORTFOLIO_FIXTURE_ENV} points at a directory that holds the demo runner`, () => {
+    assert.fail(`${PORTFOLIO_FIXTURE_ENV} is set, but no run.ts exists at ${lookup.tried.join(', ')}.`);
+  });
+}
 
-type DemoModule = typeof import('../../../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3/run.ts');
-
-async function loadRunner(): Promise<DemoModule> {
+async function loadRunner(): Promise<PortfolioDemoModule> {
+  if (lookup.runner === null) throw new Error(skipReason(lookup));
   // A file URL, not a path: an absolute Windows path is not a valid ESM
   // specifier, and the namespaced form (`\\?\C:\...`) is read as a package name.
-  return (await import(pathToFileURL(RUNNER).href)) as DemoModule;
+  return (await import(pathToFileURL(lookup.runner).href)) as PortfolioDemoModule;
 }
 
 /** The real thing: a seeded database driven through the real stages. */

@@ -9,6 +9,7 @@ import { cors } from './http/cors.ts';
 import { rateLimit } from './http/rateLimit.ts';
 import { createRepositories } from './db/repositories/index.ts';
 import { createLlmProvider } from './adapters/llm/index.ts';
+import { createDemoSandbox } from './demo/sandbox.ts';
 import { config as defaultConfig, type AppConfig } from './config/env.ts';
 import { toErrorEnvelope } from './lib/errors.ts';
 import { createLogger, type Logger } from './lib/logger.ts';
@@ -41,6 +42,8 @@ export function createApp({
 }: AppDeps): Express {
   const app = express();
   const repos = createRepositories(db);
+  // Public demo runs happen here, never in `db`. See demo/sandbox.ts.
+  const sandbox = createDemoSandbox({ migrationsDir: config.migrationsDir, logger });
 
   // Built here so a misconfigured provider fails at startup rather than on the
   // first request. Nothing calls it until P3-C.
@@ -96,7 +99,8 @@ export function createApp({
   //                       it is its own router with its own scenario allow-list
   //                       (demo/runScenario.ts) rather than an extension of
   //                       either the auth routes or the read-only public-demo
-  //                       allow-list below.
+  //                       allow-list below. It runs in an in-memory sandbox and
+  //                       writes nothing to `db`.
   //   6. requireSession — the gate. Everything past it is authenticated.
   //
   // Anything added after step 6 is protected by default. That is deliberate:
@@ -106,11 +110,11 @@ export function createApp({
   app.use('/api', rateLimiter);
   app.use('/api', requireCsrf());
   app.use('/api', createAuthRouter({ repos, config, logger }));
-  app.use('/api', createDemoRouter({ repos, logger }));
+  app.use('/api', createDemoRouter({ repos, sandbox, logger }));
   app.use('/api', requireSessionOrPublicRead({ publicReadsEnabled: config.demoPublicReadonly }));
 
   // Everything from here on is behind the gate.
-  app.use('/api', createRecruiterRouter({ repos, logger }));
+  app.use('/api', createRecruiterRouter({ repos, logger, sandbox }));
 
   app.use('/api', (_req: Request, res: Response) => {
     res.status(404).json({ error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } });

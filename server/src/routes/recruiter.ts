@@ -7,6 +7,7 @@ import {
   type EvaluationDeps,
 } from '../handlers/evaluations.ts';
 import { operatorOf } from '../auth/middleware.ts';
+import type { DemoSandbox } from '../demo/sandbox.ts';
 import { AppError } from '../lib/errors.ts';
 
 // The recruiter API.
@@ -31,7 +32,15 @@ function readId(value: unknown, what: string): string {
   return value;
 }
 
-export type RecruiterDeps = JobDeps & EvaluationDeps;
+export type RecruiterDeps = JobDeps &
+  EvaluationDeps & {
+    /**
+     * Where public demo-run results live. Consulted only by the two evaluation
+     * reads below, and never by the decision route: a sandbox id is unknown to
+     * the canonical database, so nothing in the sandbox can be decided on.
+     */
+    sandbox?: DemoSandbox;
+  };
 
 export function createRecruiterRouter(deps: RecruiterDeps): Router {
   const router = Router();
@@ -63,7 +72,19 @@ export function createRecruiterRouter(deps: RecruiterDeps): Router {
   router.get(
     '/evaluations/:evaluationId',
     wrap(async (req, res) => {
-      const result = await handleEvaluationDetail(deps, readId(req.params.evaluationId, 'assessment'));
+      const evaluationId = readId(req.params.evaluationId, 'assessment');
+      const sandboxed = deps.sandbox?.find(evaluationId) ?? null;
+      if (sandboxed) {
+        const result = await handleEvaluationDetail({ ...deps, repos: sandboxed.repos }, evaluationId);
+        // The sandbox's own job has its own id. Name the canonical one, so the
+        // link back to the role lands on the real ranking.
+        res.status(result.status).json({
+          ...result.body,
+          job: { ...result.body.job, id: sandboxed.canonicalJobId },
+        });
+        return;
+      }
+      const result = await handleEvaluationDetail(deps, evaluationId);
       res.status(result.status).json(result.body);
     }),
   );
@@ -71,7 +92,12 @@ export function createRecruiterRouter(deps: RecruiterDeps): Router {
   router.get(
     '/evaluations/:evaluationId/audit',
     wrap(async (req, res) => {
-      const result = await handleEvaluationAudit(deps, readId(req.params.evaluationId, 'assessment'));
+      const evaluationId = readId(req.params.evaluationId, 'assessment');
+      const sandboxed = deps.sandbox?.find(evaluationId) ?? null;
+      const result = await handleEvaluationAudit(
+        sandboxed ? { ...deps, repos: sandboxed.repos } : deps,
+        evaluationId,
+      );
       res.status(result.status).json(result.body);
     }),
   );

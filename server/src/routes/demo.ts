@@ -12,14 +12,15 @@ import { handleDemoRun, type DemoDeps } from '../handlers/demo.ts';
 // (`auth/middleware.ts::PUBLIC_DEMO_READS` / `requireSessionOrPublicRead`).
 // That allow-list is anchored to GET only, on purpose, and widening it to
 // cover a POST would change what "read-only" means for every route already
-// on that list. This route is a second, independent, narrowly-scoped public
-// operation — the one deliberate write in this codebase that an anonymous
-// caller may perform — not an extension of the read-only window.
+// on that list.
 //
-// It is the one POST in this codebase an anonymous stranger can reach. Every
-// other write requires a session; this is a server-validated exception with
-// its own scenario allow-list (`demo/runScenario.ts`) and its own rate-limit
-// class (`http/rateLimit.ts`'s `demoRun`), not a hole in that rule.
+// It is the one POST in this codebase an anonymous stranger can reach, and it
+// writes nothing the operator can see. The scenario runs in an isolated,
+// in-memory sandbox (`demo/sandbox.ts`), so an anonymous caller cannot create,
+// supersede or displace a canonical evaluation or a recruiter's decision. Every
+// other write requires a session; this one is a server-validated exception
+// with its own scenario allow-list (`demo/runScenario.ts`) and its own
+// rate-limit class (`http/rateLimit.ts`'s `demoRun`).
 
 export function createDemoRouter(deps: DemoDeps): Router {
   const router = Router();
