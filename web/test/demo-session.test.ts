@@ -108,14 +108,12 @@ test('no source file contains a password, hash or demo credential', () => {
 test('the demo entry point sends no credentials of its own', () => {
   const login = fs.readFileSync(path.join(SRC, 'screens/Login.tsx'), 'utf8');
 
-  // The demo button hands the app a local view preference and nothing else. If
-  // it ever starts calling the login endpoint it has become a sign-in, and a
-  // sign-in needs a credential — which is the thing this design exists to
-  // avoid having at all.
-  assert.ok(
-    login.includes('onClick={onBrowseDemo}'),
-    'the demo button no longer calls onBrowseDemo directly',
-  );
+  // The demo entry is a plain link to the public demo and holds no state or
+  // handler at all. If it ever starts calling the login endpoint it has become a
+  // sign-in, and a sign-in needs a credential — which is the thing this design
+  // exists to avoid having at all.
+  assert.match(login, /<a\s[^>]*href=\{routeToHash\(\{ name: 'demo', id: null \}\)\}/, 'the demo entry is no longer a link to the demo route');
+  assert.ok(!login.includes('onBrowseDemo'), 'the sign-in screen still carries a demo handler');
 
   // Exactly one call, and it is the one the password form makes.
   const calls = login.split('api.login(').length - 1;

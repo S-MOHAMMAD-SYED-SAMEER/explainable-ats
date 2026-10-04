@@ -471,7 +471,7 @@ test('the layout is fluid: one column on a phone, more on wider screens, never a
 
 // =============================================================== the recruiter flow
 
-test('the recruiter\'s sign-in is exactly what it was, and the demo link is the only addition', () => {
+test('the recruiter\'s sign-in is exactly what it was, and the one read-only demo link is the only addition', () => {
   const login = code(read('screens/Login.tsx'));
 
   for (const original of [
@@ -487,7 +487,8 @@ test('the recruiter\'s sign-in is exactly what it was, and the demo link is the 
   }
   assert.equal(login.split('api.login(').length - 1, 1);
   assert.equal(login.split('await api.login(password)').length - 1, 1);
-  assert.ok(login.includes('onClick={onBrowseDemo}'));
+  // The demo entry is a link now, not a button that sets state.
+  assert.doesNotMatch(login, /onBrowseDemo/);
   // Nothing about the demo reaches into sign-in state.
   assert.doesNotMatch(login, /demoSession|useDemoSession|DemoEntry/);
 });
@@ -495,7 +496,7 @@ test('the recruiter\'s sign-in is exactly what it was, and the demo link is the 
 test('the signed-in recruiter\'s screens are the recruiter\'s: no demo copy, no demo gate, no demo controls', () => {
   const app = code(read('App.tsx'));
   // The sign-in gate is untouched in kind.
-  assert.match(app, /session\.state\.status === 'anonymous' && !browsingDemo && !inDemoSession/);
+  assert.match(app, /session\.state\.status === 'anonymous' && !inDemoSession/);
   // A recruiter's operator name and sign-out are shown whenever the demo is not on.
   assert.match(app, /session\.state\.status === 'authenticated' && !inDemoSession \? session\.state\.operator : null/);
 

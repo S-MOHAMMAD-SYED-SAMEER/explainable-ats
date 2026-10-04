@@ -11,6 +11,7 @@ import {
   resolveApiPath,
 } from '../src/demo/session.ts';
 import { api, setApiScope, setDemoSessionLostHandler, setUnauthorizedHandler } from '../src/api/client.ts';
+import { openingTags } from './jsxScan.ts';
 
 // The public demo's entry and session (Phase 3C.1), from the browser's side.
 //
@@ -48,8 +49,9 @@ test('the demo entry sits above the sign-in gate, which is still there and still
   assert.ok(entry !== -1 && login !== -1, 'App renders both the demo entry and the sign-in screen');
   assert.ok(entry < login, 'a visitor who asked for the demo would meet the password box first');
 
-  // The gate itself is untouched in kind: anonymous, not browsing, and not in a demo session.
-  assert.match(app, /session\.state\.status === 'anonymous' && !browsingDemo && !inDemoSession/);
+  // The gate itself is untouched in kind: anonymous, and not in a demo session. (It once also
+  // asked "and not browsing the read-only window"; that window is no longer reachable.)
+  assert.match(app, /session\.state\.status === 'anonymous' && !inDemoSession/);
   assert.match(app, /demoSessionInUse\(/);
 });
 
@@ -73,12 +75,22 @@ test('the demo files never sign in, sign out, decide, or read the operator\'s se
   }
 });
 
-test('the sign-in screen is unchanged in kind and links to the demo through the router', () => {
+test('the sign-in screen is unchanged in kind, and its one demo entry is a link to /#/demo built through the router', () => {
   const login = code(read('screens/Login.tsx'));
   assert.equal(login.split('api.login(').length - 1, 1, 'exactly one sign-in call');
   assert.ok(login.includes('await api.login(password)'));
-  assert.ok(login.includes('onClick={onBrowseDemo}'), 'the read-only demo button is still there');
-  assert.match(login, /routeToHash\(\{ name: 'demo', id: null \}\)/, 'the demo link must be built with the router');
+
+  // One entry, an anchor — not a button that sets state. It goes where the router says.
+  const anchors = openingTags(login, 'a');
+  assert.equal(anchors.length, 1, 'the sign-in screen should have exactly one link');
+  assert.match(anchors[0] ?? '', /href=\{routeToHash\(\{ name: 'demo', id: null \}\)\}/, 'the demo link must be built with the router');
+  assert.match(anchors[0] ?? '', /focus-visible:outline/, 'the link needs a visible focus ring');
+  assert.equal(routeToHash({ name: 'demo', id: null }), '#/demo');
+  assert.deepEqual(parseRoute('#/demo'), { name: 'demo', id: null });
+
+  // Nothing is remembered about a visitor having chosen it.
+  assert.doesNotMatch(login, /onBrowseDemo|browsingDemo|setBrowsingDemo|demoAvailable/);
+  assert.equal(openingTags(login, 'button').length, 1, 'the only button is the password form\'s submit');
 });
 
 test('the entry screen never starts a session by itself: only a visitor\'s click does, and a failure is retried the same way', () => {

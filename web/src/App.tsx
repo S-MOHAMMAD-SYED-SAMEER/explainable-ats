@@ -51,10 +51,6 @@ export function App(): ReactNode {
   // The visitor-scoped public demo. Entirely separate from `session`: a demo
   // session is not a sign-in, and nothing below lets one stand in for the other.
   const demoSession = useDemoSession();
-  // Viewing the dashboard without a session. A local view preference, not an
-  // authentication state — see the note on `SessionState`. It buys this browser
-  // nothing the server would not already give an anonymous caller.
-  const [browsingDemo, setBrowsingDemo] = useState(false);
 
   // Whether the dashboard is drawn from the visitor's own sandbox. Derived from
   // the server's two answers, never stored — see `demoSessionInUse`.
@@ -91,18 +87,12 @@ export function App(): ReactNode {
   // the boundary itself — the server refuses every protected endpoint on its
   // own. The demo branch below relies on exactly that: it draws the dashboard
   // for a visitor with no session, and every write behind it still fails.
-  if (session.state.status === 'anonymous' && !browsingDemo && !inDemoSession) {
-    return (
-      <Login
-        onSignedIn={() => void session.refresh()}
-        demoAvailable={session.state.demoAvailable}
-        onBrowseDemo={() => setBrowsingDemo(true)}
-      />
-    );
+  if (session.state.status === 'anonymous' && !inDemoSession) {
+    return <Login onSignedIn={() => void session.refresh()} />;
   }
 
-  // Anonymous past that return means the visitor chose to browse the demo, one
-  // way or the other. A signed-in operator who chose the visitor demo is in it too.
+  // Anonymous past that return means the visitor is in their own demo session. A
+  // signed-in operator who chose the visitor demo is in it too.
   const demo = session.state.status === 'anonymous' || inDemoSession;
 
   return (
@@ -111,7 +101,6 @@ export function App(): ReactNode {
       operator={session.state.status === 'authenticated' && !inDemoSession ? session.state.operator : null}
       onSignOut={() => void session.signOut()}
       demo={demo}
-      onExitDemo={() => setBrowsingDemo(false)}
       demoSession={
         inDemoSession
           ? {

@@ -20,7 +20,7 @@ What exists today, stated plainly:
 | Anthropic / Claude provider | **Implemented, not yet verified against the real API.** `LLM_PROVIDER=anthropic` builds an adapter that forces a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a local stub server only: **no call to the live Anthropic API has been made**, whether the configured model accepts the request as built is unconfirmed, and **extraction quality has not been evaluated**. The public demo always uses the mock. |
 | Resume input | **Plain text only**, through the existing pipeline. There is no upload endpoint and no PDF or DOCX parsing. |
 | Job requirements | **Structured and typed** (label, criterion, must-have or nice-to-have, weight). They are not extracted from a free-text job description. |
-| Public demo | Two layers. A **visitor-scoped demo session** (`/#/demo`, no sign-in): each visitor gets a private, in-memory copy of the five invented candidates, scored by the real deterministic pipeline, that no other visitor can see. And the older read-only dashboard over the canonical seeded data, plus a **demo-run endpoint** that runs one candidate in a shared, temporary, isolated in-memory sandbox. A visitor can record a demo decision in their own session only. See Sections 5 and 6. |
+| Public demo | Two layers. A **visitor-scoped demo session** (`/#/demo`, no sign-in): each visitor gets a private, in-memory copy of the five invented candidates, scored by the real deterministic pipeline, that no other visitor can see. The sign-in page's "Read-only demo" entry links to it. The older read-only dashboard over the canonical seeded data is no longer reachable from the UI; its API allow-list (`DEMO_PUBLIC_READONLY`) and a **demo-run endpoint** that runs one candidate in a shared, temporary, isolated in-memory sandbox remain on the server. A visitor can record a demo decision in their own session only. See Sections 5 and 6. |
 | Evaluation harness / accuracy metrics | **None.** |
 | Docker / deployment configuration | **None** in this repository. CI exists (Section 11). |
 
@@ -206,7 +206,9 @@ not a general-purpose PII scrubber for arbitrary real-world resumes.
     looks it up, read-only, and answers "not available" if it is missing). It is
     **not** controlled by `DEMO_PUBLIC_READONLY`.
 - **The visitor-scoped demo session** (`demo/sessions.ts`, `routes/demoSession.ts`)
-  is the public entry. A visitor opens `/#/demo`, with no sign-in, and meets a
+  is the public entry. A visitor opens `/#/demo`, with no sign-in — the sign-in
+  page's single "Read-only demo" entry is an ordinary link to it, always offered,
+  and described as isolated sample data whose demo actions stay private — and meets a
   landing screen ("Interactive ATS Demo") that says what the product does, what
   can be explored, that the data is synthetic and private, that no key or AI
   service is needed, and walks through the seven stages a CV goes through. Nothing
@@ -622,8 +624,7 @@ faked to make them run.
   (Section 5). A visitor's demo decision lives only in their session and is not
   saved anywhere durable. The demo has a landing, a short guide, the redacted resume
   with highlighted evidence, a pipeline and an audit timeline, but no what-if controls.
-  Those sections exist only in a visitor's own session, not in the recruiter's screens
-  or the read-only window.
+  Those sections exist only in a visitor's own session, not in the recruiter's screens.
 - **No evaluation harness or accuracy metrics** exist.
 - **Matching is term coverage, not comprehension.** It is deliberately crude and
   explainable, and it has not been measured against real resumes.
