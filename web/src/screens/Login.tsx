@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client.ts';
+import { routeToHash } from '../router.ts';
 
 // The sign-in screen (M6-A).
 //
@@ -147,6 +148,17 @@ export function Login({
             </p>
           </div>
         ) : null}
+
+        <p className="mt-4 text-meta text-ink-muted">
+          Just looking?{' '}
+          <a
+            href={routeToHash({ name: 'demo', id: null })}
+            className="font-semibold text-ink underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            Open the interactive demo
+          </a>{' '}
+          — no sign-in, with a private copy of five invented candidates.
+        </p>
 
         <p className="mt-4 text-meta text-ink-muted">
           The password is checked on the server and never stored in this browser.

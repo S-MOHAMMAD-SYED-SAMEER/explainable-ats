@@ -125,16 +125,28 @@ export const RATE_LIMITS = Object.freeze({
   login: { limit: 10, windowMs: 60_000 },
   mutation: { limit: 120, windowMs: 60_000 },
   demoRun: { limit: 10, windowMs: 60_000 },
+  // Starting, resetting and ending a visitor's demo session. Starting builds a
+  // private database and runs the whole pipeline over the dataset, so it is the
+  // most expensive thing an anonymous caller can ask for — hence its own class
+  // and the same conservative pace as `login`, not `mutation`'s 120/minute.
+  demoSession: { limit: 10, windowMs: 60_000 },
 } satisfies Record<string, RateLimitRule>);
 
 export type RateLimitClass = keyof typeof RATE_LIMITS;
 
-/** The one public demo-run endpoint (`routes/demo.ts`). POST only. */
-const DEMO_RUN_PATH = /^\/demo\/scenarios\/[^/]+\/run$/;
+/**
+ * The public demo-run endpoints: the shared sandbox's (`routes/demo.ts`) and a
+ * visitor session's own (`routes/demoSession.ts`). POST only.
+ */
+const DEMO_RUN_PATH = /^\/demo\/(?:session\/)?scenarios\/[^/]+\/run$/;
+
+/** A visitor session's lifecycle: start, reset, end. */
+const DEMO_SESSION_PATH = /^\/demo\/session(?:\/reset)?$/;
 
 export function classify(method: string, path: string): RateLimitClass | null {
   if (path === '/auth/login') return 'login';
   if (method === 'POST' && DEMO_RUN_PATH.test(path)) return 'demoRun';
+  if ((method === 'POST' || method === 'DELETE') && DEMO_SESSION_PATH.test(path)) return 'demoSession';
   // Reads are not limited: they are cheap, and limiting them would make a busy
   // dashboard look like an attack.
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return null;

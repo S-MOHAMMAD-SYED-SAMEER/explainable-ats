@@ -32,7 +32,7 @@ export type DemoDeps = {
 export type DemoRunResult = { evaluationId: string };
 
 /** True for "no body was sent" — `undefined`, `null`, or an empty object. */
-function hasBodyContent(body: unknown): boolean {
+export function hasBodyContent(body: unknown): boolean {
   if (body === undefined || body === null) return false;
   if (typeof body === 'object' && !Array.isArray(body)) return Object.keys(body as object).length > 0;
   return true;

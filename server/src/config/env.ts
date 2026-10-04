@@ -25,6 +25,12 @@ try {
 }
 
 export const LLM_PROVIDERS = ['mock', 'anthropic'] as const;
+
+/** Anthropic request limits. Both are bounded: nothing here may wait forever. */
+export const ANTHROPIC_DEFAULT_TIMEOUT_MS = 60_000;
+export const ANTHROPIC_MAX_TIMEOUT_MS = 300_000;
+export const ANTHROPIC_DEFAULT_MAX_RETRIES = 2;
+export const ANTHROPIC_MAX_RETRIES = 5;
 export type LlmProviderName = (typeof LLM_PROVIDERS)[number];
 
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const satisfies readonly LogLevel[];
@@ -66,6 +72,30 @@ function readNonNegativeInt(key: string, fallback: number, problems: string[]): 
   return parsed;
 }
 
+/** Like `readInt`, but a value above `ceiling` is reported and clamped to it. */
+function readBoundedInt(
+  key: string,
+  fallback: number,
+  ceiling: number,
+  allowZero: boolean,
+  problems: string[],
+): number {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < (allowZero ? 0 : 1)) {
+    problems.push(
+      `${key} must be ${allowZero ? 'a non-negative' : 'a positive'} integer; received "${raw}". Using ${fallback}.`,
+    );
+    return fallback;
+  }
+  if (parsed > ceiling) {
+    problems.push(`${key} is ${parsed}, above the maximum of ${ceiling}. Using ${ceiling}.`);
+    return ceiling;
+  }
+  return parsed;
+}
+
 function readEnum<T extends string>(key: string, allowed: readonly T[], fallback: T, problems: string[]): T {
   const raw = readString(key, fallback).toLowerCase();
   if (!(allowed as readonly string[]).includes(raw)) {
@@ -86,6 +116,10 @@ export type AppConfig = {
   llmProvider: LlmProviderName;
   anthropicApiKey: string | null;
   anthropicModel: string;
+  /** Per-request timeout for the Anthropic provider, in milliseconds. */
+  anthropicTimeoutMs: number;
+  /** Retries after the first attempt, for transient failures only. */
+  anthropicMaxRetries: number;
   operatorPasswordHash: string | null;
   /**
    * Whether anonymous callers may read the allow-listed demo routes.
@@ -157,9 +191,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         anthropicApiKey,
         // Sonnet 5 is the intended tier for resume ranking, and is not a default
         // to drift from: API spend is real money, so the tier is stated here and
-        // changed deliberately or not at all. Nothing reads this value yet — the
-        // Anthropic provider is not implemented.
+        // changed deliberately or not at all. The Anthropic provider passes this
+        // string through verbatim and never names a model of its own.
         anthropicModel: readString('ANTHROPIC_MODEL', 'claude-sonnet-5'),
+        anthropicTimeoutMs: readBoundedInt(
+          'ANTHROPIC_TIMEOUT_MS',
+          ANTHROPIC_DEFAULT_TIMEOUT_MS,
+          ANTHROPIC_MAX_TIMEOUT_MS,
+          false,
+          problems,
+        ),
+        anthropicMaxRetries: readBoundedInt(
+          'ANTHROPIC_MAX_RETRIES',
+          ANTHROPIC_DEFAULT_MAX_RETRIES,
+          ANTHROPIC_MAX_RETRIES,
+          true,
+          problems,
+        ),
         operatorPasswordHash,
         // Off unless an operator turns it on, by name, in the environment.
         demoPublicReadonly: readBool('DEMO_PUBLIC_READONLY', false),

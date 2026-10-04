@@ -48,7 +48,7 @@ function facts(health: Health): Fact[] {
       value: a.llmProvider === 'mock' ? 'Demo mode' : a.llmProvider === 'anthropic' ? 'Claude' : String(a.llmProvider),
       detail:
         a.llmProvider === 'mock'
-          ? 'Running on recorded responses, so a walkthrough behaves identically every time.'
+          ? 'A fixed keyword matcher stands in for a language model, so a walkthrough behaves identically every time and calls no external service.'
           : 'Live model calls, with every reply checked before it can be used.',
       tone: 'neutral',
     },

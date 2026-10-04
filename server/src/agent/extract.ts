@@ -81,6 +81,7 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
   let output: Record<string, unknown>;
   let model: string;
   let latencyMs: number;
+  let usage: { inputTokens: number; outputTokens: number } | undefined;
 
   try {
     const response = await provider.complete({
@@ -94,6 +95,7 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
     output = response.output;
     model = response.model;
     latencyMs = response.latencyMs;
+    usage = response.usage;
   } catch (err) {
     // A provider failure is recorded as a failure. It never becomes an empty
     // result, because "the model found nothing" and "the model could not be
@@ -218,7 +220,14 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
     actorId: model,
     outcome: 'ok',
     summary: `Read the resume against ${requirements.length} requirement(s).`,
-    payload: { model, promptVersion: EXTRACTION_PROMPT_VERSION, requirements: requirements.length },
+    // Token counts, only when the provider reported them (the mock does not, so
+    // its payload is unchanged). Counts, not cost: nothing here is priced.
+    payload: {
+      model,
+      promptVersion: EXTRACTION_PROMPT_VERSION,
+      requirements: requirements.length,
+      ...(usage ? { usage } : {}),
+    },
     entityType: 'evaluation',
     entityId: evaluation.id,
   });
@@ -228,6 +237,7 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
     verified: verified.length,
     rejected: rejected.length,
     malformed: malformed.length,
+    ...(usage ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens } : {}),
   });
 
   return { evaluation: updated, verified: verified.length, rejected: rejected.length, malformed: malformed.length };

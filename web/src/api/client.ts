@@ -1,7 +1,9 @@
 import { CSRF_HEADER, currentCsrfToken, needsCsrf, type SessionResponse } from '../auth/session.ts';
+import { isDemoSessionPath, resolveApiPath, type ApiScope } from '../demo/session.ts';
 import type {
   AuditEntry,
   DecisionResult,
+  DemoResume,
   ErrorEnvelope,
   EvaluationDetail,
   Health,
@@ -51,6 +53,28 @@ export function setCsrfFailureHandler(handler: AuthListener | null): void {
   onCsrfFailure = handler;
 }
 
+// --- which half of the API the dashboard is reading --------------------------
+//
+// The screens call `api.job(id)` and friends and know nothing about demos. In
+// the `demo` scope those same calls are answered by the visitor's own sandbox
+// (see `resolveApiPath`), so there is one set of screens and no second copy to
+// drift. Module-level, like the two handlers above, because exactly one thing
+// sets it — the app shell — and every request reads it.
+
+let apiScope: ApiScope = 'recruiter';
+
+/** Idempotent: setting the scope it already has is a no-op, so it is safe to call from render. */
+export function setApiScope(scope: ApiScope): void {
+  apiScope = scope;
+}
+
+let onDemoSessionLost: AuthListener | null = null;
+
+/** Called when the server says the visitor's demo session is gone. Not a sign-out. */
+export function setDemoSessionLostHandler(handler: AuthListener | null): void {
+  onDemoSessionLost = handler;
+}
+
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
@@ -72,6 +96,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // HttpOnly and is never touched here — the browser attaches it.
   const csrf = needsCsrf(init?.method) ? currentCsrfToken() : null;
 
+  // Where this logical path lives for the current scope. The error handling
+  // below keys on `path`, the logical name, except where it says `target`.
+  const target = resolveApiPath(path, apiScope);
+
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     ...(csrf ? { [CSRF_HEADER]: csrf } : {}),
@@ -80,7 +108,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetch(`${BASE_URL}${target}`, {
       ...init,
       // Explicit rather than relying on the default. The API is same-origin —
       // the dev proxy makes that true locally too — and this is the line that
@@ -119,7 +147,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // and `/auth/login` because a wrong password is a failed sign-in rather
     // than a lost session. Notifying on either would put the app in a loop
     // between "check the session" and "the session is gone".
-    if (error.status === 401 && path !== '/auth/session' && path !== '/auth/login') {
+    if (error.status === 401 && isDemoSessionPath(target)) {
+      // A visitor's demo session ending is not the operator's session ending.
+      // Reporting it as a sign-out would send a visitor to a password box for
+      // an account they never had; it has its own handler, and its own answer
+      // (start the demo again).
+      onDemoSessionLost?.();
+    } else if (error.status === 401 && path !== '/auth/session' && path !== '/auth/login') {
       onUnauthorized?.();
     }
 
@@ -170,11 +204,36 @@ export const api = {
   evaluationAudit: (evaluationId: string): Promise<{ events: AuditEntry[] }> =>
     request<{ events: AuditEntry[] }>(`/evaluations/${encodeURIComponent(evaluationId)}/audit`),
 
+  /**
+   * The redacted resume. Exists only in a visitor's demo session: the recruiter API
+   * has no such route, so this is only ever called in the `demo` scope.
+   */
+  evaluationResume: (evaluationId: string): Promise<DemoResume> =>
+    request<DemoResume>(`/evaluations/${encodeURIComponent(evaluationId)}/resume`),
+
   decide: (evaluationId: string, outcome: string, reason: string): Promise<DecisionResult> =>
     request<DecisionResult>(`/evaluations/${encodeURIComponent(evaluationId)}/decision`, {
       method: 'POST',
       body: JSON.stringify({ outcome, reason }),
     }),
+
+  // --- the visitor-scoped demo session ---------------------------------------
+  //
+  // Each of these answers with the session's view, or a status saying there is
+  // none. None of them sends or receives a token: the session is named by an
+  // HttpOnly cookie the browser attaches by itself. They are left unresolved by
+  // `resolveApiPath` — they are the session, not reads inside it.
+
+  demoSession: (): Promise<unknown> => request<unknown>('/demo/session'),
+
+  startDemoSession: (): Promise<unknown> =>
+    request<unknown>('/demo/session', { method: 'POST', body: JSON.stringify({}) }),
+
+  resetDemoSession: (): Promise<unknown> =>
+    request<unknown>('/demo/session/reset', { method: 'POST', body: JSON.stringify({}) }),
+
+  endDemoSession: (): Promise<{ ended: boolean }> =>
+    request<{ ended: boolean }>('/demo/session', { method: 'DELETE' }),
 
   // --- the public demo runner (Option B) -------------------------------------
   //

@@ -1,12 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { AppShell } from './components/AppShell.tsx';
 import { Overview } from './screens/Overview.tsx';
 import { Jobs } from './screens/Jobs.tsx';
 import { JobDetail } from './screens/JobDetail.tsx';
 import { CandidateDetail } from './screens/CandidateDetail.tsx';
 import { Login } from './screens/Login.tsx';
+import { DemoEntry } from './screens/DemoEntry.tsx';
 import { useSession } from './auth/useSession.ts';
-import { DEFAULT_ROUTE, parseRoute, type Route } from './router.ts';
+import { useDemoSession } from './demo/useDemoSession.ts';
+import { demoSessionInUse } from './demo/session.ts';
+import { setApiScope } from './api/client.ts';
+import { DEFAULT_ROUTE, navigate, parseRoute, type Route } from './router.ts';
 
 /**
  * Subscribes to the location hash.
@@ -44,12 +48,29 @@ export function App(): ReactNode {
   // guards it here.
   const route = useRoute();
   const session = useSession();
+  // The visitor-scoped public demo. Entirely separate from `session`: a demo
+  // session is not a sign-in, and nothing below lets one stand in for the other.
+  const demoSession = useDemoSession();
   // Viewing the dashboard without a session. A local view preference, not an
   // authentication state — see the note on `SessionState`. It buys this browser
   // nothing the server would not already give an anonymous caller.
   const [browsingDemo, setBrowsingDemo] = useState(false);
 
-  if (session.state.status === 'loading') {
+  // Whether the dashboard is drawn from the visitor's own sandbox. Derived from
+  // the server's two answers, never stored — see `demoSessionInUse`.
+  const inDemoSession = demoSessionInUse({
+    sessionActive: demoSession.state.status === 'active',
+    authenticated: session.state.status === 'authenticated',
+    entered: demoSession.entered,
+  });
+
+  // Which half of the API every screen below reads. Set here, in render, because
+  // a child's data-loading effect runs BEFORE any effect this component could
+  // register, and would otherwise read the previous scope. It is idempotent —
+  // the same inputs always set the same value — which is what makes it safe.
+  setApiScope(inDemoSession ? 'demo' : 'recruiter');
+
+  if (session.state.status === 'loading' || demoSession.state.status === 'checking') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-canvas">
         <p className="text-small text-ink-muted">Loading…</p>
@@ -57,11 +78,20 @@ export function App(): ReactNode {
     );
   }
 
+  // The public demo's front door, and the recovery path when a demo session
+  // ends mid-visit. It sits ABOVE the sign-in gate on purpose: a visitor who
+  // asked for the demo must not meet a password box first. It grants nothing —
+  // everything a demo session can reach is synthetic, and the server refuses the
+  // recruiter's routes to it regardless of what this screen believes.
+  if (route.name === 'demo' || (demoSession.entered && !inDemoSession)) {
+    return <DemoEntry demo={demoSession} redirect={route.name === 'demo'} />;
+  }
+
   // This gate is the honest presentation of the server's boundary rather than
   // the boundary itself — the server refuses every protected endpoint on its
   // own. The demo branch below relies on exactly that: it draws the dashboard
   // for a visitor with no session, and every write behind it still fails.
-  if (session.state.status === 'anonymous' && !browsingDemo) {
+  if (session.state.status === 'anonymous' && !browsingDemo && !inDemoSession) {
     return (
       <Login
         onSignedIn={() => void session.refresh()}
@@ -71,16 +101,32 @@ export function App(): ReactNode {
     );
   }
 
-  // Anonymous past that return means the visitor chose to browse the demo.
-  const demo = session.state.status === 'anonymous';
+  // Anonymous past that return means the visitor chose to browse the demo, one
+  // way or the other. A signed-in operator who chose the visitor demo is in it too.
+  const demo = session.state.status === 'anonymous' || inDemoSession;
 
   return (
     <AppShell
       route={route}
-      operator={session.state.status === 'authenticated' ? session.state.operator : null}
+      operator={session.state.status === 'authenticated' && !inDemoSession ? session.state.operator : null}
       onSignOut={() => void session.signOut()}
       demo={demo}
       onExitDemo={() => setBrowsingDemo(false)}
+      demoSession={
+        inDemoSession
+          ? {
+              busy: demoSession.busy,
+              onReset: () => {
+                void demoSession.reset().then((view) => {
+                  if (view) navigate({ name: 'jobs', id: view.jobId });
+                });
+              },
+              onExit: () => {
+                void demoSession.end().then(() => navigate({ name: 'jobs', id: null }));
+              },
+            }
+          : undefined
+      }
       notice={session.notice}
       onDismissNotice={session.dismissNotice}
     >
@@ -88,9 +134,14 @@ export function App(): ReactNode {
           plainly than a registry, and each screen owns its own loading. A
           detail route with no id is a stale or mistyped link, so it falls back
           to the list it belongs to rather than to an error. */}
-      {route.name === 'overview' ? <Overview /> : null}
-      {route.name === 'jobs' ? route.id === null ? <Jobs /> : <JobDetail jobId={route.id} demo={demo} /> : null}
-      {route.name === 'candidates' ? route.id === null ? <Jobs /> : <CandidateDetail evaluationId={route.id} demo={demo} /> : null}
+      {/* Keyed on which half of the API is being read and on the reset count, so
+          entering the demo, leaving it, or resetting it remounts the screens and
+          re-reads from the right place instead of showing the last place's data. */}
+      <Fragment key={`${inDemoSession ? 'demo' : 'recruiter'}-${demoSession.generation}`}>
+        {route.name === 'overview' ? <Overview /> : null}
+        {route.name === 'jobs' ? route.id === null ? <Jobs /> : <JobDetail jobId={route.id} demo={demo} demoSession={inDemoSession} /> : null}
+        {route.name === 'candidates' ? route.id === null ? <Jobs /> : <CandidateDetail evaluationId={route.id} demo={demo} demoSession={inDemoSession} /> : null}
+      </Fragment>
     </AppShell>
   );
 }

@@ -2,6 +2,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { createHealthRouter } from './routes/health.ts';
 import { createAuthRouter } from './routes/auth.ts';
 import { createDemoRouter } from './routes/demo.ts';
+import { createDemoSessionRouter } from './routes/demoSession.ts';
 import { createRecruiterRouter } from './routes/recruiter.ts';
 import { attachSession, requireSessionOrPublicRead } from './auth/middleware.ts';
 import { requireCsrf } from './auth/csrf.ts';
@@ -10,6 +11,7 @@ import { rateLimit } from './http/rateLimit.ts';
 import { createRepositories } from './db/repositories/index.ts';
 import { createLlmProvider } from './adapters/llm/index.ts';
 import { createDemoSandbox } from './demo/sandbox.ts';
+import { createDemoSessionStore, type DemoSessionStore } from './demo/sessions.ts';
 import { config as defaultConfig, type AppConfig } from './config/env.ts';
 import { toErrorEnvelope } from './lib/errors.ts';
 import { createLogger, type Logger } from './lib/logger.ts';
@@ -27,6 +29,8 @@ export type AppDeps = {
   rateLimiter?: ReturnType<typeof rateLimit>;
   /** Injectable so a test can supply a deterministic provider. */
   provider?: LlmProvider;
+  /** Injectable so a test can control expiry and capacity. Defaults to a real store. */
+  demoSessions?: DemoSessionStore;
 };
 
 // Large enough for a long resume pasted as text, small enough that a request
@@ -40,16 +44,21 @@ export function createApp({
   config = defaultConfig,
   provider,
   rateLimiter = rateLimit(),
+  demoSessions,
 }: AppDeps): Express {
   const app = express();
   const repos = createRepositories(db);
   // Public demo runs happen here, never in `db`. See demo/sandbox.ts.
   const sandbox = createDemoSandbox({ migrationsDir: config.migrationsDir, logger });
+  // Per-visitor demo sessions: private in-memory databases, handed no reference
+  // to `db`. See demo/sessions.ts.
+  const sessionStore = demoSessions ?? createDemoSessionStore({ migrationsDir: config.migrationsDir, logger });
 
-  // Built here so a misconfigured provider fails at startup rather than on the
-  // first request. Nothing calls it yet: there is no HTTP route that runs
-  // extraction, and the public demo builds its own deterministic provider.
-  const llm = provider ?? createLlmProvider(config);
+  // Built here so a misconfigured provider (an unknown name, a missing key) fails
+  // at startup rather than on the first request. Nothing calls it yet: there is
+  // no HTTP route that runs extraction, and the public demo builds its own
+  // deterministic provider whatever this is set to.
+  const llm = provider ?? createLlmProvider(config, { logger });
   void llm;
 
   app.disable('x-powered-by');
@@ -103,6 +112,13 @@ export function createApp({
   //                       either the auth routes or the read-only public-demo
   //                       allow-list below. It runs in an in-memory sandbox and
   //                       writes nothing to `db`.
+  //   5c. demo-session routes — the visitor-scoped public demo
+  //                       (routes/demoSession.ts). Anonymous by design, and
+  //                       answered entirely from a private in-memory database
+  //                       per visitor: the router is never given `repos`. Its
+  //                       cookie is not a session — `req.session` and
+  //                       `req.operator` stay unset, so every recruiter route
+  //                       behind the gate is exactly as closed as it was.
   //   6. requireSession — the gate. Everything past it is authenticated.
   //
   // Anything added after step 6 is protected by default. That is deliberate:
@@ -113,6 +129,7 @@ export function createApp({
   app.use('/api', requireCsrf());
   app.use('/api', createAuthRouter({ repos, config, logger }));
   app.use('/api', createDemoRouter({ repos, sandbox, logger }));
+  app.use('/api', createDemoSessionRouter({ store: sessionStore, config, logger }));
   app.use('/api', requireSessionOrPublicRead({ publicReadsEnabled: config.demoPublicReadonly }));
 
   // Everything from here on is behind the gate.

@@ -140,3 +140,6 @@ export type AuditEntry = {
 };
 
 export type DecisionResult = { decision: Decision; evaluation: EvaluationDetail };
+
+/** A demo candidate's resume as the pipeline saw it: the redacted text, and nothing else. */
+export type DemoResume = { text: string };

@@ -24,6 +24,10 @@ export const ROUTES = [
   // against one; addressing the assessment is what keeps a link pointing at the
   // evidence it was written about rather than at whatever is newest.
   'candidates',
+  // `#/demo` — the public demo's front door. It is a place to ENTER from, not a
+  // screen in the dashboard: it starts (or resumes) the visitor's own sandbox
+  // and moves on to its job. Reachable with no sign-in, by design.
+  'demo',
 ] as const;
 
 export type RouteName = (typeof ROUTES)[number];

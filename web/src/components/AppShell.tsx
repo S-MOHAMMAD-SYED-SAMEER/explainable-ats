@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { routeToHash, type Route, type RouteName } from '../router.ts';
+import { DemoGuide } from './DemoGuide.tsx';
+import { CONTROL_HELP, DEMO_DISCLOSURE, DEMO_TITLE } from '../demo/copy.ts';
 
 // The frame every screen sits in.
 //
@@ -26,6 +28,12 @@ export type AppShellProps = {
   demo?: boolean;
   /** Leaves the demo and returns to the sign-in screen. */
   onExitDemo?: () => void;
+  /**
+   * Set when the dashboard is drawn from a visitor's own demo sandbox, as
+   * opposed to the read-only window onto the canonical data. It replaces the
+   * sign-in button with the two things a visitor can do to their copy.
+   */
+  demoSession?: { onReset: () => void; onExit: () => void; busy: boolean };
   notice: string | null;
   onDismissNotice: () => void;
   children: ReactNode;
@@ -37,6 +45,7 @@ export function AppShell({
   onSignOut,
   demo = false,
   onExitDemo,
+  demoSession,
   notice,
   onDismissNotice,
   children,
@@ -55,14 +64,39 @@ export function AppShell({
             <h1 className="text-subhead">Explainable ATS</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-meta text-ink-muted">{demo ? 'Read-only demo' : operator}</span>
-            <button
-              type="button"
-              onClick={demo ? onExitDemo : onSignOut}
-              className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-            >
-              {demo ? 'Sign in' : 'Sign out'}
-            </button>
+            {demoSession ? (
+              <>
+                <span className="text-meta text-ink-muted">Public demo</span>
+                <button
+                  type="button"
+                  onClick={demoSession.onReset}
+                  disabled={demoSession.busy}
+                  title={CONTROL_HELP.reset}
+                  className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                >
+                  {demoSession.busy ? 'Resetting…' : 'Reset demo'}
+                </button>
+                <button
+                  type="button"
+                  onClick={demoSession.onExit}
+                  title={CONTROL_HELP.exit}
+                  className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  Exit demo
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-meta text-ink-muted">{demo ? 'Read-only demo' : operator}</span>
+                <button
+                  type="button"
+                  onClick={demo ? onExitDemo : onSignOut}
+                  className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  {demo ? 'Sign in' : 'Sign out'}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -89,7 +123,18 @@ export function AppShell({
         </nav>
       </header>
 
-      {demo ? (
+      {demoSession ? (
+        <div className="mx-auto mt-4 max-w-6xl rounded-card border border-line bg-surface px-4 py-3">
+          <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">
+            {DEMO_TITLE} · your own private copy
+          </p>
+          <p className="mt-1 text-small text-ink">
+            {DEMO_DISCLOSURE} The candidates are invented, and this copy belongs to this browser alone — it is discarded
+            after a while without use.
+          </p>
+          <DemoGuide />
+        </div>
+      ) : demo ? (
         <div className="mx-auto mt-4 max-w-6xl rounded-card border border-line bg-surface px-4 py-3">
           <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">
             Read-only demo · not signed in

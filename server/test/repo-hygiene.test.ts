@@ -5,6 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classify, RATE_LIMITS } from '../src/http/rateLimit.ts';
 import { CSRF_COOKIE, SESSION_COOKIE } from '../src/auth/cookies.ts';
+import { DEFAULT_DEMO_SESSION_TTL_MS, DEFAULT_MAX_DEMO_SESSIONS } from '../src/demo/sessions.ts';
+import { DEMO_SESSION_COOKIE } from '../src/routes/demoSession.ts';
+import {
+  ANTHROPIC_DEFAULT_MAX_RETRIES,
+  ANTHROPIC_DEFAULT_TIMEOUT_MS,
+  ANTHROPIC_MAX_RETRIES,
+  ANTHROPIC_MAX_TIMEOUT_MS,
+} from '../src/config/env.ts';
 import { resolvePortfolioFixture } from './portfolioFixture.ts';
 
 // The repository describes itself in three places a reader trusts without
@@ -99,6 +107,11 @@ test('the README does not repeat claims that were once true or never were', () =
     [/No Docker, Compose, or CI/i, 'denies the CI workflow'],
     [/reachability has not been verified/i, 'makes an obsolete deployment-reachability claim'],
     [/pinned to `?claude-sonnet-5`? by default/i, 'implies the Anthropic provider works'],
+    [/anthropic[^\n]{0,60}not implemented/i, 'says the Anthropic provider is not implemented'],
+    [/not implemented[^\n]{0,60}anthropic/i, 'says the Anthropic provider is not implemented'],
+    [/not imported anywhere/i, 'says the Anthropic SDK is unused'],
+    [/production[- ]ready (AI|extraction)/i, 'overclaims what the Anthropic provider is'],
+    [/\b(has|have) been (verified|tested|confirmed)[^.]{0,40}(real|live)[^.]{0,20}API/i, 'claims live-API verification'],
     [/read-only exploration experience/i, 'calls the demo purely read-only'],
   ];
 
@@ -118,9 +131,14 @@ test('the README states the things that are true now', () => {
     [/isolated[^.]*in-memory[^.]*sandbox/i, 'that it runs in an isolated in-memory sandbox'],
     [/does not write to the canonical database/i, 'that it does not touch canonical state'],
     [/ephemeral/i, 'that sandbox results are ephemeral'],
-    [/anthropic[^\n]*not implemented|not implemented[^\n]*anthropic/i, 'that the Anthropic provider is not implemented'],
-    [/@anthropic-ai\/sdk[\s\S]{0,120}not imported|not imported[\s\S]{0,120}@anthropic-ai\/sdk/i, 'that the SDK is unused'],
-    [/deterministic mock/i, 'that extraction is a deterministic mock'],
+    [/Implemented, not yet verified against the real API/i, 'that the Anthropic provider is implemented but unverified'],
+    [/no call to the live Anthropic API has been made/i, 'that no live call has been made'],
+    [/extraction quality has not been evaluated/i, 'that extraction quality is unevaluated'],
+    [/public demo always uses the mock/i, 'that the public demo still uses the mock'],
+    [/\*\*forces the `record_evidence` tool\*\*/i, 'that the tool call is forced'],
+    [/redacted resume text\s+only/i, 'that only redacted text is sent'],
+    [/no cost calculation and no cost tracking/i, 'that cost is not tracked'],
+    [/deterministic mock/i, 'that extraction defaults to a deterministic mock'],
     [/no PDF or DOCX parsing/i, 'that there is no PDF/DOCX parsing'],
     [/PORTFOLIO_DEMO_DIR/, 'the parity override'],
     [/\.github\/workflows\/ci\.yml/, 'the CI workflow'],
@@ -137,7 +155,8 @@ test('the README\'s claims about the code match the code', () => {
   // The demo-run route it documents is the route that exists.
   assert.match(read('server/src/routes/demo.ts'), /'\/demo\/scenarios\/:scenario\/run'/);
 
-  // "The SDK is not imported anywhere" — and it is not.
+  // "The SDK is imported in exactly one file, the adapter" — and it is. Nothing
+  // else in the server, and nothing in the web app, reaches for it.
   const importers: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
@@ -149,7 +168,27 @@ test('the README\'s claims about the code match the code', () => {
   walk('server/src');
   walk('server/scripts');
   walk('web/src');
-  assert.deepEqual(importers, [], 'the README says the Anthropic SDK is unused, but something references it');
+  assert.deepEqual(importers, ['server/src/adapters/llm/anthropic.ts'], 'the Anthropic SDK should be imported in exactly one file');
+
+  // The limits it documents are the limits the code enforces.
+  for (const [what, value] of [
+    ['default timeout', ANTHROPIC_DEFAULT_TIMEOUT_MS],
+    ['maximum timeout', ANTHROPIC_MAX_TIMEOUT_MS],
+    ['default retries', ANTHROPIC_DEFAULT_MAX_RETRIES],
+    ['maximum retries', ANTHROPIC_MAX_RETRIES],
+  ] as const) {
+    assert.ok(README.includes(String(value)), `the README does not state the ${what} (${value})`);
+  }
+  // (The example file wraps its comments, so join the lines before looking.)
+  const envExample = read('server/.env.example').replace(/\s*\r?\n#\s*/g, ' ');
+  assert.ok(
+    new RegExp(`default ${ANTHROPIC_DEFAULT_TIMEOUT_MS}, maximum ${ANTHROPIC_MAX_TIMEOUT_MS}`, 'i').test(envExample),
+    '.env.example does not state the timeout limits the code enforces',
+  );
+  assert.ok(
+    new RegExp(`default ${ANTHROPIC_DEFAULT_MAX_RETRIES}, maximum ${ANTHROPIC_MAX_RETRIES}`, 'i').test(envExample),
+    '.env.example does not state the retry limits the code enforces',
+  );
 
   // The cookie names and the demo-run budget it quotes.
   assert.ok(README.includes(`\`${SESSION_COOKIE}\``) && README.includes(`\`${CSRF_COOKIE}\``));
@@ -304,8 +343,44 @@ test('no source file names another project\'s cookies, routes or documents', () 
 });
 
 test('the rate limiter has no class or path for routes that do not exist', () => {
-  assert.deepEqual(Object.keys(RATE_LIMITS).sort(), ['demoRun', 'login', 'mutation']);
+  assert.deepEqual(Object.keys(RATE_LIMITS).sort(), ['demoRun', 'demoSession', 'login', 'mutation']);
   // A path nothing serves is an ordinary mutation, with no special treatment.
   assert.equal(classify('POST', '/emails/decide'), 'mutation');
   assert.equal(classify('POST', '/emails/abc/understand'), 'mutation');
+});
+
+test('the README\'s account of the visitor demo session matches the code', () => {
+  // The cookie it names, the budget it quotes, and the bounds it states.
+  assert.ok(README.includes('`' + DEMO_SESSION_COOKIE + '`'), 'the README does not name the demo cookie');
+  assert.ok(README.includes('demoSession'), 'the README does not name the demo-session rate-limit class');
+  assert.ok(
+    new RegExp(`${RATE_LIMITS.demoSession.limit} per minute`).test(README),
+    'the README quotes a different demo-session budget',
+  );
+  assert.equal(DEFAULT_DEMO_SESSION_TTL_MS, 2 * 60 * 60 * 1000, 'the README says two hours; change both together');
+  assert.ok(/two hours/.test(README), 'the README does not state the session lifetime');
+  assert.ok(
+    new RegExp(`at most ${DEFAULT_MAX_DEMO_SESSIONS} exist`).test(README),
+    'the README states a different session cap than the code enforces',
+  );
+
+  // The resume endpoint, which returns the redacted text only.
+  assert.ok(README.includes('GET /api/demo/session/evaluations/:id/resume'), 'the README does not document the demo resume route');
+
+  // The demo decision: the route and the fixed actor it names.
+  assert.ok(README.includes('POST /api/demo/session/evaluations/:id/decision'), 'the README does not document the demo decision route');
+  assert.ok(README.includes('`demo-visitor`'), 'the README does not name the demo actor');
+  assert.ok(read('server/src/handlers/demoSession.ts').includes("DEMO_ACTOR = 'demo-visitor'"), 'the README names an actor the code does not use');
+
+  // The routes it documents are the routes that exist.
+  const router = read('server/src/routes/demoSession.ts');
+  for (const route of [
+    "'/demo/session'",
+    "'/demo/session/reset'",
+    "'/demo/session/scenarios/:scenario/run'",
+    "'/demo/session/evaluations/:evaluationId/decision'",
+    "'/demo/session/evaluations/:evaluationId/resume'",
+  ]) {
+    assert.ok(router.includes(route), `the README documents ${route}, which the router does not define`);
+  }
 });

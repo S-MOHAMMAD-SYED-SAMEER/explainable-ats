@@ -3,6 +3,7 @@ import { api } from '../api/client.ts';
 import { useLoad } from '../useLoad.ts';
 import { BackLink, Badge, Empty, Loading, Problem, Technical } from '../components/Bits.tsx';
 import { DemoRunner } from '../components/DemoRunner.tsx';
+import { DemoOverview } from '../components/DemoOverview.tsx';
 import { kindLabel, tierWording } from '../copy.ts';
 import { routeToHash } from '../router.ts';
 import type { JobDetail as JobDetailData, RankedCandidate, Ranking } from '../api/types.ts';
@@ -145,7 +146,16 @@ function RankedList({ ranking }: { ranking: Ranking }): ReactNode {
   );
 }
 
-export function JobDetail({ jobId, demo = false }: { jobId: string; demo?: boolean }): ReactNode {
+export function JobDetail({
+  jobId,
+  demo = false,
+  demoSession = false,
+}: {
+  jobId: string;
+  demo?: boolean;
+  /** A visitor's own private demo session: the overview replaces the plain requirements card. */
+  demoSession?: boolean;
+}): ReactNode {
   // Every hook above every return — see the note in App.tsx.
   const job = useLoad(() => api.job(jobId), [jobId]);
   const ranking = useLoad(() => api.ranking(jobId), [jobId]);
@@ -166,7 +176,13 @@ export function JobDetail({ jobId, demo = false }: { jobId: string; demo?: boole
             ) : null}
           </section>
 
-          <Requirements job={job.state.data} />
+          {/* In a visitor's session the overview carries the requirements, with their
+              weights and what the labels mean; the recruiter still sees this card. */}
+          {demoSession ? (
+            <DemoOverview job={job.state.data} ranking={ranking.state.status === 'ready' ? ranking.state.data : null} />
+          ) : (
+            <Requirements job={job.state.data} />
+          )}
         </>
       ) : null}
 
@@ -174,7 +190,10 @@ export function JobDetail({ jobId, demo = false }: { jobId: string; demo?: boole
           unchanged; a signed-in operator never sees this, because `demo` is
           only ever true for an anonymous visitor browsing the read-only
           window (see App.tsx). */}
-      {demo ? <DemoRunner /> : null}
+      {/* Not in a visitor's own session: there, every candidate is already assessed and
+          one click opens them, so a button that says it will run the pipeline would
+          promise something the page does not do. */}
+      {demo && !demoSession ? <DemoRunner /> : null}
 
       <section>
         <h4 className="text-subhead">Candidates</h4>

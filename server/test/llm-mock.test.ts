@@ -82,14 +82,19 @@ test('the fixture key is derived in one place', () => {
   assert.equal(fixtureKey(request('extract')), 'extract');
 });
 
-test('asking for an unimplemented provider fails loudly', () => {
-  // Never a silent fall back to the mock. A run that believed it called
-  // Sonnet 5 but actually replayed a fixture would invalidate every number
-  // taken from it — and that is exactly the sort of result that ends up in a
-  // report.
-  const { config } = loadConfig({ LLM_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'sk-ant-placeholder' });
+test('asking for anthropic without a key fails loudly instead of falling back to the mock', () => {
+  // Never a silent fall back. A run that believed it called Claude but actually
+  // replayed a fixture would invalidate every number taken from it — and that
+  // is exactly the sort of result that ends up in a report. (The Anthropic
+  // provider itself is tested in anthropic-provider.test.ts.)
+  const { config } = loadConfig({ LLM_PROVIDER: 'anthropic' });
   assert.throws(() => createLlmProvider(config), LlmError);
-  assert.throws(() => createLlmProvider(config), /not implemented yet/);
+  assert.throws(() => createLlmProvider(config), /ANTHROPIC_API_KEY is not set/);
+});
+
+test('the mock provider is what the default configuration builds', () => {
+  const provider = createLlmProvider(loadConfig({}).config);
+  assert.equal(provider.name, 'mock');
 });
 
 test('the configured model tier is Sonnet 5 and does not drift', () => {

@@ -1,7 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client.ts';
-import { useLoad } from '../useLoad.ts';
+import { useLoad, type Loaded } from '../useLoad.ts';
 import { BackLink, Badge, Loading, Problem, Technical } from '../components/Bits.tsx';
+import { HighlightedText } from '../components/EvidenceText.ts';
+import { ResumeEvidence } from '../components/ResumeEvidence.tsx';
+import { PipelineView } from '../components/PipelineView.tsx';
+import { AuditTimeline } from '../components/AuditTimeline.tsx';
+import { buildPipeline, type RankingInput } from '../demo/pipeline.ts';
+import { buildTimeline } from '../demo/timeline.ts';
+import { contextFor, spansFromRequirements } from '../demo/evidence.ts';
 import {
   MIN_REASON_CHARS,
   OUTCOMES,
@@ -12,7 +19,8 @@ import {
   verdictWording,
 } from '../copy.ts';
 import { routeToHash } from '../router.ts';
-import type { EvaluationDetail, RequirementOutcome } from '../api/types.ts';
+import { DEMO_LABELS, GUIDE_STEPS, historyActorLabel } from '../demo/copy.ts';
+import type { AuditEntry, EvaluationDetail, RequirementOutcome } from '../api/types.ts';
 
 // One candidate, against one role — the screen a hiring decision is made on.
 //
@@ -28,7 +36,7 @@ import type { EvaluationDetail, RequirementOutcome } from '../api/types.ts';
 // a person should not have to read the word "basis points" to do it, and an
 // engineer checking the arithmetic should not have to ask.
 
-function Headline({ detail }: { detail: EvaluationDetail }): ReactNode {
+function Headline({ detail, demo = false }: { detail: EvaluationDetail; demo?: boolean }): ReactNode {
   const wording = tierWording(detail.tier);
   const name = detail.candidate.displayName ?? detail.candidate.reference;
 
@@ -41,7 +49,9 @@ function Headline({ detail }: { detail: EvaluationDetail }): ReactNode {
         </div>
         <div className="text-right">
           <p className="text-display leading-none text-ink">{detail.scorePercent ?? '—'}</p>
-          <p className="mt-1 text-meta uppercase tracking-wide text-ink-muted">Evidence score</p>
+          <p className="mt-1 text-meta uppercase tracking-wide text-ink-muted">
+            {demo ? DEMO_LABELS.score : 'Evidence score'}
+          </p>
         </div>
       </div>
 
@@ -70,12 +80,23 @@ function Headline({ detail }: { detail: EvaluationDetail }): ReactNode {
           10,000 basis points: <strong>{detail.scoreBasisPoints ?? '—'}</strong>. Each requirement below shows its own
           contribution, and those contributions add up to exactly this total.
         </p>
-        <p>
-          Evidence was read by <strong>{detail.model ?? 'no model yet'}</strong> under prompt version{' '}
-          <strong>{detail.promptVersion ?? '—'}</strong>. The model quotes passages; it does not decide whether a
-          requirement is met and it does not produce a score. Those are computed here, in ordinary arithmetic, from
-          quotes that were checked against the CV first.
-        </p>
+        {detail.model === 'mock' ? (
+          // The stand-in extractor says so about itself. Calling it "read by mock",
+          // or "the model", would imply a model was involved when none was.
+          <p>
+            <strong>{DEMO_LABELS.extraction}:</strong> passages were picked from the masked CV by a fixed keyword
+            matcher (contract version <strong>{detail.promptVersion ?? '—'}</strong>) — no language model was used. The
+            matcher quotes passages; it does not decide whether a requirement is met and it does not produce a score.
+            Those are computed here, in ordinary arithmetic, from quotes that were checked against the CV first.
+          </p>
+        ) : (
+          <p>
+            Evidence was read by <strong>{detail.model ?? 'no model yet'}</strong> under prompt version{' '}
+            <strong>{detail.promptVersion ?? '—'}</strong>. The model quotes passages; it does not decide whether a
+            requirement is met and it does not produce a score. Those are computed here, in ordinary arithmetic, from
+            quotes that were checked against the CV first.
+          </p>
+        )}
         {detail.evidenceRejectedCount > 0 ? (
           <p>
             <strong>{detail.evidenceRejectedCount}</strong> quoted passage
@@ -125,9 +146,19 @@ function Fairness({ detail }: { detail: EvaluationDetail }): ReactNode {
 function RequirementCard({
   requirement,
   totalBasisPoints,
+  demo = false,
+  number,
+  context = null,
+  requirementNames = [],
 }: {
   requirement: RequirementOutcome;
   totalBasisPoints: number | null;
+  demo?: boolean;
+  /** 1-based position of this requirement; the same number marks its evidence in the resume. */
+  number?: number;
+  /** The lines of the redacted resume this requirement's evidence sits on. Visitor's session only. */
+  context?: ReturnType<typeof contextFor> | null;
+  requirementNames?: readonly string[];
 }): ReactNode {
   const wording = verdictWording(requirement.verdict);
 
@@ -135,6 +166,9 @@ function RequirementCard({
     <li className="rounded-card border border-line bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex flex-wrap items-baseline gap-2">
+          {demo && number !== undefined ? (
+            <span className="text-meta font-semibold uppercase tracking-wide text-brand">Requirement {number}</span>
+          ) : null}
           <span className="text-body font-semibold text-ink">{requirement.label}</span>
           <span className="text-meta uppercase tracking-wide text-ink-muted">{kindLabel(requirement.kind)}</span>
         </div>
@@ -146,7 +180,9 @@ function RequirementCard({
 
       {requirement.evidence.length > 0 ? (
         <div className="mt-3">
-          <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">From the CV</p>
+          <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">
+            {demo ? `${DEMO_LABELS.evidence} — checked against the CV` : 'From the CV'}
+          </p>
           <ul className="mt-1 space-y-2">
             {requirement.evidence.map((item) => (
               <li key={item.id} className="border-l-2 border-brand pl-3">
@@ -161,7 +197,31 @@ function RequirementCard({
         </p>
       )}
 
-      <Technical summary="How this requirement was judged">
+      {context !== null && context.blocks.length > 0 ? (
+        <div className="mt-3">
+          <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">
+            Relevant CV context — where this sits in the redacted resume
+          </p>
+          <ul className="mt-1 space-y-2">
+            {context.blocks.map((block, index) => (
+              <li
+                key={index}
+                className="whitespace-pre-wrap break-words rounded-control border border-line bg-canvas p-2 text-small text-ink"
+              >
+                <HighlightedText segments={block.segments} requirementNames={requirementNames} />
+              </li>
+            ))}
+          </ul>
+          {context.more > 0 ? (
+            <p className="mt-1 text-meta text-ink-muted">
+              and {context.more} more line{context.more === 1 ? '' : 's'} with evidence for this requirement, in the
+              redacted resume below
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <Technical summary={demo ? `${DEMO_LABELS.match}: how this requirement was judged` : 'How this requirement was judged'}>
         <p>{requirement.rationale ?? 'This requirement was not judged, because the assessment did not finish.'}</p>
         <p>
           Weight {requirement.weight}
@@ -175,11 +235,32 @@ function RequirementCard({
   );
 }
 
-function DecisionRecorded({ detail }: { detail: EvaluationDetail }): ReactNode {
+function DecisionRecorded({ detail, demo = false }: { detail: EvaluationDetail; demo?: boolean }): ReactNode {
   const decision = detail.decision;
   if (!decision) return null;
 
   const wording = outcomeWording(decision.outcome);
+
+  // A visitor's decision is demo data, and says so everywhere it is shown: the
+  // heading, the line about who made it, and what can be done with it. The
+  // recruiter's wording below is exactly what it was.
+  if (demo) {
+    return (
+      <section className="rounded-card border border-line-strong bg-surface p-5">
+        <h4 className="text-subhead">Demo decision recorded</h4>
+        <p className={`mt-2 text-body font-semibold ${toneClass(wording.tone)}`}>{wording.label}</p>
+        <p className="mt-2 text-small text-ink">“{decision.reason}”</p>
+        <p className="mt-2 text-meta text-ink-muted">
+          Recorded by {decision.decidedBy} (the demo’s stand-in recruiter) on{' '}
+          {new Date(decision.decidedAt).toLocaleString()}.
+        </p>
+        <p className="mt-3 text-meta text-ink-muted">
+          This is demo data, saved only to your private demo session. It does not affect any real recruiter record,
+          and it is not editable here: use Reset demo in the header to clear it and start over.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-card border border-line-strong bg-surface p-5">
@@ -200,9 +281,17 @@ function DecisionRecorded({ detail }: { detail: EvaluationDetail }): ReactNode {
 function DecisionForm({
   detail,
   onDecided,
+  demo = false,
 }: {
   detail: EvaluationDetail;
   onDecided: (updated: EvaluationDetail) => void;
+  /**
+   * A visitor's demo decision rather than a recruiter's. The form is the same
+   * and posts through the same client call; only the words change. Where the
+   * decision goes is decided by the API scope (see `resolveApiPath`), and the
+   * server refuses it unless the visitor's own demo session accompanies it.
+   */
+  demo?: boolean;
 }): ReactNode {
   // Every hook above every return — see the note in App.tsx. The guards that
   // hide this form live in the parent for exactly that reason.
@@ -233,11 +322,23 @@ function DecisionForm({
 
   return (
     <section className="rounded-card border border-line bg-surface p-5 shadow-resting">
-      <h4 className="text-subhead">Your decision</h4>
-      <p className="mt-1 text-small text-ink-muted">
-        Every decision needs a reason. It is kept on the record permanently, and it is what makes this decision
-        explainable to the candidate later.
-      </p>
+      <h4 className="text-subhead">{demo ? 'Demo recruiter decision' : 'Your decision'}</h4>
+      {demo ? (
+        <>
+          <p className="mt-1 text-small text-ink">
+            This decision is saved only to your private demo session and does not affect real recruiter records.
+          </p>
+          <p className="mt-1 text-small text-ink-muted">
+            Try it as a recruiter would: every decision needs a reason, which is what makes it explainable to the
+            candidate later. Reset demo clears it.
+          </p>
+        </>
+      ) : (
+        <p className="mt-1 text-small text-ink-muted">
+          Every decision needs a reason. It is kept on the record permanently, and it is what makes this decision
+          explainable to the candidate later.
+        </p>
+      )}
 
       <form
         className="mt-4"
@@ -310,7 +411,7 @@ function DecisionForm({
           disabled={!ready}
           className="mt-4 h-control rounded-control bg-brand px-5 text-small font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
         >
-          {submitting ? 'Recording…' : 'Record decision'}
+          {submitting ? 'Recording…' : demo ? 'Record demo decision' : 'Record decision'}
         </button>
       </form>
     </section>
@@ -342,8 +443,8 @@ function History({ evaluationId }: { evaluationId: string }): ReactNode {
                   <span className="text-meta text-ink-muted">{new Date(event.createdAt).toLocaleString()}</span>
                 </div>
                 <p className="mt-1 text-meta text-ink-muted">
-                  {event.actor === 'ai' ? 'By the model' : event.actor === 'human' ? 'By a person' : 'Automatic'}
-                  {event.actorId ? ` (${event.actorId})` : ''}
+                  {historyActorLabel(event.actor, event.actorId)}
+                  {event.actorId && event.actorId !== 'mock' ? ` (${event.actorId})` : ''}
                   {event.outcome === 'ok' ? '' : ` — ${event.outcome}`}
                 </p>
               </li>
@@ -355,9 +456,63 @@ function History({ evaluationId }: { evaluationId: string }): ReactNode {
   );
 }
 
+// --- the visitor's private demo session: how the result was reached ---------------
+//
+// These three sections exist only in a visitor's own session. Each is drawn from
+// what the server already produced — the audit events, the redacted resume, the
+// live ranking — and says "unavailable" when it could not be read rather than
+// filling the gap. None of them is on the recruiter's screen.
+
+type AuditLoad = Loaded<{ events: AuditEntry[] } | null>;
+
+function DemoPipelineSection({ detail, audit }: { detail: EvaluationDetail; audit: AuditLoad }): ReactNode {
+  // Every hook above every return — see the note in App.tsx.
+  const ranking = useLoad(() => api.ranking(detail.job.id), [detail.job.id, detail.evaluationId]);
+
+  if (audit.status === 'loading' || ranking.state.status === 'loading') return <Loading what="the pipeline" />;
+
+  const events = audit.status === 'ready' && audit.data ? audit.data.events : null;
+
+  let rankingInput: RankingInput = { state: 'unavailable' };
+  if (ranking.state.status === 'ready') {
+    const live = ranking.state.data;
+    const entry = live.entries.find((candidate) => candidate.evaluationId === detail.evaluationId);
+    rankingInput = {
+      state: 'ready',
+      rank: entry?.rank ?? null,
+      position: entry?.position ?? null,
+      rankedCount: live.rankedCount,
+      total: live.entries.length,
+    };
+  }
+
+  return <PipelineView stages={buildPipeline({ events, detail, ranking: rankingInput })} />;
+}
+
+function DemoResumeSection({
+  detail,
+  resume,
+}: {
+  detail: EvaluationDetail;
+  resume: Loaded<{ text: string } | null>;
+}): ReactNode {
+  if (resume.status === 'loading') return <Loading what="the redacted resume" />;
+  if (resume.status === 'error') return <Problem message={resume.message} />;
+  if (resume.data === null) return null;
+  return <ResumeEvidence text={resume.data.text} detail={detail} />;
+}
+
+function DemoTimelineSection({ detail, audit }: { detail: EvaluationDetail; audit: AuditLoad }): ReactNode {
+  if (audit.status === 'loading') return <Loading what="the timeline" />;
+  if (audit.status === 'error') return <Problem message={audit.message} />;
+  if (audit.data === null) return null;
+  return <AuditTimeline items={buildTimeline(audit.data.events, detail)} />;
+}
+
 export function CandidateDetail({
   evaluationId,
   demo = false,
+  demoSession = false,
 }: {
   evaluationId: string;
   /**
@@ -367,25 +522,59 @@ export function CandidateDetail({
    * refuses the write regardless of this prop.
    */
   demo?: boolean;
+  /**
+   * Viewing a visitor's own private demo session. Unlike the read-only window
+   * (`demo` alone), this one can record a decision — to that session's sandbox,
+   * through the demo's own route, never the recruiter's. `demo` is also true here,
+   * which is what keeps the recruiter's form from being drawn.
+   */
+  demoSession?: boolean;
 }): ReactNode {
   // Every hook above every return — see the note in App.tsx.
   const { state, set } = useLoad(() => api.evaluation(evaluationId), [evaluationId]);
+  // Only a visitor's own session has a resume endpoint, so only there are these
+  // two asked for; everywhere else they resolve at once to nothing and no request
+  // is made. They are declared unconditionally because hooks cannot be conditional.
+  const audit = useLoad(
+    (): Promise<{ events: AuditEntry[] } | null> => (demoSession ? api.evaluationAudit(evaluationId) : Promise.resolve(null)),
+    [evaluationId, demoSession],
+  );
+  const resume = useLoad(
+    (): Promise<{ text: string } | null> => (demoSession ? api.evaluationResume(evaluationId) : Promise.resolve(null)),
+    [evaluationId, demoSession],
+  );
 
   if (state.status === 'loading') return <Loading what="the candidate" />;
   if (state.status === 'error') return <Problem message={state.message} />;
 
   const detail = state.data;
+  const names = detail.requirements.map((requirement) => requirement.label);
+  const spans = spansFromRequirements(detail.requirements);
+  const resumeText = resume.state.status === 'ready' && resume.state.data ? resume.state.data.text : null;
   // Both conditions are enforced by the server, which answers 409 either way.
   // Hiding the form is the honest presentation of that rule, not the rule.
   const decidable =
     !demo && detail.decision === null && detail.isCurrent && detail.status === 'scored';
+  // The same conditions, for a visitor's own session. Mutually exclusive with
+  // `decidable`: `demo` is true whenever `demoSession` is.
+  const demoDecidable =
+    demoSession && detail.decision === null && detail.isCurrent && detail.status === 'scored';
 
   return (
     <div className="space-y-5">
       <BackLink href={routeToHash({ name: 'jobs', id: detail.job.id })}>Back to {detail.job.title}</BackLink>
 
-      <Headline detail={detail} />
+      <Headline detail={detail} demo={demoSession} />
+      {demoSession ? (
+        <p className="rounded-control border border-line bg-brand-tint px-3 py-2 text-small text-ink">
+          <span className="font-semibold">Demo walkthrough:</span>{' '}
+          {GUIDE_STEPS.slice(1).map((step) => step.label).join(' → ')}.
+        </p>
+      ) : null}
+
       <Fairness detail={detail} />
+
+      {demoSession ? <DemoPipelineSection detail={detail} audit={audit.state} /> : null}
 
       <section>
         <h4 className="text-subhead">Requirement by requirement</h4>
@@ -393,21 +582,40 @@ export function CandidateDetail({
           Every requirement is shown, including the ones the CV said nothing about.
         </p>
         <ul className="space-y-3">
-          {detail.requirements.map((requirement) => (
+          {detail.requirements.map((requirement, index) => (
             <RequirementCard
               key={requirement.requirementId}
               requirement={requirement}
               totalBasisPoints={detail.scoreBasisPoints}
+              demo={demoSession}
+              number={index + 1}
+              context={demoSession && resumeText !== null ? contextFor(resumeText, spans, index + 1) : null}
+              requirementNames={names}
             />
           ))}
         </ul>
       </section>
 
-      <DecisionRecorded detail={detail} />
+      {demoSession ? <DemoResumeSection detail={detail} resume={resume.state} /> : null}
+
+      <DecisionRecorded detail={detail} demo={demoSession} />
 
       {decidable ? <DecisionForm detail={detail} onDecided={set} /> : null}
 
-      {demo && detail.decision === null ? (
+      {demoDecidable ? (
+        <DecisionForm
+          detail={detail}
+          onDecided={(updated) => {
+            set(updated);
+            // The decision is a new audit event: re-read the trail so it appears
+            // in the pipeline and the timeline without a reload.
+            audit.reload();
+          }}
+          demo
+        />
+      ) : null}
+
+      {demo && !demoSession && detail.decision === null ? (
         <section className="rounded-card border border-dashed border-line-strong p-5">
           <p className="text-small text-ink-muted">
             Recording a decision is where this stops being read-only, so it needs an operator
@@ -417,7 +625,7 @@ export function CandidateDetail({
         </section>
       ) : null}
 
-      {!decidable && detail.decision === null ? (
+      {!decidable && !demoDecidable && detail.decision === null ? (
         <section className="rounded-card border border-dashed border-line-strong p-5">
           <p className="text-small text-ink-muted">
             {detail.isCurrent
@@ -427,7 +635,9 @@ export function CandidateDetail({
         </section>
       ) : null}
 
-      <History evaluationId={evaluationId} />
+      {/* A visitor's session gets the timeline; everyone else keeps the history list
+          exactly as it was. */}
+      {demoSession ? <DemoTimelineSection detail={detail} audit={audit.state} /> : <History evaluationId={evaluationId} />}
     </div>
   );
 }

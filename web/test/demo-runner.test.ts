@@ -165,10 +165,13 @@ test('no internal detail can reach the error message', () => {
 
 // --- 13: JobDetail wiring -----------------------------------------------------
 
-test('JobDetail imports and renders DemoRunner only when demo is true', () => {
+test('JobDetail renders DemoRunner only in the read-only demo: never for a recruiter, never in a visitor\'s own session', () => {
   const source = JOB_DETAIL();
   assert.match(source, /import\s*\{\s*DemoRunner\s*\}\s*from\s*'\.\.\/components\/DemoRunner\.tsx'/);
-  assert.match(source, /\{demo\s*\?\s*<DemoRunner\s*\/>\s*:\s*null\}/, 'DemoRunner is not gated by `demo`');
+  // Gated by `demo` (so a recruiter never sees it) and NOT in a visitor's session,
+  // where every candidate is already assessed and a "run" button would promise
+  // something the page does not do.
+  assert.match(source, /\{demo\s*&&\s*!demoSession\s*\?\s*<DemoRunner\s*\/>\s*:\s*null\}/, 'DemoRunner is not gated as intended');
 });
 
 test('JobDetail accepts a demo prop, defaulted to false', () => {
