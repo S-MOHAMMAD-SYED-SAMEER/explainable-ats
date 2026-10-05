@@ -247,13 +247,17 @@ test('a demo evaluation id cannot be decided through the canonical recruiter rou
     const canonicalBefore = await canonicalSnapshot(h.ctx);
     const aBefore = await whatTheyCanSee(h, a, demoId);
 
-    // Anonymously, with the demo cookie: refused outright.
-    const anonymous = await h.call('POST', `/api/evaluations/${demoId}/decision`, { token: a.token, body: PAYLOAD });
+    // On the demo the recruiter route does not exist at all.
+    const onDemo = await h.call('POST', `/api/evaluations/${demoId}/decision`, { token: a.token, body: PAYLOAD });
+    assert.equal(onDemo.status, 404);
+
+    // On the real application, anonymously, with the demo cookie: refused outright.
+    const anonymous = await h.callApp('POST', `/api/evaluations/${demoId}/decision`, { token: a.token, body: PAYLOAD });
     assert.equal(anonymous.status, 401);
 
     // Even a fully authenticated operator with a valid CSRF token cannot: the id is
     // not a canonical evaluation, so there is nothing for the recruiter route to find.
-    const asOperator = await fetch(`${h.base}/api/evaluations/${demoId}/decision`, {
+    const asOperator = await fetch(`${h.appBase}/api/evaluations/${demoId}/decision`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `${op.cookie}; ${DEMO_SESSION_COOKIE}=${a.token}`, [CSRF_HEADER]: op.csrf },
       body: JSON.stringify(PAYLOAD),
@@ -336,13 +340,16 @@ test('a demo session cannot satisfy recruiter authentication on the recruiter de
     const before = await canonicalSnapshot(h.ctx);
 
     const attempts: Array<[string, Reply]> = [
-      ['demo cookie only', await h.call('POST', `/api/evaluations/${target}/decision`, { token: a.token, body: PAYLOAD })],
-      ['demo token as the operator cookie', await h.call('POST', `/api/evaluations/${target}/decision`, { rawCookie: `${SESSION_COOKIE}=${a.token}`, body: PAYLOAD })],
-      ['demo token as both operator cookies', await h.call('POST', `/api/evaluations/${target}/decision`, { rawCookie: `${SESSION_COOKIE}=${a.token}; ${CSRF_COOKIE}=${a.token}`, body: PAYLOAD })],
+      ['demo cookie only', await h.callApp('POST', `/api/evaluations/${target}/decision`, { token: a.token, body: PAYLOAD })],
+      ['demo token as the operator cookie', await h.callApp('POST', `/api/evaluations/${target}/decision`, { rawCookie: `${SESSION_COOKIE}=${a.token}`, body: PAYLOAD })],
+      ['demo token as both operator cookies', await h.callApp('POST', `/api/evaluations/${target}/decision`, { rawCookie: `${SESSION_COOKIE}=${a.token}; ${CSRF_COOKIE}=${a.token}`, body: PAYLOAD })],
     ];
     for (const [label, reply] of attempts) assert.equal(reply.status, 401, label);
 
-    const withCsrfHeader = await fetch(`${h.base}/api/evaluations/${target}/decision`, {
+    // The demo has no such route to offer, whatever is presented.
+    assert.equal((await h.call('POST', `/api/evaluations/${target}/decision`, { token: a.token, body: PAYLOAD })).status, 404);
+
+    const withCsrfHeader = await fetch(`${h.appBase}/api/evaluations/${target}/decision`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=${a.token}; ${DEMO_SESSION_COOKIE}=${a.token}`, [CSRF_HEADER]: a.token },
       body: JSON.stringify(PAYLOAD),
@@ -360,7 +367,7 @@ test('a demo session cannot satisfy the recruiter\'s CSRF check', async () => {
     const target = h.canonicalEvaluations.get('demo-002') as string;
     const before = await canonicalSnapshot(h.ctx);
     const send = (headers: Record<string, string>) =>
-      fetch(`${h.base}/api/evaluations/${target}/decision`, {
+      fetch(`${h.appBase}/api/evaluations/${target}/decision`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...headers },
         body: JSON.stringify({ outcome: 'hold', reason: 'Attempt with someone else\'s CSRF token.' }),
@@ -697,12 +704,21 @@ test('no decision response carries a key, a credential, the token or a real reco
   });
 });
 
-test('the decision surface is not on the public read allow-list, under any method', async () => {
-  const { isPublicDemoRead } = await import('../src/auth/middleware.ts');
-  for (const method of ['GET', 'POST']) {
-    assert.equal(isPublicDemoRead(method, '/demo/session/evaluations/e1/decision'), false);
-    assert.equal(isPublicDemoRead(method, '/evaluations/e1/decision'), false);
-  }
+test('the real application does not serve the demo decision route, even to a signed-in operator', async () => {
+  await withHarness(async (h) => {
+    const a = await visitor(h);
+    const rowan = await evaluationOf(h, a, 'demo-001');
+    const op = await h.operator();
+
+    const asOperator = await fetch(`${h.appBase}/api/demo/session/evaluations/${rowan}/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `${op.cookie}; ${DEMO_SESSION_COOKIE}=${a.token}`, [CSRF_HEADER]: op.csrf },
+      body: JSON.stringify(PAYLOAD),
+    });
+    assert.equal(asOperator.status, 404);
+    assert.equal((await h.callApp('POST', `/api/demo/session/evaluations/${rowan}/decision`, { token: a.token, body: PAYLOAD })).status, 401);
+    assert.equal((await detail(h, a, rowan)).body.decision, null, 'a decision reached the demo through the real application');
+  });
 });
 
 test('no demo decision test relies on a model, a key or the network', () => {

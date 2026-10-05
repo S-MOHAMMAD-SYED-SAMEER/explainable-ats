@@ -1,18 +1,17 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { createHealthRouter } from './routes/health.ts';
 import { createAuthRouter } from './routes/auth.ts';
-import { createDemoRouter } from './routes/demo.ts';
 import { createDemoSessionRouter } from './routes/demoSession.ts';
 import { createRecruiterRouter } from './routes/recruiter.ts';
-import { attachSession, requireSessionOrPublicRead } from './auth/middleware.ts';
+import { attachSession, requireSession } from './auth/middleware.ts';
 import { requireCsrf } from './auth/csrf.ts';
 import { cors } from './http/cors.ts';
 import { rateLimit } from './http/rateLimit.ts';
 import { createRepositories } from './db/repositories/index.ts';
 import { createLlmProvider } from './adapters/llm/index.ts';
-import { createDemoSandbox } from './demo/sandbox.ts';
 import { createDemoSessionStore, type DemoSessionStore } from './demo/sessions.ts';
 import { config as defaultConfig, type AppConfig } from './config/env.ts';
+import { capabilitiesOf } from './config/mode.ts';
 import { toErrorEnvelope } from './lib/errors.ts';
 import { createLogger, type Logger } from './lib/logger.ts';
 import type { LlmProvider } from './adapters/llm/types.ts';
@@ -20,16 +19,28 @@ import type { Database } from './db/types.ts';
 
 // Application assembly, separate from the server bootstrap so a test can build
 // the app without binding a port.
+//
+// TWO PRODUCTS, ONE CODEBASE, DECIDED HERE
+//
+// `config.appMode` (config/mode.ts) chooses which routes exist. A route that does
+// not belong to the running mode is never registered — there is no handler that
+// refuses it, no flag that could be flipped, nothing a request could reach — and
+// it answers like any other path this server has never heard of.
 
 export type AppDeps = {
-  db: Database;
+  /**
+   * The canonical database. REQUIRED in app mode and FORBIDDEN in demo mode: a
+   * demo process is not handed one, so there is nothing for a demo request to
+   * reach however it is routed.
+   */
+  db?: Database;
   logger?: Logger;
   config?: AppConfig;
   /** Injectable so a test can drive the limiter with a fixed clock. */
   rateLimiter?: ReturnType<typeof rateLimit>;
-  /** Injectable so a test can supply a deterministic provider. */
+  /** Injectable so a test can supply a deterministic provider. App mode only. */
   provider?: LlmProvider;
-  /** Injectable so a test can control expiry and capacity. Defaults to a real store. */
+  /** Injectable so a test can control expiry and capacity. Demo mode only. */
   demoSessions?: DemoSessionStore;
 };
 
@@ -46,20 +57,18 @@ export function createApp({
   rateLimiter = rateLimit(),
   demoSessions,
 }: AppDeps): Express {
-  const app = express();
-  const repos = createRepositories(db);
-  // Public demo runs happen here, never in `db`. See demo/sandbox.ts.
-  const sandbox = createDemoSandbox({ migrationsDir: config.migrationsDir, logger });
-  // Per-visitor demo sessions: private in-memory databases, handed no reference
-  // to `db`. See demo/sessions.ts.
-  const sessionStore = demoSessions ?? createDemoSessionStore({ migrationsDir: config.migrationsDir, logger });
+  const mode = config.appMode;
+  const can = capabilitiesOf(mode);
 
-  // Built here so a misconfigured provider (an unknown name, a missing key) fails
-  // at startup rather than on the first request. Nothing calls it yet: there is
-  // no HTTP route that runs extraction, and the public demo builds its own
-  // deterministic provider whatever this is set to.
-  const llm = provider ?? createLlmProvider(config, { logger });
-  void llm;
+  // A process is one product. Mixing the two is a wiring mistake, and it is
+  // refused here rather than quietly honoured, because the whole point of a mode
+  // is that the other product's dependencies are not in the process at all.
+  if (can.canonicalDatabase && !db) throw new Error(`APP_MODE=${mode} needs a database.`);
+  if (!can.canonicalDatabase && db) throw new Error(`APP_MODE=${mode} must not be given a canonical database.`);
+  if (!can.demoSessionStore && demoSessions) throw new Error(`APP_MODE=${mode} does not run demo sessions.`);
+  if (!can.canonicalDatabase && provider) throw new Error(`APP_MODE=${mode} does not use a model provider.`);
+
+  const app = express();
 
   app.disable('x-powered-by');
 
@@ -93,47 +102,17 @@ export function createApp({
     next(err);
   });
 
-  // The order below IS the security boundary, so it is worth reading as one:
-  //
-  //   1. health         — liveness, before anything. A monitor must not need a
-  //                       password to learn the service is up, and health
-  //                       reports capabilities, never secrets.
-  //   2. attachSession  — resolves a session if one is presented. Never rejects.
-  //   3. rate limiting  — after attachSession, so a signed-in caller is keyed by
-  //                       their session rather than sharing an IP bucket with
-  //                       everyone behind the same NAT.
-  //   4. CSRF           — between "who is this?" and "may they?".
-  //   5. auth routes    — sign in and out. The only endpoints reachable without
-  //                       a session, which is why they sit above the gate.
-  //   5b. demo routes   — the public demo-run endpoint. Also reachable without
-  //                       a session, by the same reasoning as auth routes, but
-  //                       it is its own router with its own scenario allow-list
-  //                       (demo/runScenario.ts) rather than an extension of
-  //                       either the auth routes or the read-only public-demo
-  //                       allow-list below. It runs in an in-memory sandbox and
-  //                       writes nothing to `db`.
-  //   5c. demo-session routes — the visitor-scoped public demo
-  //                       (routes/demoSession.ts). Anonymous by design, and
-  //                       answered entirely from a private in-memory database
-  //                       per visitor: the router is never given `repos`. Its
-  //                       cookie is not a session — `req.session` and
-  //                       `req.operator` stay unset, so every recruiter route
-  //                       behind the gate is exactly as closed as it was.
-  //   6. requireSession — the gate. Everything past it is authenticated.
-  //
-  // Anything added after step 6 is protected by default. That is deliberate:
-  // the failure mode of a deny-list is the route someone forgot to add to it.
+  // Health is the one route both products register. A monitor must not need a
+  // password to learn the service is up, health reports capabilities and never
+  // secrets, and the front end reads `mode` from it to learn which product it is.
   app.use('/api', createHealthRouter(db, config));
-  app.use('/api', attachSession({ repos }));
-  app.use('/api', rateLimiter);
-  app.use('/api', requireCsrf());
-  app.use('/api', createAuthRouter({ repos, config, logger }));
-  app.use('/api', createDemoRouter({ repos, sandbox, logger }));
-  app.use('/api', createDemoSessionRouter({ store: sessionStore, config, logger }));
-  app.use('/api', requireSessionOrPublicRead({ publicReadsEnabled: config.demoPublicReadonly }));
 
-  // Everything from here on is behind the gate.
-  app.use('/api', createRecruiterRouter({ repos, logger, sandbox }));
+  if (can.canonicalDatabase && db) {
+    mountApplication(app, { db, logger, config, provider, rateLimiter });
+  }
+  if (can.demoSessionStore) {
+    mountDemo(app, { logger, config, rateLimiter, demoSessions });
+  }
 
   app.use('/api', (_req: Request, res: Response) => {
     res.status(404).json({ error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } });
@@ -166,4 +145,75 @@ export function createApp({
   });
 
   return app;
+}
+
+type ApplicationDeps = {
+  db: Database;
+  logger: Logger;
+  config: AppConfig;
+  provider: LlmProvider | undefined;
+  rateLimiter: ReturnType<typeof rateLimit>;
+};
+
+/**
+ * The real application's routes: sign-in, then the recruiter's.
+ *
+ * The order below IS the security boundary, so it is worth reading as one:
+ *
+ *   1. attachSession  — resolves a session if one is presented. Never rejects.
+ *   2. rate limiting  — after attachSession, so a signed-in caller is keyed by
+ *                       their session rather than sharing an IP bucket with
+ *                       everyone behind the same NAT.
+ *   3. CSRF           — between "who is this?" and "may they?".
+ *   4. auth routes    — sign in and out. The only endpoints reachable without
+ *                       a session, which is why they sit above the gate.
+ *   5. requireSession — the gate. Everything past it is authenticated.
+ *
+ * Anything added after step 5 is protected by default. That is deliberate:
+ * the failure mode of a deny-list is the route someone forgot to add to it. There
+ * is no anonymous read window and no demo route in this mode.
+ */
+function mountApplication(app: Express, { db, logger, config, provider, rateLimiter }: ApplicationDeps): void {
+  const repos = createRepositories(db);
+
+  // Built here so a misconfigured provider (an unknown name, a missing key) fails
+  // at startup rather than on the first request. Nothing calls it yet: there is
+  // no HTTP route that runs extraction.
+  const llm = provider ?? createLlmProvider(config, { logger });
+  void llm;
+
+  app.use('/api', attachSession({ repos }));
+  app.use('/api', rateLimiter);
+  app.use('/api', requireCsrf());
+  app.use('/api', createAuthRouter({ repos, config, logger }));
+  app.use('/api', requireSession());
+
+  // Everything from here on is behind the gate.
+  app.use('/api', createRecruiterRouter({ repos, logger }));
+}
+
+type DemoDeps = {
+  logger: Logger;
+  config: AppConfig;
+  rateLimiter: ReturnType<typeof rateLimit>;
+  demoSessions: DemoSessionStore | undefined;
+};
+
+/**
+ * The demo's routes: the visitor-scoped session endpoints, and nothing else.
+ *
+ * There is no sign-in, no operator session and no CSRF layer here because there
+ * is no operator, no session and no cookie that authorises anything — the
+ * `ats_demo` cookie only names a private, synthetic, in-memory sandbox. Rate
+ * limiting stays: starting a session builds a database, which is the most
+ * expensive thing an anonymous caller can ask for.
+ *
+ * `createDemoSessionRouter` is handed a store and a logger. It is not handed a
+ * repository, because a demo process has no canonical database to hand it.
+ */
+function mountDemo(app: Express, { logger, config, rateLimiter, demoSessions }: DemoDeps): void {
+  const store = demoSessions ?? createDemoSessionStore({ migrationsDir: config.migrationsDir, logger });
+
+  app.use('/api', rateLimiter);
+  app.use('/api', createDemoSessionRouter({ store, config, logger }));
 }

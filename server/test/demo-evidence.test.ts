@@ -221,24 +221,19 @@ test('canonical evaluations cannot be reached through the resume endpoint, and n
     assert.equal((await h.call('GET', `/api/demo/session/evaluations/${'x'.repeat(200)}/resume`, { token: a.token })).status, 400);
     assert.equal((await h.call('GET', '/api/demo/session/evaluations/nope/resume', { token: a.token })).status, 404);
 
-    // There is no canonical resume route: anonymous is refused, and an operator finds nothing.
+    // There is no canonical resume route. The demo has no such path at all, the
+    // real application refuses a stranger, and an operator finds nothing.
     const canonicalId = h.canonicalEvaluations.get('demo-001') as string;
-    assert.equal((await h.call('GET', `/api/evaluations/${canonicalId}/resume`)).status, 401);
+    assert.equal((await h.call('GET', `/api/evaluations/${canonicalId}/resume`)).status, 404);
+    assert.equal((await h.callApp('GET', `/api/evaluations/${canonicalId}/resume`)).status, 401);
     const op = await h.operator();
-    assert.equal((await fetch(`${h.base}/api/evaluations/${canonicalId}/resume`, { headers: { cookie: op.cookie } })).status, 404);
+    assert.equal((await fetch(`${h.appBase}/api/evaluations/${canonicalId}/resume`, { headers: { cookie: op.cookie } })).status, 404);
+
+    // And the real application has no demo resume route either.
+    assert.equal((await fetch(`${h.appBase}/api/demo/session/evaluations/${canonicalId}/resume`, { headers: { cookie: op.cookie } })).status, 404);
 
     assert.equal(await canonicalSnapshot(h.ctx), before);
   });
-
-  // And with the read-only window open, the canonical surface still serves no resume.
-  await withHarness(
-    async (h) => {
-      const canonicalId = h.canonicalEvaluations.get('demo-001') as string;
-      assert.equal((await h.call('GET', `/api/evaluations/${canonicalId}/resume`)).status, 401);
-      assert.equal((await h.call('GET', `/api/evaluations/${canonicalId}`)).status, 200, 'precondition: the window is open');
-    },
-    { overrides: { demoPublicReadonly: true } },
-  );
 });
 
 test('the response is JSON, uncacheable, and carries nosniff', async () => {
@@ -305,8 +300,8 @@ test('resume text containing markup, scripts and secrets is returned as inert te
       close: async () => {},
     };
 
-    const config: AppConfig = { ...loadConfig({}).config, cookieSecure: false, demoPublicReadonly: false };
-    const app = createApp({ db: ctx.db, config, logger: createMemoryLogger().logger, demoSessions: store, rateLimiter: rateLimit({ limits: { ...RATE_LIMITS } }) });
+    const config: AppConfig = { ...loadConfig({ APP_MODE: 'demo' }).config, cookieSecure: false };
+    const app = createApp({ config, logger: createMemoryLogger().logger, demoSessions: store, rateLimiter: rateLimit({ limits: { ...RATE_LIMITS } }) });
     const server = app.listen(0);
     await new Promise<void>((resolve) => server.once('listening', () => resolve()));
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

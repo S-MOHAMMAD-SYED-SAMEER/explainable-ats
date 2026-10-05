@@ -27,7 +27,6 @@ async function withServer(fn: (h: Harness) => Promise<void>): Promise<void> {
     ...loadConfig({}).config,
     operatorPasswordHash: await hashPassword(PASSWORD),
     cookieSecure: false,
-    demoPublicReadonly: false,
   };
   const app = createApp({ db: ctx.db, config, logger: createMemoryLogger().logger });
   const server = app.listen(0);

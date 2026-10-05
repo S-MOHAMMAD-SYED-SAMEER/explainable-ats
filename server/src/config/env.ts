@@ -1,6 +1,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { LogLevel } from '../lib/logger.ts';
+import { APP_MODES, DEFAULT_APP_MODE, isAppMode, type AppMode } from './mode.ts';
+
+export { APP_MODES, type AppMode };
 
 // Configuration, read once at startup.
 //
@@ -14,6 +17,13 @@ import type { LogLevel } from '../lib/logger.ts';
 //
 // Problems are collected rather than thrown. A single wrong variable should
 // produce a startup warning naming it, not a crash that hides the other four.
+//
+// THE EXCEPTION IS THE DEPLOYMENT MODE. Every other setting has a safe fallback;
+// `APP_MODE` does not. A typo that quietly fell back to "app" would start the
+// real application where the demo was meant, and a demo started with a database
+// URL, a password hash or an API key is a demo that can reach what it must not.
+// Those are refused outright, naming every offending VARIABLE and never a value,
+// so a misconfigured deploy fails at boot, where it is seen.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_ROOT = path.resolve(__dirname, '../..');
@@ -22,6 +32,23 @@ try {
   process.loadEnvFile(path.join(SERVER_ROOT, '.env'));
 } catch {
   // No .env is the normal case for tests and a fresh clone.
+}
+
+/**
+ * A configuration the process refuses to run with.
+ *
+ * Carries the names of the variables at fault and nothing else: the message goes
+ * to an operator's terminal and a deploy log, and a value — a connection string,
+ * a hash, a key — must never be in either.
+ */
+export class ConfigError extends Error {
+  readonly problems: readonly string[];
+
+  constructor(problems: readonly string[]) {
+    super(`Invalid configuration:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
+    this.name = 'ConfigError';
+    this.problems = [...problems];
+  }
 }
 
 export const LLM_PROVIDERS = ['mock', 'anthropic'] as const;
@@ -105,7 +132,54 @@ function readEnum<T extends string>(key: string, allowed: readonly T[], fallback
   return raw as T;
 }
 
+/** Reads `APP_MODE`. Unset means the real application; anything unrecognised is refused. */
+function readAppMode(): AppMode {
+  const raw = process.env.APP_MODE;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_APP_MODE;
+
+  const mode = raw.trim().toLowerCase();
+  if (!isAppMode(mode)) {
+    // The variable and the allowed values — never the value it had.
+    throw new ConfigError([`APP_MODE must be one of: ${APP_MODES.join(', ')}.`]);
+  }
+  return mode;
+}
+
+/**
+ * Everything demo mode refuses to start with, by variable name.
+ *
+ * A demo is a process with no credentials and no persistent state. If one of
+ * these is present the deploy is wrong — usually the demo service cloned from the
+ * real service's settings — and the safe response is to stop, not to ignore the
+ * variable and run on. Each check is on the variable being SET, so nothing here
+ * ever puts a secret's value in a message.
+ */
+function forbiddenInDemo(): string[] {
+  const present = (key: string): boolean => (process.env[key] ?? '').trim() !== '';
+  const refusals: string[] = [];
+
+  if (present('DATABASE_URL')) refusals.push('DATABASE_URL must not be set in demo mode: the demo has no canonical database.');
+  if (present('OPERATOR_PASSWORD_HASH')) {
+    refusals.push('OPERATOR_PASSWORD_HASH must not be set in demo mode: the demo has no sign-in.');
+  }
+  if (present('ANTHROPIC_API_KEY')) refusals.push('ANTHROPIC_API_KEY must not be set in demo mode: the demo calls no model.');
+
+  const provider = (process.env.LLM_PROVIDER ?? '').trim().toLowerCase();
+  if (provider !== '' && provider !== 'mock') {
+    refusals.push('LLM_PROVIDER must be "mock" (or unset) in demo mode: the demo uses the deterministic provider only.');
+  }
+
+  const sqlitePath = (process.env.SQLITE_PATH ?? '').trim();
+  if (sqlitePath !== '' && sqlitePath !== ':memory:') {
+    refusals.push('SQLITE_PATH must be unset (or ":memory:") in demo mode: the demo keeps no persistent database.');
+  }
+
+  return refusals;
+}
+
 export type AppConfig = {
+  /** Which product this process is. See `config/mode.ts`. */
+  appMode: AppMode;
   port: number;
   databaseUrl: string | null;
   dbDriver: DbDriverName;
@@ -121,15 +195,6 @@ export type AppConfig = {
   /** Retries after the first attempt, for transient failures only. */
   anthropicMaxRetries: number;
   operatorPasswordHash: string | null;
-  /**
-   * Whether anonymous callers may read the allow-listed demo routes.
-   *
-   * Default false, and false is the safe direction: an environment that
-   * forgets to set it behaves exactly as it did before this flag existed —
-   * fully gated. Turning it on opens reads over the invented dataset only.
-   * It creates no credential and grants no session.
-   */
-  demoPublicReadonly: boolean;
   sessionTtlHours: number;
   cookieSecure: boolean;
   corsAllowedOrigins: string[];
@@ -146,21 +211,33 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
   const problems: string[] = [];
 
   try {
-    const databaseUrl = readString('DATABASE_URL', '') || null;
+    const appMode = readAppMode();
+    const isDemo = appMode === 'demo';
+
+    // In demo mode these are not merely unused, they are forbidden.
+    if (isDemo) {
+      const refusals = forbiddenInDemo();
+      if (refusals.length > 0) throw new ConfigError(refusals);
+    }
+
+    const databaseUrl = isDemo ? null : readString('DATABASE_URL', '') || null;
     const dbDriver: DbDriverName = databaseUrl === null ? 'sqlite' : 'postgres';
 
-    const llmProvider = readEnum('LLM_PROVIDER', LLM_PROVIDERS, 'mock', problems);
-    const anthropicApiKey = readString('ANTHROPIC_API_KEY', '') || null;
+    const llmProvider: LlmProviderName = isDemo ? 'mock' : readEnum('LLM_PROVIDER', LLM_PROVIDERS, 'mock', problems);
+    const anthropicApiKey = isDemo ? null : readString('ANTHROPIC_API_KEY', '') || null;
     if (llmProvider === 'anthropic' && anthropicApiKey === null) {
       problems.push('LLM_PROVIDER is "anthropic" but ANTHROPIC_API_KEY is not set.');
     }
 
-    // Sign-in is the only credential this system has.
-    const operatorPasswordHash = readString('OPERATOR_PASSWORD_HASH', '').trim() || null;
-    if (operatorPasswordHash === null) {
-      problems.push('OPERATOR_PASSWORD_HASH is not set, so nobody can sign in. Generate one with `npm run hash-password`.');
-    } else if (!operatorPasswordHash.startsWith('scrypt$')) {
-      problems.push('OPERATOR_PASSWORD_HASH is not a scrypt hash produced by `npm run hash-password`.');
+    // Sign-in is the only credential this system has. The demo has none and does
+    // not warn about it: nobody is meant to sign in to it.
+    const operatorPasswordHash = isDemo ? null : readString('OPERATOR_PASSWORD_HASH', '').trim() || null;
+    if (!isDemo) {
+      if (operatorPasswordHash === null) {
+        problems.push('OPERATOR_PASSWORD_HASH is not set, so nobody can sign in. Generate one with `npm run hash-password`.');
+      } else if (!operatorPasswordHash.startsWith('scrypt$')) {
+        problems.push('OPERATOR_PASSWORD_HASH is not a scrypt hash produced by `npm run hash-password`.');
+      }
     }
 
     const corsAllowedOrigins = readString('CORS_ALLOWED_ORIGINS', '')
@@ -180,10 +257,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
 
     return {
       config: {
+        appMode,
         port: readInt('PORT', 3200, problems),
         databaseUrl,
         dbDriver,
-        sqlitePath: readString('SQLITE_PATH', path.join(SERVER_ROOT, 'data', 'explainable-ats.sqlite')),
+        // The demo has no canonical database. Its only SQLite is the per-visitor,
+        // in-memory one the session store builds for itself.
+        sqlitePath: isDemo ? ':memory:' : readString('SQLITE_PATH', path.join(SERVER_ROOT, 'data', 'explainable-ats.sqlite')),
         migrationsDir: readString('MIGRATIONS_DIR', path.join(SERVER_ROOT, 'migrations')),
         demoDataDir: readString('DEMO_DATA_DIR', path.join(SERVER_ROOT, 'data', 'demo')),
         webDistDir: readString('WEB_DIST_DIR', path.join(SERVER_ROOT, '..', 'web', 'dist')),
@@ -209,8 +289,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
           problems,
         ),
         operatorPasswordHash,
-        // Off unless an operator turns it on, by name, in the environment.
-        demoPublicReadonly: readBool('DEMO_PUBLIC_READONLY', false),
         sessionTtlHours: readInt('SESSION_TTL_HOURS', 12, problems),
         cookieSecure,
         corsAllowedOrigins: corsAllowedOrigins.filter((origin) => origin !== '*' && /^https?:\/\/[^/]+$/.test(origin)),
@@ -239,17 +317,34 @@ export function configSummary(cfg: AppConfig = config): Record<string, string | 
   return {
     llmProvider: cfg.llmProvider,
     llmConfigured: cfg.llmProvider === 'mock' || cfg.anthropicApiKey !== null,
-    database: cfg.dbDriver,
+    // The demo has no canonical database; its visitors' in-memory ones are not
+    // something health is about.
+    database: cfg.appMode === 'demo' ? 'none' : cfg.dbDriver,
     authConfigured: cfg.operatorPasswordHash !== null,
-    // Surfaced so an operator can see from outside whether the public demo
-    // window is open, without having to read the deployment environment.
-    demoPublicReadonly: cfg.demoPublicReadonly,
     cookieSecure: cfg.cookieSecure,
     /** How many origins are allowed — never which. */
     corsAllowedOrigins: cfg.corsAllowedOrigins.length,
   };
 }
 
-const loaded = loadConfig();
+/**
+ * Loads the process's configuration, or stops it with a clear message.
+ *
+ * A refused configuration ends the process here, at import, rather than
+ * surfacing as a stack trace from wherever the first caller happened to be.
+ */
+function loadOrExit(): ConfigResult {
+  try {
+    return loadConfig();
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(`\n[config] ${err.message}\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+
+const loaded = loadOrExit();
 export const config: AppConfig = loaded.config;
 export const configProblems: readonly string[] = loaded.problems;

@@ -69,30 +69,17 @@ export type SessionResponse = {
   operator: string | null;
   expiresAt: string | null;
   csrfToken: string | null;
-  /**
-   * Whether the server would serve its allow-listed read routes to a caller
-   * with no session at all. Configuration, not a permission — see below.
-   */
-  demoAvailable: boolean;
 };
 
 /**
- * `demoAvailable` is not a third authentication state.
- *
- * An anonymous visitor is anonymous whether or not the read-only window is
- * open. The flag only says the server would answer a handful of GETs for
- * them, which is what lets the sign-in screen offer "Browse the demo" instead
- * of leaving a stranger at a password box with no way past it.
- *
- * Deliberately NOT modelled as `{ status: 'demo' }`: a status the app can
- * enter would be a status some future component treats as "signed in enough",
- * and the write path would then be one careless check away from being drawn.
- * Demo viewing is a choice the app makes on top of `anonymous`, and the server
- * refuses writes to it regardless of what this browser believes.
+ * There are three states and no more. In particular there is no "demo" one: the
+ * demo is a different deployment (`mode.ts`), which has no sign-in and so never
+ * asks this question. An anonymous visitor to the real application is anonymous,
+ * and is shown the sign-in screen.
  */
 export type SessionState =
   | { status: 'loading' }
-  | { status: 'anonymous'; demoAvailable: boolean }
+  | { status: 'anonymous' }
   | { status: 'authenticated'; operator: string; expiresAt: string | null };
 
 /**
@@ -104,15 +91,12 @@ export type SessionState =
  * the difference would mean guessing.
  */
 export function sessionFromResponse(body: unknown): SessionState {
-  if (!body || typeof body !== 'object') return { status: 'anonymous', demoAvailable: false };
+  if (!body || typeof body !== 'object') return { status: 'anonymous' };
 
   const response = body as Partial<SessionResponse>;
-  // Strictly `true`. A missing or malformed flag means no demo offer, which
-  // fails toward the password box rather than toward an empty dashboard.
-  const demoAvailable = response.demoAvailable === true;
 
   if (response.authenticated !== true || typeof response.operator !== 'string' || response.operator === '') {
-    return { status: 'anonymous', demoAvailable };
+    return { status: 'anonymous' };
   }
 
   return {

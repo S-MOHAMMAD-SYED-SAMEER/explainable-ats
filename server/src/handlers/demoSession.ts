@@ -1,7 +1,5 @@
-import { hasBodyContent } from './demo.ts';
 import { handleJobDetail, handleJobList, handleJobRanking } from './jobs.ts';
 import { handleDecision, handleEvaluationAudit, handleEvaluationDetail } from './evaluations.ts';
-import { isDemoScenarioId } from '../demo/runScenario.ts';
 import { AppError, ValidationError } from '../lib/errors.ts';
 import type { DemoSessionStore, VisitorSandbox } from '../demo/sessions.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -60,6 +58,13 @@ export function viewOf(sandbox: VisitorSandbox): DemoSessionView {
  */
 export function noDemoSession(): AppError {
   return new AppError('UNAUTHORIZED', 'There is no active demo session. Start the demo and try again.');
+}
+
+/** True unless "no body was sent" — `undefined`, `null`, or an empty object. */
+function hasBodyContent(body: unknown): boolean {
+  if (body === undefined || body === null) return false;
+  if (typeof body === 'object' && !Array.isArray(body)) return Object.keys(body as object).length > 0;
+  return true;
 }
 
 function refuseBody(body: unknown): void {
@@ -131,29 +136,6 @@ export async function demoEvaluationResume(
   if (!resume) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
 
   return { status: 200, body: { text: resume.redactedText } };
-}
-
-/**
- * "Run" a fixed scenario in this visitor's session.
- *
- * The session already holds every scenario, produced by the real pipeline when
- * it was built, so a run resolves to that evaluation rather than building a
- * second one: the same repeat-runs-are-the-same-run behaviour the shared sandbox
- * has. The scenario still comes from the path and nowhere else, checked against
- * the same literal allow-list, and a body is refused outright.
- */
-export function handleDemoSessionRun(
-  sandbox: VisitorSandbox,
-  scenarioParam: unknown,
-  body: unknown,
-): HandlerResult<{ evaluationId: string }> {
-  refuseBody(body);
-
-  if (!isDemoScenarioId(scenarioParam)) {
-    throw new AppError('NOT_FOUND', 'That demo scenario does not exist.');
-  }
-
-  return { status: 200, body: { evaluationId: sandbox.evaluationFor(scenarioParam) } };
 }
 
 export { refuseBody as refuseDemoBody };

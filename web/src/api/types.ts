@@ -9,8 +9,11 @@ export type ErrorEnvelope = {
 };
 
 export type Health = {
+  /** Which deployment answered. Read by the page before it draws anything. */
+  mode: 'app' | 'demo';
   status: 'ok' | 'degraded';
-  database: { driver: string; reachable: boolean; migrationsApplied: number };
+  /** `null` in the demo, which has no canonical database to report on. */
+  database: { driver: string; reachable: boolean; migrationsApplied: number } | null;
   /** Reported as configured-or-not. Never a value, never a key. */
   adapters: Record<string, string | boolean | number>;
   version: string;

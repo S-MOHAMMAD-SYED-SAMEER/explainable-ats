@@ -12,11 +12,11 @@ import type { Database } from '../db/types.ts';
  * instead of its own, and a status surface that contradicts the system it
  * reports on is worse than no status surface.
  */
-export function createHealthRouter(db: Database, config?: AppConfig): Router {
+export function createHealthRouter(db: Database | undefined, config?: AppConfig): Router {
   const router = Router();
 
   router.get('/health', async (_req, res) => {
-    const result = await handleHealth(config ? { db, config } : { db });
+    const result = await handleHealth({ ...(db ? { db } : {}), ...(config ? { config } : {}) });
     res.status(result.status).json(result.body);
   });
 

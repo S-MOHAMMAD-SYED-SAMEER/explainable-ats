@@ -41,12 +41,9 @@ test('the demo decision area says what it is, in the words the demo promises', (
 test('the demo never tells a visitor an operator sign-in is required', () => {
   const source = DETAIL();
 
-  // The only place that sentence lives is a branch the visitor's own session
-  // cannot reach: the read-only window, which still cannot decide.
-  const at = source.indexOf('needs an operator');
-  assert.notEqual(at, -1, 'precondition: the read-only note is still there');
-  const guard = source.slice(Math.max(0, at - 400), at);
-  assert.match(guard, /demo && !demoSession && detail\.decision === null/);
+  // The read-only note that once said so is gone: there is no read-only window to
+  // be in, so no screen has a visitor who cannot decide.
+  assert.doesNotMatch(source, /needs an operator|read-only/i);
 
   // And nothing in any demo-only string says it.
   for (const [name, snippet] of [
@@ -79,8 +76,9 @@ test('the demo result shows the decision, its reason, the demo actor, a timestam
 test('the visitor\'s form is drawn only for a visitor\'s own session; the recruiter\'s only for a signed-in recruiter', () => {
   const source = DETAIL();
 
-  // The recruiter's condition is exactly what it was.
-  assert.match(source, /const decidable =\s*!demo && detail\.decision === null && detail\.isCurrent && detail\.status === 'scored';/);
+  // The recruiter's condition is what it was, with the one thing that can now exclude it named
+  // for what it is: the demo deployment's own session.
+  assert.match(source, /const decidable =\s*!demoSession && detail\.decision === null && detail\.isCurrent && detail\.status === 'scored';/);
   // The visitor's is the same conditions, for the session only.
   assert.match(source, /const demoDecidable =\s*demoSession && detail\.decision === null && detail\.isCurrent && detail\.status === 'scored';/);
 
@@ -92,19 +90,21 @@ test('the visitor\'s form is drawn only for a visitor\'s own session; the recrui
   assert.match(source, /demoSession = false,/);
 });
 
-test('only the visitor\'s own session enables it: the read-only window and the recruiter do not', () => {
-  const app = code(read('App.tsx'));
+test('only the demo deployment\'s own session enables it: the recruiter\'s app never passes the prop', () => {
+  const demo = code(read('DemoApp.tsx'));
+  const recruiter = code(read('RecruiterApp.tsx'));
 
-  // The prop is the derived "in a demo session" value, never the broader `demo`.
-  assert.match(app, /<CandidateDetail evaluationId=\{route\.id\} demo=\{demo\} demoSession=\{inDemoSession\} \/>/);
-  assert.match(app, /const inDemoSession = demoSessionInUse\(/);
+  // The demo's screens are given `demoSession`, and nothing else decides it.
+  assert.match(demo, /<CandidateDetail evaluationId=\{route\.id\} demoSession \/>/);
+  assert.match(demo, /<JobDetail jobId=\{route\.id\} demoSession \/>/);
 
-  // `demo` stays true in a session, which is what keeps the recruiter's form out.
-  assert.match(app, /const demo = session\.state\.status === 'anonymous' \|\| inDemoSession;/);
+  // The recruiter's are given neither, so the recruiter's form is the default.
+  assert.match(recruiter, /<CandidateDetail evaluationId=\{route\.id\} \/>/);
+  assert.match(recruiter, /<JobDetail jobId=\{route\.id\} \/>/);
+  assert.doesNotMatch(recruiter, /demoSession/);
 
-  // JobDetail is given the same derived value, for the overview — and nothing on it
-  // can decide: it never calls the decision endpoint.
-  assert.match(app, /<JobDetail jobId=\{route\.id\} demo=\{demo\} demoSession=\{inDemoSession\} \/>/);
+  // JobDetail is given it for the overview — and nothing on it can decide: it never
+  // calls the decision endpoint.
   assert.doesNotMatch(code(read('screens/JobDetail.tsx')), /api\.decide|DecisionForm/);
 });
 

@@ -7,6 +7,7 @@ import { classify, RATE_LIMITS } from '../src/http/rateLimit.ts';
 import { CSRF_COOKIE, SESSION_COOKIE } from '../src/auth/cookies.ts';
 import { DEFAULT_DEMO_SESSION_TTL_MS, DEFAULT_MAX_DEMO_SESSIONS } from '../src/demo/sessions.ts';
 import { DEMO_SESSION_COOKIE } from '../src/routes/demoSession.ts';
+import { APP_MODES } from '../src/config/mode.ts';
 import {
   ANTHROPIC_DEFAULT_MAX_RETRIES,
   ANTHROPIC_DEFAULT_TIMEOUT_MS,
@@ -113,6 +114,10 @@ test('the README does not repeat claims that were once true or never were', () =
     [/production[- ]ready (AI|extraction)/i, 'overclaims what the Anthropic provider is'],
     [/\b(has|have) been (verified|tested|confirmed)[^.]{0,40}(real|live)[^.]{0,20}API/i, 'claims live-API verification'],
     [/read-only exploration experience/i, 'calls the demo purely read-only'],
+    // Phase 3C.8 removed these. The README may say they are gone; it may not describe them as current.
+    [/DEMO_PUBLIC_READONLY=true/, 'tells a reader to turn on the retired read-only window'],
+    [/POST \/api\/demo\/scenarios/, 'documents the retired demo-run endpoint'],
+    [/PUBLIC_DEMO_READS[^\n]{0,40}allow-list/i, 'documents the retired public read allow-list as current'],
   ];
 
   for (const [pattern, why] of stale) {
@@ -127,14 +132,15 @@ test('the README names no machine-specific path', () => {
 
 test('the README states the things that are true now', () => {
   const required: Array<[RegExp, string]> = [
-    [/POST \/api\/demo\/scenarios\/:scenario\/run/, 'the demo-run endpoint'],
-    [/isolated[^.]*in-memory[^.]*sandbox/i, 'that it runs in an isolated in-memory sandbox'],
-    [/does not write to the canonical database/i, 'that it does not touch canonical state'],
-    [/ephemeral/i, 'that sandbox results are ephemeral'],
+    [/APP_MODE=app/, 'the application mode'],
+    [/APP_MODE=demo/, 'the demo mode'],
+    [/refuses to start/i, 'that demo mode refuses forbidden settings at boot'],
+    [/has no canonical database/i, 'that the demo has no canonical database'],
+    [/ephemeral/i, 'that demo sessions are ephemeral'],
     [/Implemented, not yet verified against the real API/i, 'that the Anthropic provider is implemented but unverified'],
     [/no call to the live Anthropic API has been made/i, 'that no live call has been made'],
     [/extraction quality has not been evaluated/i, 'that extraction quality is unevaluated'],
-    [/public demo always uses the mock/i, 'that the public demo still uses the mock'],
+    [/demo deployment always uses the mock/i, 'that the demo deployment still uses the mock'],
     [/\*\*forces the `record_evidence` tool\*\*/i, 'that the tool call is forced'],
     [/redacted resume text\s+only/i, 'that only redacted text is sent'],
     [/no cost calculation and no cost tracking/i, 'that cost is not tracked'],
@@ -152,8 +158,16 @@ test('the README states the things that are true now', () => {
 // --- README: the claims that can be checked against the code ------------------
 
 test('the README\'s claims about the code match the code', () => {
-  // The demo-run route it documents is the route that exists.
-  assert.match(read('server/src/routes/demo.ts'), /'\/demo\/scenarios\/:scenario\/run'/);
+  // The two modes it documents are the two modes the code has, and the health field it names exists.
+  assert.deepEqual([...APP_MODES], ['app', 'demo']);
+  for (const mode of APP_MODES) assert.ok(README.includes(`APP_MODE=${mode}`), `the README does not document APP_MODE=${mode}`);
+  assert.match(read('server/src/handlers/health.ts'), /mode: AppMode;/);
+  assert.ok(README.includes('`/api/health`') && README.includes('`mode`'));
+  // The variables demo mode refuses are the ones the README lists.
+  for (const forbidden of ['DATABASE_URL', 'OPERATOR_PASSWORD_HASH', 'ANTHROPIC_API_KEY', 'LLM_PROVIDER', 'SQLITE_PATH']) {
+    assert.ok(read('server/src/config/env.ts').includes(`${forbidden} must`), `demo mode does not refuse ${forbidden}`);
+    assert.ok(README.includes(forbidden), `the README does not list ${forbidden}`);
+  }
 
   // "The SDK is imported in exactly one file, the adapter" — and it is. Nothing
   // else in the server, and nothing in the web app, reaches for it.
@@ -190,9 +204,8 @@ test('the README\'s claims about the code match the code', () => {
     '.env.example does not state the retry limits the code enforces',
   );
 
-  // The cookie names and the demo-run budget it quotes.
+  // The cookie names it quotes.
   assert.ok(README.includes(`\`${SESSION_COOKIE}\``) && README.includes(`\`${CSRF_COOKIE}\``));
-  assert.ok(new RegExp(`${RATE_LIMITS.demoRun.limit} per minute`).test(README), 'the README quotes a different demo-run budget');
 });
 
 test('the parity lookup order the README documents is the lookup order in the code', () => {
@@ -343,7 +356,7 @@ test('no source file names another project\'s cookies, routes or documents', () 
 });
 
 test('the rate limiter has no class or path for routes that do not exist', () => {
-  assert.deepEqual(Object.keys(RATE_LIMITS).sort(), ['demoRun', 'demoSession', 'login', 'mutation']);
+  assert.deepEqual(Object.keys(RATE_LIMITS).sort(), ['demoSession', 'login', 'mutation']);
   // A path nothing serves is an ordinary mutation, with no special treatment.
   assert.equal(classify('POST', '/emails/decide'), 'mutation');
   assert.equal(classify('POST', '/emails/abc/understand'), 'mutation');
@@ -377,7 +390,6 @@ test('the README\'s account of the visitor demo session matches the code', () =>
   for (const route of [
     "'/demo/session'",
     "'/demo/session/reset'",
-    "'/demo/session/scenarios/:scenario/run'",
     "'/demo/session/evaluations/:evaluationId/decision'",
     "'/demo/session/evaluations/:evaluationId/resume'",
   ]) {

@@ -107,24 +107,16 @@ export class FixedWindowLimiter {
 }
 
 /**
- * The classes of traffic, per spec §11 plus the public demo-run endpoint.
+ * The classes of traffic, per spec §11 plus the demo's session lifecycle.
  *
  * There is no class for endpoints that call a model, because there is no such
  * endpoint yet: extraction is a deterministic mock. When one exists it needs
  * its own, tighter class — API spend is real money, not merely load — rather
  * than falling through to `mutation`.
- *
- * `demoRun` is its own class rather than falling through to `mutation`. It is
- * reachable with no session at all, and although it writes nothing canonical
- * (it runs in an in-memory sandbox, built once per scenario), an anonymous
- * caller still should not get `mutation`'s 120/minute on an endpoint that can
- * trigger a pipeline run. It is set to the same cadence as `login`
- * (10/minute): conservative, and paced for a human, not a session.
  */
 export const RATE_LIMITS = Object.freeze({
   login: { limit: 10, windowMs: 60_000 },
   mutation: { limit: 120, windowMs: 60_000 },
-  demoRun: { limit: 10, windowMs: 60_000 },
   // Starting, resetting and ending a visitor's demo session. Starting builds a
   // private database and runs the whole pipeline over the dataset, so it is the
   // most expensive thing an anonymous caller can ask for — hence its own class
@@ -134,18 +126,11 @@ export const RATE_LIMITS = Object.freeze({
 
 export type RateLimitClass = keyof typeof RATE_LIMITS;
 
-/**
- * The public demo-run endpoints: the shared sandbox's (`routes/demo.ts`) and a
- * visitor session's own (`routes/demoSession.ts`). POST only.
- */
-const DEMO_RUN_PATH = /^\/demo\/(?:session\/)?scenarios\/[^/]+\/run$/;
-
 /** A visitor session's lifecycle: start, reset, end. */
 const DEMO_SESSION_PATH = /^\/demo\/session(?:\/reset)?$/;
 
 export function classify(method: string, path: string): RateLimitClass | null {
   if (path === '/auth/login') return 'login';
-  if (method === 'POST' && DEMO_RUN_PATH.test(path)) return 'demoRun';
   if ((method === 'POST' || method === 'DELETE') && DEMO_SESSION_PATH.test(path)) return 'demoSession';
   // Reads are not limited: they are cheap, and limiting them would make a busy
   // dashboard look like an attack.

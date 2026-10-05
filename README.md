@@ -17,12 +17,12 @@ What exists today, stated plainly:
 |---|---|
 | Redaction, verification, matching, scoring, ranking, audit trail, recruiter decision | **Implemented and tested.** Deterministic. |
 | Evidence extraction | **Deterministic mock by default** — a keyword matcher (`agent/mockExtractor.ts`), and the only thing the demo, the seed script and the tests run. An Anthropic provider exists behind the same interface (next row), but nothing runs it unless `LLM_PROVIDER=anthropic` is set, and no HTTP route triggers extraction. |
-| Anthropic / Claude provider | **Implemented, not yet verified against the real API.** `LLM_PROVIDER=anthropic` builds an adapter that forces a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a local stub server only: **no call to the live Anthropic API has been made**, whether the configured model accepts the request as built is unconfirmed, and **extraction quality has not been evaluated**. The public demo always uses the mock. |
+| Anthropic / Claude provider | **Implemented, not yet verified against the real API.** `LLM_PROVIDER=anthropic` builds an adapter that forces a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a local stub server only: **no call to the live Anthropic API has been made**, whether the configured model accepts the request as built is unconfirmed, and **extraction quality has not been evaluated**. The demo deployment always uses the mock, and refuses to start with a key. |
 | Resume input | **Plain text only**, through the existing pipeline. There is no upload endpoint and no PDF or DOCX parsing. |
 | Job requirements | **Structured and typed** (label, criterion, must-have or nice-to-have, weight). They are not extracted from a free-text job description. |
-| Public demo | Two layers. A **visitor-scoped demo session** (`/#/demo`, no sign-in): each visitor gets a private, in-memory copy of the five invented candidates, scored by the real deterministic pipeline, that no other visitor can see. The sign-in page's "Read-only demo" entry links to it. The older read-only dashboard over the canonical seeded data is no longer reachable from the UI; its API allow-list (`DEMO_PUBLIC_READONLY`) and a **demo-run endpoint** that runs one candidate in a shared, temporary, isolated in-memory sandbox remain on the server. A visitor can record a demo decision in their own session only. See Sections 5 and 6. |
+| Deployment modes and the demo | **One codebase, two deployments.** `APP_MODE=app` (the default) is the real application: recruiter sign-in, the recruiter routes, a canonical database, and no demo routes at all. `APP_MODE=demo` is the portfolio demo: no sign-in, no canonical database, no credentials, the mock provider only, and a private in-memory copy of five invented candidates per visitor (`/#/demo`: a project explanation, then the interactive demo). A route that does not belong to the running mode is never registered. See Sections 5, 6 and 14. |
 | Evaluation harness / accuracy metrics | **None.** |
-| Docker / deployment configuration | **None** in this repository. CI exists (Section 11). |
+| Docker / deployment configuration | **None** in this repository: there is no `render.yaml`. Section 14 documents how the two deployments are meant to be configured; nothing has been configured on any host. CI exists (Section 11). |
 
 ## 1. What It Does
 
@@ -39,15 +39,17 @@ boundary. By default a deterministic mock stands in for the model; an Anthropic
 provider is implemented behind the same interface but has not been run against
 the real API.
 
-**The current demo experience** is a dashboard over a fixed dataset. A visitor
-can open `/#/demo` with no sign-in and get a private copy of it, browse a job, its
-ranked candidates, and the full evidence and audit trail behind any evaluation,
-run one of five fixed demo candidates to see a temporary result, and record a
-**demo decision** that is saved only to their own private session. A signed-in
-operator can additionally record a real recruiter decision. **There is no HTTP endpoint that
+**The demo experience** is the second deployment (`APP_MODE=demo`). A visitor opens
+it with no sign-in, reads a short explanation of the project, and presses
+*Explore the Interactive Demo* to get a private copy of a fixed synthetic dataset:
+they can browse a job and its ranked candidates, read the redacted CV with the
+verified evidence highlighted, follow the pipeline and the audit timeline, and
+record a **demo decision** that is saved only to their own session. The real
+application is a separate deployment that has none of this, and its signed-in
+operator can record a real recruiter decision. **There is no HTTP endpoint that
 accepts an uploaded or pasted resume.** The pipeline runs on the seeded dataset
-(`npm run seed:demo`) and on the five fixed demo scenarios, never on a visitor's
-own document. See Section 5.
+(`npm run seed:demo`) and, in the demo, on a private copy of that dataset built for
+each visitor, never on a visitor's own document. See Section 5.
 
 ## 2. Architecture
 
@@ -160,6 +162,9 @@ not a general-purpose PII scrubber for arbitrary real-world resumes.
 
 ## 5. The Demo: Deterministic, Synthetic, Temporary
 
+The demo is its own deployment: `APP_MODE=demo` (Section 14). Everything below
+describes that deployment, and none of it exists in the real application.
+
 - The demo runs against a **fixed, synthetic dataset**
   (`server/src/demo/dataset.ts::DEMO_JOB`, `DEMO_CANDIDATES`: one job, five
   invented candidates), not arbitrary user-submitted resumes.
@@ -168,53 +173,25 @@ not a general-purpose PII scrubber for arbitrary real-world resumes.
   (`agent/mockExtractor.ts`) that is a pure function of the prompt it is given
   — the same input always produces the same output, with `latencyMs: 0` and no
   network call. **No language model is involved anywhere in the demo.**
-- The demo runs **without any API key**: `LLM_PROVIDER=mock` is the default and
-  nothing in the demo path reads `ANTHROPIC_API_KEY`.
-- **The canonical data is seeded by a script**, run once by an operator:
-
-  ```
-  npm run seed:demo
-  ```
-
-  This calls `ingestResume` → `openEvaluation`/`extractEvidence` →
-  `matchAndScore` for each demo candidate (`server/src/demo/seed.ts`) — the
-  same functions a live evaluation would use — rather than inserting
-  pre-computed rows directly into the database. The seeded evaluations are the
-  ones the ranking shows, and the ones a recruiter can decide on.
-- **The demo-run endpoint** is `POST /api/demo/scenarios/:scenario/run`, where
-  `:scenario` is one of `demo-001` … `demo-005` (a literal allow-list in
-  `demo/runScenario.ts`). It accepts no body.
-  - It runs the same pipeline functions on that one fixed candidate, but inside
-    an **isolated, in-memory SQLite sandbox** (`demo/sandbox.ts`): same
-    migrations, same fixed demo job, a fixed clock and ids derived from the
-    scenario name. **It does not write to the canonical database** and so cannot
-    create, supersede or displace a canonical evaluation or a recruiter's
-    decision.
-  - It returns `201 {"evaluationId": "..."}`. That id is readable through the
-    existing `GET /api/evaluations/:id` and `/audit` routes, subject to the same
-    access rules as any evaluation (Section 6). It cannot be decided on: the
-    decision route looks ids up in the canonical database, where a sandbox id
-    does not exist.
-  - **Sandbox results are ephemeral.** They live in server memory only. A restart
-    — including a free-tier host going to sleep — discards them, and a link to a
-    result then returns "not found" until the scenario is run again.
-  - **It is deterministic and bounded.** Each scenario is run once per process
-    and then reused: a repeat run returns the same evaluation instead of stacking
-    another. There are at most five sandboxed evaluations, however many requests
-    arrive.
-  - It is available whenever the database contains the demo job (the endpoint
-    looks it up, read-only, and answers "not available" if it is missing). It is
-    **not** controlled by `DEMO_PUBLIC_READONLY`.
-- **The visitor-scoped demo session** (`demo/sessions.ts`, `routes/demoSession.ts`)
-  is the public entry. A visitor opens `/#/demo`, with no sign-in — the sign-in
-  page's single "Read-only demo" entry is an ordinary link to it, always offered,
-  and described as isolated sample data whose demo actions stay private — and meets a
-  landing screen ("Interactive ATS Demo") that says what the product does, what
-  can be explored, that the data is synthetic and private, that no key or AI
-  service is needed, and walks through the seven stages a CV goes through. Nothing
-  starts until they press **Start Demo**, which starts a session — or resumes the
-  one the browser already holds ("Resume demo", with an explicit "Start over").
-  No AI provider, key or network call is involved.
+- The demo runs **without any credential, and refuses to start with one**: it has
+  no canonical database, no sign-in and no API key (Section 14 lists exactly what it
+  refuses). It does not read or write the server's data directory, it never runs migrations
+  against a persistent database, and it seeds nothing at boot.
+- **The first page** (`/#/demo`, and wherever a visitor with no session lands) is a
+  project explanation, not a login and not a dashboard: what the system is, the
+  problem it addresses, the seven-stage workflow, evidence-first matching,
+  deterministic scoring and ranking, redaction and privacy, how model-produced
+  evidence is verified, the recruiter decision and audit trail, the architecture, the
+  security boundaries, how it is tested and the tech stack — and, plainly, what the
+  demo is not (no CV upload and no PDF or DOCX parsing, no language model running,
+  not a multi-user production system). It carries one call to action,
+  **Explore the Interactive Demo**, which starts a session — or resumes the one the
+  browser already holds, with an explicit "Start over". Nothing starts until they
+  press it. No AI provider, key or network call is involved. The page's wording is
+  one pure module (`web/src/demo/copy.ts`), so every sentence is testable.
+- **The second page** is the interactive demo: the same screens a recruiter would
+  use, drawn from the visitor's own session. It has no navigation menu and no Status
+  screen; **Exit demo** returns to the first page.
   - **Evidence in context, the pipeline and the timeline** explain why a candidate
     landed where they did, from data the backend already produced. A candidate's
     page shows the **redacted resume** (`GET /api/demo/session/evaluations/:id/resume`
@@ -228,96 +205,89 @@ not a general-purpose PII scrubber for arbitrary real-world resumes.
     **pipeline** of eight stages is built from the recorded audit events: a stage
     with no event is "Not run", ranking (which is derived on read, not recorded) is
     "Derived on read", and nothing is given a timestamp it was not stored with. The
-    **timeline** replaces the history list in a visitor's session — one item per
-    event, in recorded order, with the arithmetic behind the score and the evidence
-    verification behind an expander and the demo decision as its final event.
-    Pipeline events carry the demo's fixed clock; a decision carries the real time.
-  - **The demo's wording** is one pure module (`web/src/demo/copy.ts`), so every
-    sentence is testable. It claims no model and names no vendor: the keyword
-    matcher that picks passages is described as one, the history says
-    "Deterministic demo extraction (no AI model)" for it, and a real model is still
-    labelled as one. Inside the demo, the first screen is an overview (role,
-    requirements with kind and weight, candidate count, what each ranking label
-    means) built from the visitor's own session data, and a "How this demo works"
-    panel in the header lists the path through a candidate and what Reset and Exit
-    do.
+    **timeline** shows one item per event, in recorded order, with the arithmetic
+    behind the score and the evidence verification behind an expander and the demo
+    decision as its final event. Pipeline events carry the demo's fixed clock; a
+    decision carries the real time.
+  - **The demo's wording** claims no model and names no vendor: the keyword matcher
+    that picks passages is described as one, the history says "Deterministic demo
+    extraction (no AI model)" for it, and a real model is still labelled as one.
+    Inside the demo, the first screen is an overview (role, requirements with kind
+    and weight, candidate count, what each ranking label means) built from the
+    visitor's own session data, and a "How this demo works" panel lists the path
+    through a candidate and what Reset and Exit do.
   - **What a session is.** A private in-memory SQLite database, built by the same
     `seedDemoData` the canonical seeder runs (ingest, redact, extract, verify,
     match, score) over the same fixed dataset, with the deterministic stand-in for
     the model. A fixed clock and sequential ids make every session start
-    byte-identical. It does not read, copy or depend on the canonical database,
-    and the canonical repositories are never passed to it, so a session works even
-    on a deployment where `npm run seed:demo` was never run.
+    byte-identical. The demo process has no canonical database to read or copy, and
+    no canonical repositories exist in it to be passed to a session.
   - **How it is named.** An opaque random token (32 bytes, base64url) in an
     `ats_demo` cookie: `HttpOnly`, `SameSite=Strict`, `Secure` unless
     `COOKIE_SECURE=false`. It carries no identity and nothing decodable, is never
     in a response body or a URL, and is stored server-side only as its SHA-256. The
-    cookie is not an operator session: `req.session` and `req.operator` stay
-    unset, and each cookie is looked up only in its own store.
-  - **Routes** (all anonymous, all under `/api/demo/session`): `POST` start or
-    resume, `GET` status (never an error), `POST /reset`, `DELETE` end, the
-    dashboard's reads (`/jobs`, `/jobs/:id`, `/jobs/:id/ranking`,
+    demo has no operator sessions, so the cookie cannot be mistaken for one.
+  - **Routes** (all anonymous, all under `/api/demo/session`, all registered in demo
+    mode only): `POST` start or resume, `GET` status (never an error), `POST /reset`,
+    `DELETE` end, the dashboard's reads (`/jobs`, `/jobs/:id`, `/jobs/:id/ranking`,
     `/evaluations/:id`, `/evaluations/:id/audit`, `/evaluations/:id/resume`) and
-    `POST /scenarios/:scenario/run` and `POST /evaluations/:id/decision`. These are
-    served from the visitor's own database; they are **not** on the
-    `PUBLIC_DEMO_READS` allow-list, which is unchanged.
+    `POST /evaluations/:id/decision`. They are served from the visitor's own
+    database. There is no run endpoint: a session already holds every scenario.
   - **A visitor's decision** (`POST /api/demo/session/evaluations/:id/decision`)
-    is a separate route from the recruiter's and shares nothing with it but the
-    handler logic. It needs the `ats_demo` cookie and nothing else (a token in a
-    URL, header or body is never read), looks the evaluation up **only in the
-    caller's own database** (a canonical id is "not found"), and records it as the
-    fixed actor `demo-visitor`, which the request cannot override. It reuses the
-    recruiter's `handleDecision`, so the outcomes (`shortlist`, `reject`, `hold`),
-    the reason rule (at least 10 characters), the one-decision-per-assessment rule
-    and the audit event (`decision_recorded`) are the same code, not a copy; the
-    validation errors are the one difference — they say what was wrong without
-    quoting what was sent. A decision is stamped with the real time (the seeded
-    data stays on its fixed clock), appears in that session's history, and is
-    removed by Reset. It never touches the canonical database.
+    needs the `ats_demo` cookie and nothing else (a token in a URL, header or body
+    is never read), looks the evaluation up **only in the caller's own database**,
+    and records it as the fixed actor `demo-visitor`, which the request cannot
+    override. It reuses the recruiter's `handleDecision`, so the outcomes
+    (`shortlist`, `reject`, `hold`), the reason rule (at least 10 characters), the
+    one-decision-per-assessment rule and the audit event (`decision_recorded`) are
+    the same code, not a copy; the validation errors are the one difference — they
+    say what was wrong without quoting what was sent. A decision is stamped with the
+    real time (the seeded data stays on its fixed clock), appears in that session's
+    history, and is removed by Reset.
   - **Reset** rebuilds only the caller's own database from the fixed dataset. It
     takes no body and no target: the session is whichever the cookie names.
   - **Bounded and ephemeral.** A session lapses after two hours without use (use
     slides the window), at most 100 exist (the least recently used is evicted), and
-    a restart discards them all. Starting one is the most expensive anonymous
-    request, so it has its own rate-limit class (`demoSession`, 10 per minute).
+    a restart discards them all — including a free-tier host going to sleep. Starting
+    one is the most expensive anonymous request, so it has its own rate-limit class
+    (`demoSession`, 10 per minute).
   - **Survives a reload** because the browser keeps the cookie and the app asks the
     server at startup; nothing is kept in localStorage or the URL. Because every
-    session starts identical, its ids are identical: an id is only meaningful
-    inside the session whose cookie accompanies it.
-- **A visitor's run does not appear in the ranking.** The ranking, and every
-  number on the job page, is the canonical seeded data and is unaffected.
-- The web dashboard says so next to the "Run demo" button: demo results are
-  temporary and do not change the recruiter's saved evaluations.
-- **There is no public endpoint that accepts a resume.** The demo-run endpoint
-  takes a scenario name from a fixed list and nothing else.
+    session starts identical, its ids are identical: an id is only meaningful inside
+    the session whose cookie accompanies it.
+- **There is no public endpoint that accepts a resume.** The session routes take no
+  document, only the visitor's own decision.
 
-## 6. Public Demo Safety
+## 6. Deployment Boundaries and Safety
 
-Documented from source (`server/src/auth/middleware.ts`, `server/src/app.ts`,
+Documented from source (`server/src/config/mode.ts`, `server/src/app.ts`,
 `server/src/config/env.ts`, `server/src/http/rateLimit.ts`):
 
-- **Anonymous read-only access** is gated behind `DEMO_PUBLIC_READONLY`
-  (default `false`). Off means every route except health, the auth routes
-  (sign-in, sign-out, session) and the demo-run endpoint requires a session.
-- **Public-demo read allow-list**: a literal, anchored list of five GET patterns
-  (`PUBLIC_DEMO_READS`) — `/jobs`, `/jobs/:id`, `/jobs/:id/ranking`,
-  `/evaluations/:id`, `/evaluations/:id/audit`. Matched on method and full
-  path; nothing outside this list is reachable anonymously, even when the flag
-  is on. Sandbox results are read through the same two evaluation routes and so
-  are only as readable as any other evaluation: anonymously only while the flag
-  is on, otherwise only with a session.
-- **The anonymous writes are the demo's, and only those**: the shared-sandbox
-  demo-run endpoint and the visitor session's start, reset, end, scenario run and
-  demo decision
-  (Section 5). None writes to the canonical database; each takes no body, accepts
-  only five fixed scenario names, issues no session and no cookie, and has its
-  own rate-limit class (10 per minute). **Every other write requires a real
-  authenticated session**, and the one that matters — recording a recruiter
-  decision — also requires a CSRF token.
-- **Recruiter decisions are protected.** `POST /evaluations/:id/decision` needs a
-  session and a CSRF token, takes the decider from the session rather than a
-  header, and can only target a canonical, scored, non-superseded evaluation.
-  Anonymous demo runs cannot change that state (see `test/demo-isolation.test.ts`).
+- **The boundary is structural.** `APP_MODE` decides which routes exist. A route
+  that does not belong to the running mode is never registered, so there is no
+  handler to refuse it and no flag to flip: it answers like any other path the
+  server has never heard of.
+  - **Application mode** registers health, the sign-in routes and the recruiter
+    routes behind the session gate. It registers no demo route, builds no demo
+    session store and offers no anonymous read. A stranger asking for a demo path
+    gets the same sign-in refusal as for a path that never existed; a signed-in
+    operator gets the same 404.
+  - **Demo mode** registers health and the demo-session routes. It registers no
+    sign-in route, no operator session, no CSRF layer and no recruiter route, and
+    is never handed a database: building the app refuses one.
+- **Anonymous access is the demo's alone.** In the real application every route but
+  health and sign-in needs a session; **there is no anonymous read window** (the old
+  public read list, the `DEMO_PUBLIC_READONLY` switch, the shared demo-run sandbox
+  and its run endpoint were removed in Phase 3C.8, and setting the old variable now
+  changes nothing).
+- **The anonymous writes are the demo's session lifecycle and a visitor's own
+  decision** (Section 5), and exist only in the demo deployment. None can reach a
+  canonical record, because that deployment has none; each takes no body (except
+  the decision), issues no operator session, and has a rate-limit class.
+- **Recruiter decisions are protected.** `POST /evaluations/:id/decision` exists in
+  the application only, needs a session and a CSRF token, takes the decider from
+  the session rather than a header, and can only target a canonical, scored,
+  non-superseded evaluation.
 - **Session cookies** are named `ats_session` (HttpOnly) and `ats_csrf` (readable,
   so the front end can echo it in `x-csrf-token`). Both are `SameSite=Strict`, and
   `Secure` unless `COOKIE_SECURE=false`.
@@ -328,9 +298,12 @@ Documented from source (`server/src/auth/middleware.ts`, `server/src/app.ts`,
   distributed rate limiting, and a restart or a second instance would not
   share counters. There is no model-call rate class because no HTTP route calls a
   model.
-- **Synthetic data only**: the allow-listed reads expose only what
-  `npm run seed:demo` populated, and the sandbox only ever holds the five fixed
-  demo scenarios.
+- **Synthetic data only in the demo**: a demo process can only hold what a session
+  seeds from the five fixed demo scenarios.
+- **The front end learns the mode from the server.** One built client is served by
+  both deployments, so it asks `/api/health` (which reports `mode`) before drawing
+  anything, and draws only that mode's screens. A missing or unrecognised answer is
+  an error with a retry, never a guess.
 - **Prompt injection is not specifically handled.** Resume text is placed into
   the extraction prompt under plain section markers. The verifier limits the
   damage — a provider can only cite text that really exists in the resume — but
@@ -379,8 +352,7 @@ Documented from source (`server/src/auth/middleware.ts`, `server/src/app.ts`,
     non-retried error), real latency, real token counts, and **extraction quality**
     — there is no evaluation dataset or metric.
   - **Nothing connects the provider to a user.** No HTTP route runs extraction,
-    and the public demo and the seed script build their own mock provider
-    whatever `LLM_PROVIDER` is set to.
+    and the demo deployment refuses to start with a non-mock provider or a key.
   - The `@anthropic-ai/sdk` dependency is imported in exactly one file, the
     adapter.
 - **No embedding or vector-search provider** exists anywhere in this codebase.
@@ -411,9 +383,9 @@ Documented from source (`server/src/auth/middleware.ts`, `server/src/app.ts`,
 - **Audit persistence** is append-only: the audit repository
   (`db/repositories/audit.ts`) has an `append` method and read methods and no
   update or delete, and a sequence number unique per correlation id.
-- The demo sandbox (Section 5) is a separate in-memory SQLite database that
-  exists only inside the server process, whichever driver the canonical
-  database uses.
+- The demo deployment (Section 5) has no canonical database at all. Its visitors'
+  sessions are separate in-memory SQLite databases that exist only inside that
+  process and are never written to disk.
 
 Consult `server/migrations/` directly for exact column definitions.
 
@@ -442,9 +414,9 @@ The only mutation route that requires a session
 - The decision is recorded and audited (`eventType: 'decision_recorded'`,
   actor `human`), and the caller is handed back the resulting state rather than
   asked to re-fetch it.
-- A demo-run (sandbox) evaluation id is not found by this route, so it cannot be
-  decided on. A visitor's session ids are not found here either; a visitor decides
-  through the demo's own route (Section 5), which this route never serves.
+- The route exists in the application only. A visitor decides through the demo's
+  own route (Section 5), which the application never registers, and which shares
+  nothing with this one but the handler logic.
 
 ## 10. Running Locally
 
@@ -453,7 +425,7 @@ TypeScript directly through Node's native type stripping, with no build step, an
 uses `node:sqlite`.
 
 ```bash
-# Server
+# Server — the real application (APP_MODE=app, the default)
 cd server
 npm install
 npm run migrate        # applies server/migrations/*.sql
@@ -461,6 +433,9 @@ npm run hash-password  # reads a password from stdin; prints a hash for OPERATOR
 npm run seed:demo      # runs the pipeline over the fixed demo dataset
 npm run dev            # http://localhost:3200 (or PORT), restarts on change
 npm run start          # the same, without watching
+
+# Server — the demo (APP_MODE=demo): no database, no migrations, no password, no key
+APP_MODE=demo npm run dev
 npm test               # node --test
 npm run typecheck      # tsc --noEmit
 npm run lint           # oxlint
@@ -479,9 +454,14 @@ Notes on running the server:
 
 - Per `server/.env.example`, it runs with **no `.env` file at all**, using a local
   SQLite file and the `mock` provider. The variables that change behavior are
-  `DATABASE_URL` (selects Postgres), `OPERATOR_PASSWORD_HASH` (**required for
-  anyone to sign in**; there is no built-in default password) and
-  `DEMO_PUBLIC_READONLY=true` (opens the anonymous read window, Section 6).
+  `APP_MODE` (`app` or `demo`, Section 14), `DATABASE_URL` (selects Postgres) and
+  `OPERATOR_PASSWORD_HASH` (**required for anyone to sign in**; there is no
+  built-in default password).
+- `APP_MODE=demo` **refuses to start** if `DATABASE_URL`, `OPERATOR_PASSWORD_HASH`
+  or `ANTHROPIC_API_KEY` is set, if `LLM_PROVIDER` is anything but `mock`, or if
+  `SQLITE_PATH` is anything but `:memory:` — and says which, never the value. On a
+  machine that has `ANTHROPIC_API_KEY` in its environment, unset it for that shell
+  before starting the demo.
 - To select the Anthropic provider, set `LLM_PROVIDER=anthropic` and
   `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`, `ANTHROPIC_TIMEOUT_MS`,
   `ANTHROPIC_MAX_RETRIES`; see `.env.example`). That provider has not been
@@ -492,8 +472,13 @@ Notes on running the server:
   every boot.
 - To serve the dashboard from the API, run `npm run build` in `web/` first; the
   server serves `web/dist` from the same origin.
-- To try the demo end to end: `migrate`, `seed:demo`, then start the server with
-  `DEMO_PUBLIC_READONLY=true`.
+- To try the demo end to end: build the web app, then run
+  `APP_MODE=demo npm run start` in `server/` and open `/#/demo`. It needs no
+  `migrate`, no `seed:demo` and no environment beyond that. To try the application:
+  `migrate`, `seed:demo` (optional), set `OPERATOR_PASSWORD_HASH`, and start it with
+  no `APP_MODE`.
+- Under `npm run dev` in `web/` the Vite server proxies `/api` to whichever server is
+  running on `:3200`, so the page shows whichever mode that server was started in.
 - No credential or secret value is included in this README or in `.env.example`.
 
 ## 11. Testing
@@ -505,12 +490,11 @@ client and a loopback stub server (the real SDK pointed at `127.0.0.1`), so no
 test contacts Anthropic and none needs a key.
 
 **Counts, as run in the verified workspace** (the portfolio checked out beside
-this repository): **423 server + 56 web = 479 tests,
-479 passing, 0 failing, 0 skipped.** Server `typecheck`, web
-`typecheck`, server `lint`, web `lint` and web `build` all pass with no errors.
-(Node's runner counts each of the three helper modules in `server/test/` as one
-passing test, so the server figure includes 3 that are not test cases; there are
-420 `test(...)` cases on the server.)
+this repository): **500 server + 189 web = 689 tests, 689 passing,
+0 failing, 0 skipped.** Server `typecheck`, web `typecheck`, server `lint`,
+web `lint` and web `build` all pass with no errors. (Node's runner counts each of
+the helper modules in `server/test/` as one passing test, so the server figure
+includes a few that are not test cases.)
 
 What the server suite covers (`server/test/`):
 
@@ -520,11 +504,17 @@ What the server suite covers (`server/test/`):
 - **Pipeline integration** — ingest, extract, match and rank against a real
   (in-memory) database, the append-only audit trail, repositories and schema
   parity with the domain enums.
-- **HTTP/API** — health, sign-in, CSRF, CORS, rate limiting, the public read
-  allow-list, the recruiter endpoints, and the demo-run endpoint.
-- **Demo isolation** (`demo-isolation.test.ts`) — a public run cannot supersede a
-  canonical evaluation or displace a recruiter decision, adds no persistent
-  rows, and the decision route stays protected by session and CSRF.
+- **HTTP/API** — health, sign-in, CSRF, CORS, rate limiting, and the recruiter
+  endpoints.
+- **Deployment modes** (`app-mode.test.ts`) — `APP_MODE` is read strictly (an invalid
+  value stops the process); demo mode refuses each forbidden setting by name without
+  printing a value; every recruiter and sign-in path is a 404 on the demo and every
+  demo path is absent from the application, answering exactly as a path that never
+  existed does; an app is refused the wrong dependencies; health reports the mode; the
+  wiring is scanned so the demo's router is never given a repository; and the real
+  server entry point is started as a child process in each mode (a bad mode and a
+  demo with a database URL, a hash and a key both exit non-zero with a message and no
+  secret value; the demo boots with no database and no file in the server's data directory).
 - **Demo evidence and audit** (`demo-evidence.test.ts`) — the resume endpoint returns
   only the redacted text and no personal detail, needs the demo cookie, cannot reach
   canonical evaluations and is not a canonical route; hostile markup in a resume is
@@ -545,10 +535,10 @@ What the server suite covers (`server/test/`):
 - **Visitor demo sessions** (`demo-session.test.ts`) — direct entry with no
   sign-in or key, cookie attributes, an opaque token, one visitor's state invisible
   to another, forged, malformed, duplicated and expired tokens, reset and end,
-  that no canonical row changes under any of it, that a demo cookie cannot reach
-  the recruiter decision route, that no response carries a credential or a real
-  record, rate limiting, expiry and eviction, and that building a session makes no
-  network call.
+  that the retired run endpoints are gone, that no canonical row changes under any
+  of it (the harness runs a demo and an application side by side), that a demo
+  cookie cannot reach the recruiter decision route, that no response carries a
+  credential or a real record, rate limiting, expiry and eviction.
 - **Provider** — the mock provider, and the Anthropic adapter
   (`anthropic-provider.test.ts`): the forced tool call and the request it
   sends, redacted text only, malformed, missing and multiple tool calls,
@@ -564,12 +554,16 @@ What the server suite covers (`server/test/`):
 
 What the web suite covers (`web/test/`): **static source scans only**, not
 rendered components — hook order, the wording for every value the server can
-send, "no screen recomputes what the server decided", the demo runner (including
-its temporary-results note), session handling, the demo decision form (`demo-decision.test.ts`), the demo entry
-(`demo-entry.test.ts`: the `/#/demo` route, where each call is sent in the demo scope,
-and that the browser holds no demo token) and the landing (`demo-landing.test.ts`: its
-content, the pure Start/Resume logic, that the seven stages are ones the server has, that
-no wording claims live AI, and static accessibility and responsive conventions), the
+send, "no screen recomputes what the server decided", session handling, the deployment
+mode (`deployment-mode.test.ts`: the mode is read strictly from health and never
+guessed, each half draws only its own screens, the application has no demo link and the
+demo no sign-in, nothing of the retired read-only demo is left), the demo decision form
+(`demo-decision.test.ts`), the demo entry (`demo-entry.test.ts`: each deployment's
+routes, where each call is sent in the demo scope, and that the browser holds no demo
+token) and the first page (`demo-landing.test.ts`: its twelve topics and the plain
+statement of limits, the pure call-to-action logic, that the seven stages are ones the
+server has, that no wording claims live AI or a capability the system lacks, and static
+accessibility and responsive conventions), the
 evidence highlighter (`demo-evidence.test.ts`: bounds, overlaps, rejected and mismatched
 evidence, and hostile text rendered through the real component by React's string renderer),
 the pipeline and timeline builders (`demo-pipeline.test.ts`) and the structure of the new
@@ -622,9 +616,10 @@ faked to make them run.
   HTTP route that creates a job.
 - **The demo uses seeded, synthetic data** and demo results are temporary
   (Section 5). A visitor's demo decision lives only in their session and is not
-  saved anywhere durable. The demo has a landing, a short guide, the redacted resume
-  with highlighted evidence, a pipeline and an audit timeline, but no what-if controls.
-  Those sections exist only in a visitor's own session, not in the recruiter's screens.
+  saved anywhere durable. The demo has a project explanation, a short guide, the
+  redacted resume with highlighted evidence, a pipeline and an audit timeline, but no
+  what-if controls. Those sections exist only in a visitor's own session, not in the
+  recruiter's screens.
 - **No evaluation harness or accuracy metrics** exist.
 - **Matching is term coverage, not comprehension.** It is deliberately crude and
   explainable, and it has not been measured against real resumes.
@@ -634,18 +629,71 @@ faked to make them run.
   (Section 6).
 - **PostgreSQL is unverified** for this schema (Section 8).
 - **No Docker or Compose configuration, and no deployment configuration** (no
-  `render.yaml` or equivalent) in this repository. A public instance may be
-  deployed separately; nothing here guarantees it is running this commit.
+  `render.yaml` or equivalent) in this repository. Section 14 describes the intended
+  two-service layout; it has not been applied to any host, and nothing here
+  guarantees that a public instance is running this commit or this boundary.
 - **The web tests do not render components** (Section 11).
 
 ## 13. Project Status
 
 Based on source verification: the ingest → redact → extract → verify → match →
 score → rank pipeline, the recruiter-decision write path, the append-only audit
-trail, session-based authentication, the credential-free public read window and
-the isolated demo-run sandbox are implemented and present in source, with the
-test results stated in Section 11. Extraction is a deterministic mock by default;
-an Anthropic provider is implemented but unverified against the real API. The
-project does **not** currently expose a resume-upload workflow, parse PDF or DOCX
-files, parse job descriptions, or run a language model from any HTTP route. No
-claim of "production-ready" is made.
+trail, session-based authentication, the two deployment modes and the visitor-scoped
+demo sessions are implemented and present in source, with the test results stated
+in Section 11. Extraction is a deterministic mock by default; an Anthropic provider
+is implemented but unverified against the real API. The project does **not**
+currently expose a resume-upload workflow, parse PDF or DOCX files, parse job
+descriptions, or run a language model from any HTTP route. No claim of
+"production-ready" is made.
+
+## 14. Deployment Modes
+
+One codebase, one built client, two deployments. `APP_MODE` (read once at startup by
+`server/src/config/env.ts`, defined in `server/src/config/mode.ts`) says which.
+
+| | `APP_MODE=app` (default) | `APP_MODE=demo` |
+|---|---|---|
+| What it is | The real application | The portfolio demo |
+| Sign-in | Required for everything but health | None — and no sign-in route exists |
+| Database | Canonical (SQLite file, or Postgres via `DATABASE_URL`); migrated before start | **None.** Each visitor's session is a private in-memory database |
+| Routes | Health, sign-in, the recruiter API | Health and `/api/demo/session/*` |
+| Demo routes / session store | Not registered, not built | Registered, built on demand |
+| Model provider | `mock` or `anthropic` (unverified) | `mock` only |
+| `/api/health` | `mode: "app"`, database reachability | `mode: "demo"`, `database: null` |
+| Front end | Sign-in, then Roles and Status | Project explanation, then the interactive demo; no sign-in, no Status |
+
+**Failing fast.** An `APP_MODE` other than `app` or `demo` stops the process with a
+message naming the variable and the allowed values; it is never defaulted. In demo
+mode the process also **refuses to start** — naming each variable, never printing
+a value — if any of these is set:
+
+- `DATABASE_URL`
+- `OPERATOR_PASSWORD_HASH`
+- `ANTHROPIC_API_KEY`
+- `LLM_PROVIDER` other than `mock`
+- `SQLITE_PATH` other than `:memory:`
+
+That is deliberate: a demo service created from the real service's settings should fail
+at boot, where it is seen, rather than run with a database or a key it must not have.
+
+**Health.** `GET /api/health` is the one route both modes register and always answers
+HTTP 200; the body's `status` is `degraded` when the application's database is
+unreachable, so a platform health check against it is a liveness check only.
+
+**Intended hosting layout (documentation only).** This repository contains no
+`render.yaml`, and nothing below has been applied to any host. The plan is two
+separate Render web services built from the same repository and commit:
+
+- *Live application* — `APP_MODE=app`, `OPERATOR_PASSWORD_HASH` (from
+  `npm run hash-password`), a database (`DATABASE_URL`, or `SQLITE_PATH` on a
+  persistent disk), `TRUST_PROXY=1`, migrations applied before start
+  (`npm run migrate`). Cookies stay `Secure`.
+- *Live demo* — `APP_MODE=demo` and `TRUST_PROXY=1`, and **nothing else from the list
+  above**: no database, no password hash, no key, no provider, no disk. Sessions are
+  lost whenever the service restarts or a free instance sleeps; that is by design.
+- Both: Node 24 or newer, the web app built (`npm run build` in `web/`) so the server
+  can serve `web/dist` from the same origin, start with `npm run start` in `server/`,
+  health check path `/api/health`. Do not share an environment group between the two
+  services — the demo would (correctly) refuse to start with the application's
+  variables.
+

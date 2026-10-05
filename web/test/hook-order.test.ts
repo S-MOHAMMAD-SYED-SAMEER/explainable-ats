@@ -136,6 +136,9 @@ test('the scan actually reads the components it claims to', () => {
   assert.ok(files.length >= 3, `the scan found only ${files.length} components`);
   for (const required of [
     'App.tsx',
+    'RecruiterApp.tsx',
+    'DemoApp.tsx',
+    'screens/DemoEntry.tsx',
     'screens/Overview.tsx',
     'components/AppShell.tsx',
     // The recruiter workflow (P3-F). Named explicitly so a renamed or deleted

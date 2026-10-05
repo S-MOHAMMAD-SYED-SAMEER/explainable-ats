@@ -15,16 +15,13 @@
 
 export const DEMO_TITLE = 'Interactive ATS Demo';
 
-export const DEMO_LEAD = 'Explore a complete candidate screening workflow using synthetic job and candidate data.';
+/** The one call to action on the front page, and the only button that leads into the demo. */
+export const CTA_LABEL = 'Explore the Interactive Demo';
+
+export const PROJECT_LEAD =
+  'An evidence-first resume screening system that can explain every ranking it makes. This page says how it works; the interactive demo lets you try it on synthetic candidates.';
 
 export const DEMO_DISCLOSURE = 'Deterministic and explainable demo — no external AI/API call is required.';
-
-/** What the product is for, in the three claims it makes. */
-export const WHAT_IT_DOES: readonly string[] = [
-  'Ranks candidates against a role, using the requirements the recruiter sets.',
-  'Backs every placement with a line quoted from the candidate’s own CV.',
-  'Masks personal details first, and keeps the recruiter’s decision, with its written reason, on the record.',
-];
 
 /** What a visitor can do once they are in. */
 export const EXPLORE_ITEMS: readonly string[] = [
@@ -35,20 +32,132 @@ export const EXPLORE_ITEMS: readonly string[] = [
   'A demo recruiter decision, saved only to your own session.',
 ];
 
-/** The facts about the data and about what the demo touches. */
-export const DEMO_FACTS: ReadonlyArray<{ heading: string; body: string }> = [
+export type ProjectSection = {
+  id: string;
+  heading: string;
+  /** Short paragraphs, in order. */
+  body: readonly string[];
+  /** Optional bullets after the paragraphs. */
+  points?: readonly string[];
+};
+
+/**
+ * The project explanation: what a visitor reads before they go in.
+ *
+ * Twelve topics, in the order a reviewer asks about them. The seventh-stage
+ * workflow is not a section of prose here: it is `WORKFLOW_STAGES` below, drawn as
+ * its own list, so the section called 'workflow' carries only its introduction.
+ *
+ * EVERY SENTENCE IS A CLAIM THE CODE KEEPS. Nothing here says a model reads the
+ * CVs (in this demo none does), names a vendor, or says the system can do what it
+ * cannot — `PROJECT_LIMITS` says plainly what it cannot, and the tests hold both
+ * to the same standard as the rest of this file.
+ */
+export const PROJECT_SECTIONS: readonly ProjectSection[] = [
   {
-    heading: 'Synthetic data',
-    body: 'The job and all five candidates are invented. No real person, employer or CV appears anywhere in the demo.',
+    id: 'what',
+    heading: 'What it is',
+    body: [
+      'Explainable ATS ranks candidates against a role and shows its working. Every score is built from passages quoted from the candidate’s own CV, and every quote is checked against the original document before it can count for anything.',
+    ],
   },
   {
-    heading: 'Private to you',
-    body: 'You get your own copy. What you do in it is visible only to you, and it never touches a real recruiter’s records.',
+    id: 'problem',
+    heading: 'The problem it addresses',
+    body: [
+      'A resume score nobody can explain is hard to trust, hard to challenge and hard to defend. Screening tools often return a bare number, can be swayed by details that should be irrelevant, and let a model’s wording stand in for proof.',
+      'This project is built around the opposite: show the evidence, keep out what should not matter, and leave a person accountable for the decision.',
+    ],
   },
   {
-    heading: 'No key, no account',
-    body: 'No sign-in, API key or external AI service is needed. Every score comes from fixed rules, so the demo behaves the same way every time.',
+    id: 'workflow',
+    heading: 'The seven-stage workflow',
+    body: ['Every CV goes through the same seven stages, in order. Each one is recorded, so any placement can be explained afterwards.'],
   },
+  {
+    id: 'evidence',
+    heading: 'Evidence-first matching',
+    body: [
+      'Each requirement is judged only from verified quotes. No quote, no credit: a CV that is silent on a requirement is marked “not demonstrated”, never “failed”.',
+      'Every verdict states what was counted, so a reader can check it by hand.',
+    ],
+  },
+  {
+    id: 'scoring',
+    heading: 'Deterministic scoring and ranking',
+    body: [
+      'Verdicts become a score with whole-number arithmetic: a weighted average whose parts add up exactly to the total. The same input always gives the same score.',
+      'Ranking is worked out from the stored results rather than stored itself. Candidates who meet every essential requirement rank above those who do not, whatever their score, and ties are shown as ties.',
+    ],
+  },
+  {
+    id: 'privacy',
+    heading: 'Redaction and privacy',
+    body: [
+      'Before anything reads a CV, personal details — name, contact details, date of birth, gender, nationality, address and similar — are masked in place with blocks of the same length. The system records which category was found and where, never the value, and the extraction step is shown only the masked copy.',
+      'Redaction here is pattern-based and tuned for the synthetic CVs; it is not a general-purpose scrubber for real-world documents.',
+    ],
+  },
+  {
+    id: 'verification',
+    heading: 'Verifying model-produced evidence',
+    body: [
+      'The extraction step only proposes quotes; deterministic code decides what counts. A quote must be found word for word in the original CV, and one that cannot be found is kept in the audit trail as rejected and takes no part in the score. A quote that overlaps masked text is refused.',
+      'In this demo the extraction step is a fixed keyword matcher, not a language model. The same checks apply to either.',
+    ],
+  },
+  {
+    id: 'decision',
+    heading: 'Recruiter decision and audit trail',
+    body: [
+      'A person records advance, review or reject, with a written reason, once per assessment. Every stage writes to an append-only audit trail: who acted (the system, a model or a person), what happened, and the data behind it.',
+      'In this demo your decision is saved only to your own private session.',
+    ],
+  },
+  {
+    id: 'architecture',
+    heading: 'Architecture',
+    body: [
+      'A server that runs the pipeline, a single-page client, and a database behind one interface. The extraction step sits behind its own interface and is the only stage that is not deterministic.',
+      'One codebase is deployed as two separate services: the recruiter application, and this demo.',
+    ],
+  },
+  {
+    id: 'security',
+    heading: 'Security boundaries',
+    body: ['This demo is built so that it cannot reach anything real, rather than trusted not to.'],
+    points: [
+      'It has no sign-in, no database of real records, no credentials and no API key — it refuses to start if given any.',
+      'The recruiter application’s routes do not exist here, and this demo’s routes do not exist there.',
+      'Your session is a private in-memory copy, named by an unguessable HttpOnly cookie and discarded after two hours without use.',
+      'Anonymous requests are rate limited, and no secret ever reaches the browser.',
+    ],
+  },
+  {
+    id: 'testing',
+    heading: 'How it is tested',
+    body: [
+      'Automated tests cover the scoring arithmetic, matching rules, redaction, evidence verification, the audit trail, the HTTP API, and the boundary between the two services — including starting the real server in each mode. No test calls a paid API or needs a key.',
+      'The browser client’s tests inspect source and pure logic rather than rendered pages, and there is no measurement of accuracy on real CVs.',
+    ],
+  },
+  {
+    id: 'stack',
+    heading: 'Tech stack',
+    body: ['TypeScript throughout.'],
+    points: [
+      'Server: Node.js 24 running TypeScript natively, Express 5, SQLite (PostgreSQL through the same interface).',
+      'Client: React 19, Vite and Tailwind CSS.',
+      'Tests: the Node.js built-in test runner, on both sides.',
+    ],
+  },
+];
+
+/** What this demo is not. Said plainly, on the page, rather than left to be discovered. */
+export const PROJECT_LIMITS: readonly string[] = [
+  'No CV upload. The five candidates are fixed and synthetic, and the system has no PDF or DOCX parsing — resume input is plain text.',
+  'No language model runs here. A model-backed extractor exists in the code behind the same interface, but it has not been run against a live service and its quality has not been measured.',
+  'Not a multi-user production system. It has one operator, in-memory rate limiting, and no job-description parsing.',
 ];
 
 /**

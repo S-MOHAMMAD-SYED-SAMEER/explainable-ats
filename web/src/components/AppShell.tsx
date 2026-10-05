@@ -8,6 +8,13 @@ import { CONTROL_HELP, DEMO_DISCLOSURE, DEMO_TITLE } from '../demo/copy.ts';
 // Navigation is business language, not the shape of the code: a recruiter reads
 // "Jobs" and "Review", never "evaluations" or "requirement_match". Those names
 // belong in the schema and stay there.
+//
+// ONE FRAME, TWO DEPLOYMENTS
+//
+// The real application draws it with a signed-in operator; the demo draws it with
+// a visitor's session. They are told apart by which group of props arrives, not by
+// a mode flag, so there is no third combination to render: no operator in the demo,
+// no demo controls in the application.
 
 type NavItem = { route: RouteName; label: string; hint: string };
 
@@ -16,22 +23,19 @@ const NAV: NavItem[] = [
   { route: 'overview', label: 'Status', hint: 'System status' },
 ];
 
+const BUTTON =
+  'h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
+
 export type AppShellProps = {
   route: Route;
-  /** The signed-in operator, or null when this is the read-only demo. */
-  operator: string | null;
-  onSignOut: () => void;
+  /** The signed-in operator. Present in the real application only. */
+  operator?: string;
+  onSignOut?: () => void;
   /**
-   * Viewing without a session. The banner below says so in the visitor's
-   * words; the server is what actually refuses the writes.
-   */
-  demo?: boolean;
-  /** Leaves the demo and returns to the sign-in screen. */
-  onExitDemo?: () => void;
-  /**
-   * Set when the dashboard is drawn from a visitor's own demo sandbox, as
-   * opposed to the read-only window onto the canonical data. It replaces the
-   * sign-in button with the two things a visitor can do to their copy.
+   * A visitor's own demo session. Present in the demo only: it replaces the
+   * sign-out button with the two things a visitor can do to their copy, and
+   * removes the navigation — the demo is one path, so a menu would only be a
+   * second way to get lost on it.
    */
   demoSession?: { onReset: () => void; onExit: () => void; busy: boolean };
   notice: string | null;
@@ -43,8 +47,6 @@ export function AppShell({
   route,
   operator,
   onSignOut,
-  demo = false,
-  onExitDemo,
   demoSession,
   notice,
   onDismissNotice,
@@ -72,55 +74,48 @@ export function AppShell({
                   onClick={demoSession.onReset}
                   disabled={demoSession.busy}
                   title={CONTROL_HELP.reset}
-                  className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                  className={`${BUTTON} disabled:opacity-50`}
                 >
                   {demoSession.busy ? 'Resetting…' : 'Reset demo'}
                 </button>
-                <button
-                  type="button"
-                  onClick={demoSession.onExit}
-                  title={CONTROL_HELP.exit}
-                  className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                >
+                <button type="button" onClick={demoSession.onExit} title={CONTROL_HELP.exit} className={BUTTON}>
                   Exit demo
                 </button>
               </>
             ) : (
               <>
-                <span className="text-meta text-ink-muted">{demo ? 'Read-only demo' : operator}</span>
-                <button
-                  type="button"
-                  onClick={demo ? onExitDemo : onSignOut}
-                  className="h-control rounded-control border border-line-strong px-3 text-meta font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                >
-                  {demo ? 'Sign in' : 'Sign out'}
+                <span className="text-meta text-ink-muted">{operator}</span>
+                <button type="button" onClick={onSignOut} className={BUTTON}>
+                  Sign out
                 </button>
               </>
             )}
           </div>
         </div>
 
-        <nav aria-label="Sections" className="mx-auto max-w-6xl px-6 pb-3">
-          <ul className="flex flex-wrap gap-2">
-            {NAV.map((item) => {
-              const active = item.route === section;
-              return (
-                <li key={item.route}>
-                  <a
-                    href={routeToHash({ name: item.route, id: null })}
-                    aria-current={active ? 'page' : undefined}
-                    title={item.hint}
-                    className={`inline-flex h-control items-center rounded-control px-3 text-small font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-                      active ? 'bg-brand text-white' : 'border border-line-strong text-ink-muted'
-                    }`}
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        {demoSession ? null : (
+          <nav aria-label="Sections" className="mx-auto max-w-6xl px-6 pb-3">
+            <ul className="flex flex-wrap gap-2">
+              {NAV.map((item) => {
+                const active = item.route === section;
+                return (
+                  <li key={item.route}>
+                    <a
+                      href={routeToHash({ name: item.route, id: null })}
+                      aria-current={active ? 'page' : undefined}
+                      title={item.hint}
+                      className={`inline-flex h-control items-center rounded-control px-3 text-small font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                        active ? 'bg-brand text-white' : 'border border-line-strong text-ink-muted'
+                      }`}
+                    >
+                      {item.label}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        )}
       </header>
 
       {demoSession ? (
@@ -133,17 +128,6 @@ export function AppShell({
             after a while without use.
           </p>
           <DemoGuide />
-        </div>
-      ) : demo ? (
-        <div className="mx-auto mt-4 max-w-6xl rounded-card border border-line bg-surface px-4 py-3">
-          <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">
-            Read-only demo · not signed in
-          </p>
-          <p className="mt-1 text-small text-ink">
-            This is the real application, running on five invented candidates. Everything here can be
-            read. Recording a decision needs an operator sign-in, and the server refuses it either
-            way — nothing you do here can change anything.
-          </p>
         </div>
       ) : null}
 

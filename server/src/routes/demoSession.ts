@@ -8,7 +8,6 @@ import {
   demoJobList,
   demoJobRanking,
   handleDemoDecision,
-  handleDemoSessionRun,
   handleDemoSessionStatus,
   noDemoSession,
   refuseDemoBody,
@@ -28,22 +27,21 @@ import type { AppConfig } from '../config/env.ts';
 //   GET    /demo/session/jobs[/:id[/ranking]]   the dashboard's reads
 //   GET    /demo/session/evaluations/:id[/audit|/resume]   (the resume is the REDACTED text)
 //   POST   /demo/session/evaluations/:id/decision   a demo decision, this visitor only
-//   POST   /demo/session/scenarios/:scenario/run
 //
-// Mounted before the session gate in `app.ts`, like the other public demo
-// router, and for the same reason: an anonymous visitor reaches it by design.
-// It is its own router rather than a widening of either `PUBLIC_DEMO_READS` or
-// the recruiter router, so neither of those means anything different because
-// this exists.
+// MOUNTED IN DEMO MODE ONLY
+//
+// `app.ts` registers this router when `APP_MODE=demo` and never otherwise, so in
+// the real application these paths are not routes at all. Anonymous by design, and
+// answered entirely from a private in-memory database per visitor: the router is
+// never given a canonical database, because a demo process has none.
 //
 // THE DEMO COOKIE IS NOT A SESSION
 //
-// `ats_demo` names a demo sandbox. It is never read by `attachSession`, so
-// `req.session` and `req.operator` stay undefined for every request here and
-// `operatorOf` still throws for anyone who reaches it. Putting a demo token in
-// the operator's cookie slot, or an operator's in this one, opens nothing: each
-// is looked up in its own store, and a value from one is simply unknown to the
-// other.
+// `ats_demo` names a demo sandbox. A demo process has no operator sessions at all
+// — `attachSession` is not mounted there — so `req.session` and `req.operator`
+// are never set for any request here. Putting a demo token in the operator's
+// cookie slot, or an operator's in this one, opens nothing: each is looked up in
+// its own store, and the other store does not exist in that process.
 //
 // HttpOnly, so script cannot read the token; SameSite=Strict, so a cross-site
 // page cannot make a visitor's browser send it — which is also what keeps the
@@ -218,15 +216,6 @@ export function createDemoSessionRouter(deps: Deps): Router {
     wrap(async (req, res) => {
       const sandbox = requireSandbox(req);
       const result = await handleDemoDecision(sandbox, readId(req.params.evaluationId, 'assessment'), req.body);
-      res.status(result.status).json(result.body);
-    }),
-  );
-
-  router.post(
-    '/demo/session/scenarios/:scenario/run',
-    wrap((req, res) => {
-      const sandbox = requireSandbox(req);
-      const result = handleDemoSessionRun(sandbox, req.params.scenario, req.body);
       res.status(result.status).json(result.body);
     }),
   );

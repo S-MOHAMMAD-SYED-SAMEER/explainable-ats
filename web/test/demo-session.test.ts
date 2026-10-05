@@ -23,27 +23,18 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-// ============================================ demoAvailable is not authentication
+// ============================================ the sign-in state has no demo in it
 
-test('an anonymous answer stays anonymous whether or not the demo is offered', () => {
-  for (const demoAvailable of [true, false]) {
-    const state = sessionFromResponse({
-      authenticated: false,
-      operator: null,
-      expiresAt: null,
-      csrfToken: null,
-      demoAvailable,
-    });
+test('an anonymous answer is anonymous, and says nothing else', () => {
+  const state = sessionFromResponse({ authenticated: false, operator: null, expiresAt: null, csrfToken: null });
 
-    assert.equal(state.status, 'anonymous');
-    assert.equal(isAuthenticated(state), false, 'an anonymous answer produced an authenticated state');
-    assert.equal(state.status === 'anonymous' && state.demoAvailable, demoAvailable);
-  }
+  assert.deepEqual(state, { status: 'anonymous' });
+  assert.equal(isAuthenticated(state), false, 'an anonymous answer produced an authenticated state');
 });
 
-test('demoAvailable alone can never produce an authenticated state', () => {
+test('a demo flag a stale server might still send can never produce an authenticated state, or any other', () => {
   // Every shape a confused or hostile server could send where the only truthy
-  // signal is the demo flag. None may sign anybody in.
+  // signal is the retired demo flag. None may sign anybody in, and none changes the state.
   const bodies: unknown[] = [
     { demoAvailable: true },
     { authenticated: false, demoAvailable: true, operator: 'operator' },
@@ -54,23 +45,24 @@ test('demoAvailable alone can never produce an authenticated state', () => {
   ];
 
   for (const body of bodies) {
-    assert.equal(isAuthenticated(sessionFromResponse(body)), false, JSON.stringify(body));
-  }
-});
-
-test('a malformed answer offers no demo and no session', () => {
-  for (const body of [null, undefined, 'nope', 42, [], {}]) {
     const state = sessionFromResponse(body);
-    assert.equal(state.status, 'anonymous');
-    assert.equal(state.status === 'anonymous' && state.demoAvailable, false, JSON.stringify(body));
+    assert.equal(isAuthenticated(state), false, JSON.stringify(body));
+    assert.deepEqual(state, { status: 'anonymous' }, JSON.stringify(body));
   }
 });
 
-test('the flag must be exactly true, not merely truthy', () => {
-  for (const value of ['true', 1, {}, [], 'yes']) {
-    const state = sessionFromResponse({ authenticated: false, operator: null, demoAvailable: value });
-    assert.equal(state.status === 'anonymous' && state.demoAvailable, false, JSON.stringify(value));
+test('a malformed answer is anonymous', () => {
+  for (const body of [null, undefined, 'nope', 42, [], {}]) {
+    assert.deepEqual(sessionFromResponse(body), { status: 'anonymous' }, JSON.stringify(body));
   }
+});
+
+test('the session state has three states, and none of them is a demo', () => {
+  const source = fs.readFileSync(path.join(SRC, 'auth/session.ts'), 'utf8');
+  const type = /export type SessionState =([\s\S]*?);\n/.exec(source)?.[1] ?? '';
+  assert.notEqual(type, '', 'precondition: found the type');
+  assert.deepEqual([...type.matchAll(/status: '([a-z]+)'/g)].map((m) => m[1]), ['loading', 'anonymous', 'authenticated']);
+  assert.doesNotMatch(source.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, ''), /demoAvailable|demo/i);
 });
 
 test('a real sign-in still produces an authenticated state', () => {
@@ -105,15 +97,16 @@ test('no source file contains a password, hash or demo credential', () => {
   }
 });
 
-test('the demo entry point sends no credentials of its own', () => {
-  const login = fs.readFileSync(path.join(SRC, 'screens/Login.tsx'), 'utf8');
+test('the sign-in screen sends one credential, and offers no way into the demo', () => {
+  // Code only: a comment explaining why the screen has no demo link is not a demo link.
+  const login = fs
+    .readFileSync(path.join(SRC, 'screens/Login.tsx'), 'utf8')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
 
-  // The demo entry is a plain link to the public demo and holds no state or
-  // handler at all. If it ever starts calling the login endpoint it has become a
-  // sign-in, and a sign-in needs a credential — which is the thing this design
-  // exists to avoid having at all.
-  assert.match(login, /<a\s[^>]*href=\{routeToHash\(\{ name: 'demo', id: null \}\)\}/, 'the demo entry is no longer a link to the demo route');
-  assert.ok(!login.includes('onBrowseDemo'), 'the sign-in screen still carries a demo handler');
+  // The demo is another deployment. If this screen ever links to it, holds a handler
+  // for it or calls anything but the one login call, it has become a second way in.
+  assert.doesNotMatch(login, /<a\s|href=|routeToHash|onBrowseDemo|[Dd]emo/);
 
   // Exactly one call, and it is the one the password form makes.
   const calls = login.split('api.login(').length - 1;

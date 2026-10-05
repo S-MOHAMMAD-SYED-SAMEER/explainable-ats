@@ -23,7 +23,7 @@ type Fact = { label: string; value: string; detail: string; tone: 'good' | 'bad'
 
 function facts(health: Health): Fact[] {
   const a = health.adapters;
-  const connected = health.status === 'ok' && health.database.reachable;
+  const connected = health.status === 'ok' && health.database?.reachable === true;
 
   const out: Fact[] = [
     {

@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client.ts';
-import { routeToHash } from '../router.ts';
 
 // The sign-in screen (M6-A).
 //
@@ -26,23 +25,12 @@ import { routeToHash } from '../router.ts';
 // "server has no password configured" would tell someone guessing which half of
 // the problem to work on.
 
-// THE DEMO ENTRY IS A LINK, NOT A SECOND WAY IN
+// THERE IS NOTHING ELSE ON THIS SCREEN, AND THAT IS THE DESIGN.
 //
-// "Read-only demo" is an ordinary link to the public demo at `/#/demo`. It does
-// not sign anybody in: there is no demo password, no demo account and no demo
-// token, nothing this component could leak even if it wanted to, and this file
-// holds no demo state of its own. What it leads to is the visitor's private demo
-// session, which the server keeps entirely apart from the operator's and which
-// can reach nothing but invented data.
-//
-// It is always offered. The public demo does not depend on the server's
-// `DEMO_PUBLIC_READONLY` window, so a deployment that has that window shut still
-// has a demo to send a visitor to.
-//
-// THERE IS ONE ENTRY POINT. This screen used to carry two — a button that drew a
-// read-only dashboard over the canonical data, and a link to `/#/demo` — which
-// led to two different demos. They are one now, so nothing here needs to remember
-// that a visitor chose to browse.
+// This is the real application's front door: a password and nothing beside it.
+// The portfolio demo is a different deployment with no sign-in at all, so this
+// screen offers no way into it and says nothing about one. It is rendered only
+// when the server reports `APP_MODE=app` (see `mode.ts`).
 
 export function Login({ onSignedIn }: { onSignedIn(): void }): ReactNode {
   const [password, setPassword] = useState('');
@@ -124,19 +112,6 @@ export function Login({ onSignedIn }: { onSignedIn(): void }): ReactNode {
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-
-        <div className="mt-5 rounded-card border border-line bg-surface p-5">
-          <p className="text-meta font-semibold uppercase tracking-wide text-ink-muted">Read-only demo</p>
-          <p className="mt-1 text-small text-ink">
-            Explore the ATS using isolated sample data. Demo actions stay private and never affect recruiter records.
-          </p>
-          <a
-            href={routeToHash({ name: 'demo', id: null })}
-            className="mt-4 flex h-control w-full items-center justify-center rounded-control border border-line-strong px-4 text-small font-semibold text-ink hover:border-ink-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
-            Browse the read-only demo
-          </a>
-        </div>
 
         <p className="mt-4 text-meta text-ink-muted">
           The password is checked on the server and never stored in this browser.

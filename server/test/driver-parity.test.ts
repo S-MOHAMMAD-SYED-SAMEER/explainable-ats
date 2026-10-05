@@ -212,8 +212,8 @@ test('health reports the configuration of the app it was given', async () => {
   const { status, body } = await handleHealth({ db, config });
   assert.equal(status, 200);
   assert.equal(body.status, 'ok');
-  assert.equal(body.database.reachable, true);
-  assert.equal(body.database.migrationsApplied, MIGRATION_COUNT);
+  assert.equal(body.database?.reachable, true);
+  assert.equal(body.database?.migrationsApplied, MIGRATION_COUNT);
   assert.equal(body.adapters.llmProvider, 'mock');
 
   // The version is a product version, never a milestone label: it is rendered
@@ -231,7 +231,7 @@ test('health degrades rather than throwing when the database is gone', async () 
   // asks. `degraded` in the body is what a readiness check reads.
   assert.equal(status, 200);
   assert.equal(body.status, 'degraded');
-  assert.equal(body.database.reachable, false);
+  assert.equal(body.database?.reachable, false);
 });
 
 test('health never reports a secret', async () => {

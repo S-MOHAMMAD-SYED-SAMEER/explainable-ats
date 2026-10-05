@@ -511,22 +511,14 @@ function DemoTimelineSection({ detail, audit }: { detail: EvaluationDetail; audi
 
 export function CandidateDetail({
   evaluationId,
-  demo = false,
   demoSession = false,
 }: {
   evaluationId: string;
   /**
-   * Viewing without a session. The form is not drawn, because a control that
-   * looked usable and then failed with a 401 would teach a visitor that the
-   * product is broken rather than that they are not signed in. The server
-   * refuses the write regardless of this prop.
-   */
-  demo?: boolean;
-  /**
-   * Viewing a visitor's own private demo session. Unlike the read-only window
-   * (`demo` alone), this one can record a decision — to that session's sandbox,
-   * through the demo's own route, never the recruiter's. `demo` is also true here,
-   * which is what keeps the recruiter's form from being drawn.
+   * Viewing a visitor's own private demo session (demo deployment only). It
+   * records a decision to that session's sandbox, through the demo's own route.
+   * The recruiter's form is never drawn for it, and the recruiter's route does
+   * not exist in that deployment.
    */
   demoSession?: boolean;
 }): ReactNode {
@@ -554,9 +546,9 @@ export function CandidateDetail({
   // Both conditions are enforced by the server, which answers 409 either way.
   // Hiding the form is the honest presentation of that rule, not the rule.
   const decidable =
-    !demo && detail.decision === null && detail.isCurrent && detail.status === 'scored';
+    !demoSession && detail.decision === null && detail.isCurrent && detail.status === 'scored';
   // The same conditions, for a visitor's own session. Mutually exclusive with
-  // `decidable`: `demo` is true whenever `demoSession` is.
+  // `decidable`.
   const demoDecidable =
     demoSession && detail.decision === null && detail.isCurrent && detail.status === 'scored';
 
@@ -613,16 +605,6 @@ export function CandidateDetail({
           }}
           demo
         />
-      ) : null}
-
-      {demo && !demoSession && detail.decision === null ? (
-        <section className="rounded-card border border-dashed border-line-strong p-5">
-          <p className="text-small text-ink-muted">
-            Recording a decision is where this stops being read-only, so it needs an operator
-            sign-in. Everything that produced the ranking above — the quoted evidence, the
-            verification and the scoring — is on this page already.
-          </p>
-        </section>
       ) : null}
 
       {!decidable && !demoDecidable && detail.decision === null ? (

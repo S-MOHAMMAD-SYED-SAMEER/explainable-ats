@@ -11,10 +11,19 @@ import { createDemoSessionStore, type DemoSessionStore } from '../src/demo/sessi
 import { DEMO_SESSION_COOKIE } from '../src/routes/demoSession.ts';
 import { createTestContext, MIGRATIONS_DIR, type TestContext } from './helpers.ts';
 
-// The harness the visitor-demo tests share: a real app over real HTTP, on a
-// canonical database that holds the real seeded dataset AND a recruiter's
-// decision AND a candidate who is not part of the dataset — what a deployed
-// instance holds, and the state the demo surface must leave exactly as found.
+// The harness the visitor-demo tests share: TWO real apps over real HTTP, as two
+// real deployments are.
+//
+//   the demo   (`APP_MODE=demo`) — `h.base`, `h.call`, `h.start`. No canonical
+//              database, no operator password, no key: what a deployed demo holds.
+//   the app    (`APP_MODE=app`)  — `h.appBase`, `h.callApp`, `h.operator`. A
+//              canonical database holding the real seeded dataset AND a
+//              recruiter's decision AND a candidate who is not part of the
+//              dataset: what a deployed application holds, and the state nothing
+//              the demo does may touch.
+//
+// They are separate processes in production and separate apps here. They share
+// nothing but the code, which is the point of the split.
 
 export const PASSWORD = 'demo-session-operator-password';
 export const SECRET_API_KEY = 'sk-ant-test-this-must-never-appear-in-any-response';
@@ -45,23 +54,31 @@ export type EvaluationBody = {
 };
 
 export type Harness = {
+  /** The demo deployment. */
   base: string;
+  /** The real application's deployment, over the canonical database. */
+  appBase: string;
   ctx: TestContext;
   store: DemoSessionStore;
   canonicalJobId: string;
   canonicalEvaluations: Map<string, string>;
-  /** Anonymous call, optionally carrying a demo cookie value. */
+  /** Anonymous call to the DEMO, optionally carrying a demo cookie value. */
   call<T = Json>(method: string, path: string, options?: { token?: string | null; rawCookie?: string; body?: unknown }): Promise<Reply<T>>;
+  /** The same shape of call, to the REAL APPLICATION. */
+  callApp<T = Json>(method: string, path: string, options?: { token?: string | null; rawCookie?: string; body?: unknown }): Promise<Reply<T>>;
   /** Starts a session and returns its token, read from Set-Cookie like a browser would. */
   start(): Promise<{ token: string; reply: Reply }>;
-  /** Signs in as the operator. */
+  /** Signs in as the operator, on the real application. */
   operator(): Promise<{ cookie: string; csrf: string }>;
 };
 
 export async function withHarness(
   fn: (h: Harness) => Promise<void>,
   options: {
+    /** Applied to the DEMO's configuration. */
     overrides?: Partial<AppConfig>;
+    /** Applied to the REAL APPLICATION's configuration. */
+    appOverrides?: Partial<AppConfig>;
     rateLimiter?: ReturnType<typeof rateLimit>;
     store?: DemoSessionStore;
   } = {},
@@ -80,41 +97,53 @@ export async function withHarness(
   });
   await ctx.repos.candidates.create({ reference: 'real-0001', displayName: FIXTURE_NAME, source: 'manual' });
 
-  const config: AppConfig = {
+  const appConfig: AppConfig = {
     ...loadConfig({}).config,
     operatorPasswordHash: await hashPassword(PASSWORD),
     anthropicApiKey: SECRET_API_KEY,
     cookieSecure: false,
-    demoPublicReadonly: false,
+    ...options.appOverrides,
+  };
+  assert.equal(appConfig.appMode, 'app');
+
+  // A real demo configuration: the one the loader builds, which has no password
+  // hash, no key and no database URL because it refuses to.
+  const config: AppConfig = {
+    ...loadConfig({ APP_MODE: 'demo' }).config,
+    cookieSecure: false,
     ...options.overrides,
   };
 
   const store = options.store ?? createDemoSessionStore({ migrationsDir: MIGRATIONS_DIR });
   const rateLimiter =
     options.rateLimiter ??
-    rateLimit({ limits: { ...RATE_LIMITS, demoSession: { limit: 10_000, windowMs: 60_000 }, demoRun: { limit: 10_000, windowMs: 60_000 } } });
+    rateLimit({ limits: { ...RATE_LIMITS, demoSession: { limit: 10_000, windowMs: 60_000 } } });
 
-  const app = createApp({
-    db: ctx.db,
-    config,
-    logger: createMemoryLogger().logger,
-    rateLimiter,
-    demoSessions: store,
-  });
-  const server = app.listen(0);
-  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
-  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const demoApp = createApp({ config, logger: createMemoryLogger().logger, rateLimiter, demoSessions: store });
+  const realApp = createApp({ db: ctx.db, config: appConfig, logger: createMemoryLogger().logger });
 
-  async function call<T = Json>(
-    method: string,
-    p: string,
-    opts: { token?: string | null; rawCookie?: string; body?: unknown } = {},
-  ): Promise<Reply<T>> {
-    const headers: Record<string, string> = { 'content-type': 'application/json', origin: base };
+  const listen = async (app: ReturnType<typeof createApp>) => {
+    const server = app.listen(0);
+    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+    return { server, base: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
+  };
+  const demo = await listen(demoApp);
+  const real = await listen(realApp);
+  const base = demo.base;
+  const appBase = real.base;
+
+  const callAt =
+    (root: string) =>
+    async <T = Json>(
+      method: string,
+      p: string,
+      opts: { token?: string | null; rawCookie?: string; body?: unknown } = {},
+    ): Promise<Reply<T>> => {
+    const headers: Record<string, string> = { 'content-type': 'application/json', origin: root };
     const cookie = opts.rawCookie ?? (opts.token ? `${DEMO_SESSION_COOKIE}=${opts.token}` : undefined);
     if (cookie) headers.cookie = cookie;
 
-    const response = await fetch(`${base}${p}`, {
+    const response = await fetch(`${root}${p}`, {
       method,
       headers,
       ...(method === 'GET' || method === 'HEAD' ? {} : { body: JSON.stringify(opts.body ?? {}) }),
@@ -126,15 +155,19 @@ export async function withHarness(
       headers: response.headers,
       cookies: response.headers.getSetCookie(),
     };
-  }
+  };
+  const call = callAt(base);
+  const callApp = callAt(appBase);
 
   const harness: Harness = {
     base,
+    appBase,
     ctx,
     store,
     canonicalJobId: seeded.jobId,
     canonicalEvaluations: new Map(seeded.candidates.map((c) => [c.reference, c.evaluationId ?? ''])),
     call,
+    callApp,
     async start() {
       const reply = await call('POST', '/api/demo/session');
       const token = tokenFrom(reply.cookies);
@@ -142,7 +175,7 @@ export async function withHarness(
       return { token: token as string, reply };
     },
     async operator() {
-      const login = await fetch(`${base}/api/auth/login`, {
+      const login = await fetch(`${appBase}/api/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ password: PASSWORD }),
@@ -157,7 +190,8 @@ export async function withHarness(
   try {
     await fn(harness);
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => demo.server.close(() => resolve()));
+    await new Promise<void>((resolve) => real.server.close(() => resolve()));
     await store.close();
     await ctx.close();
   }

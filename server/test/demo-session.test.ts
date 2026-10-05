@@ -6,9 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { rateLimit, RATE_LIMITS, classify } from '../src/http/rateLimit.ts';
 import { CSRF_HEADER } from '../src/auth/csrf.ts';
 import { CSRF_COOKIE, SESSION_COOKIE } from '../src/auth/cookies.ts';
-import { PUBLIC_DEMO_READS, isPublicDemoRead } from '../src/auth/middleware.ts';
 import { DEMO_CANDIDATES, DEMO_JOB, demoPersonalDetails } from '../src/demo/dataset.ts';
-import { DEMO_SCENARIO_IDS } from '../src/demo/runScenario.ts';
+import { DEMO_SCENARIO_IDS } from '../src/demo/scenarios.ts';
 import {
   createDemoSessionStore,
   isWellFormedDemoToken,
@@ -27,9 +26,10 @@ import { MIGRATIONS_DIR } from './helpers.ts';
 // would read it: not "does a session start?" but "is there ANY way through this
 // surface to a recruiter's record, to another visitor's, or to a credential?"
 //
-// Everything runs over real HTTP against a canonical database that holds the
-// real seeded dataset AND a recruiter's decision — what a deployed instance
-// holds, and the state the surface must leave exactly as it found it.
+// Everything runs over real HTTP, against the demo deployment (`APP_MODE=demo`)
+// and, beside it, the real application (`APP_MODE=app`) over a canonical database
+// that holds the real seeded dataset AND a recruiter's decision — what the two
+// deployments hold, and the state the demo must leave exactly as it found it.
 
 import {
   FIXTURE_NAME,
@@ -46,20 +46,17 @@ import {
 
 // ============================================================ 1. direct entry
 
-test('a visitor enters the demo directly: no sign-in, no key, no operator password, no demo window', async () => {
-  // Nothing is configured that a public deployment might lack: the read window
-  // is shut, and no operator password hash exists at all.
-  await withHarness(
-    async (h) => {
-      const { reply } = await h.start();
-      assert.equal(reply.status, 201);
-      assert.equal(reply.body.active, true);
-      assert.equal(reply.body.jobTitle, DEMO_JOB.title);
-      assert.equal(typeof reply.body.jobId, 'string');
-      assert.equal(typeof reply.body.expiresAt, 'string');
-    },
-    { overrides: { demoPublicReadonly: false, operatorPasswordHash: null, anthropicApiKey: null } },
-  );
+test('a visitor enters the demo directly: no sign-in, no key, no operator password', async () => {
+  // The demo's configuration has none of those at all — the loader will not
+  // build one that does.
+  await withHarness(async (h) => {
+    const { reply } = await h.start();
+    assert.equal(reply.status, 201);
+    assert.equal(reply.body.active, true);
+    assert.equal(reply.body.jobTitle, DEMO_JOB.title);
+    assert.equal(typeof reply.body.jobId, 'string');
+    assert.equal(typeof reply.body.expiresAt, 'string');
+  });
 });
 
 test('the demo cookie is HttpOnly and SameSite=Strict, and carries no operator or CSRF cookie', async () => {
@@ -171,7 +168,7 @@ test('two sessions begin byte-identical, and match the canonical seed in every j
     for (const entry of rankingA.entries) {
       const canonicalId = h.canonicalEvaluations.get(entry.reference);
       const mine = await h.call<EvaluationBody>('GET', `/api/demo/session/evaluations/${entry.evaluationId}`, { token: a.token });
-      const theirs = await fetch(`${h.base}/api/evaluations/${canonicalId}`, { headers: { cookie: op.cookie } });
+      const theirs = await fetch(`${h.appBase}/api/evaluations/${canonicalId}`, { headers: { cookie: op.cookie } });
       const canonicalBody = (await theirs.json()) as EvaluationBody;
 
       assert.equal(mine.body.scoreBasisPoints, canonicalBody.scoreBasisPoints, `${entry.reference} score`);
@@ -349,7 +346,6 @@ test('a guessed, modified or foreign token reaches nothing', async () => {
         assert.ok(!JSON.stringify(reply.body).includes('Senior Backend Engineer'), `${label} leaked the job`);
       }
       assert.equal((await h.call('POST', '/api/demo/session/reset', { token })).status, 401, `${label} reset`);
-      assert.equal((await h.call('POST', '/api/demo/session/scenarios/demo-001/run', { token })).status, 401, `${label} run`);
     }
 
     assert.ok(h.store.resolve(a.token), 'A\'s session survived every forged attempt');
@@ -405,7 +401,6 @@ test('malformed demo cookies fail safely: a clean 401 or an inactive status, nev
       assert.deepEqual(status.body, { active: false });
 
       assert.equal((await h.call('POST', '/api/demo/session/reset', { rawCookie })).status, 401);
-      assert.equal((await h.call('POST', '/api/demo/session/scenarios/demo-001/run', { rawCookie })).status, 401);
 
       // The refusal says nothing about why — and never repeats what was sent.
       assert.ok(!JSON.stringify(read.body).includes(value.slice(0, 30)) || value.length < 3);
@@ -540,38 +535,22 @@ test('ending a session discards it, is repeatable, and touches no other session'
   });
 });
 
-// ======================================================= the scenario run route
+// ======================================================= the scenario run routes are gone
 
-test('running a scenario in a session resolves to that visitor\'s own evaluation, repeatably', async () => {
-  await withHarness(async (h) => {
-    const { token, reply } = await h.start();
-    const ranking = await rankingOf(h, token, reply.body.jobId as string);
-
-    for (const scenario of DEMO_SCENARIO_IDS) {
-      const expected = ranking.entries.find((e) => e.reference === scenario)?.evaluationId;
-      for (let i = 0; i < 2; i++) {
-        const run = await h.call<{ evaluationId: string }>('POST', `/api/demo/session/scenarios/${scenario}/run`, { token });
-        assert.equal(run.status, 200);
-        assert.equal(run.body.evaluationId, expected, `${scenario} resolved to another evaluation`);
-      }
-    }
-    assert.equal(h.store.size, 1, 'running scenarios must not build further sessions');
-  });
-});
-
-test('the session run route refuses a body and any scenario outside the five', async () => {
+test('there is no run endpoint: a visitor\'s session already holds every scenario', async () => {
   await withHarness(async (h) => {
     const { token } = await h.start();
+    const sizeBefore = h.store.size;
 
-    const withBody = await h.call('POST', '/api/demo/session/scenarios/demo-001/run', {
-      token,
-      body: { candidateId: 'x', jobId: 'y', resume: 'z', provider: 'anthropic' },
-    });
-    assert.equal(withBody.status, 400);
-
-    for (const bogus of ['demo-000', 'demo-006', 'DEMO-001', '..%2F', 'x']) {
-      assert.equal((await h.call('POST', `/api/demo/session/scenarios/${bogus}/run`, { token })).status, 404, bogus);
+    for (const scenario of [...DEMO_SCENARIO_IDS, 'demo-000', 'x']) {
+      for (const p of [`/api/demo/session/scenarios/${scenario}/run`, `/api/demo/scenarios/${scenario}/run`]) {
+        for (const withToken of [true, false]) {
+          const reply = await h.call('POST', p, withToken ? { token } : {});
+          assert.equal(reply.status, 404, `POST ${p} is still a route`);
+        }
+      }
     }
+    assert.equal(h.store.size, sizeBefore, 'a refused run built a session');
   });
 });
 
@@ -583,10 +562,6 @@ test('nothing a visitor can do through the session surface changes one canonical
 
     const a = await h.start();
     const b = await h.start();
-    for (const scenario of DEMO_SCENARIO_IDS) {
-      await h.call('POST', `/api/demo/session/scenarios/${scenario}/run`, { token: a.token });
-      await h.call('POST', `/api/demo/scenarios/${scenario}/run`);
-    }
     await h.call('POST', '/api/demo/session/reset', { token: a.token });
     await h.call('POST', '/api/demo/session/reset', { token: a.token });
     await h.call('GET', '/api/demo/session/jobs', { token: a.token });
@@ -626,26 +601,34 @@ test('a session identifier cannot resolve a canonical evaluation or job, and a c
     );
     assert.deepEqual(await h.ctx.db.query('SELECT id FROM jobs WHERE id = ?', [sessionJobId]), []);
 
-    // And the reverse: the canonical surface does not know a session's ids, even
-    // with the demo window open and a demo cookie presented.
+    // And the reverse: the real application does not know a session's ids, even
+    // with a demo cookie presented beside a real operator's.
     const op = await h.operator();
-    const canonicalRead = await fetch(`${h.base}/api/evaluations/${sessionEvaluationId}`, {
+    const canonicalRead = await fetch(`${h.appBase}/api/evaluations/${sessionEvaluationId}`, {
       headers: { cookie: `${op.cookie}; ${DEMO_SESSION_COOKIE}=${token}` },
     });
     assert.equal(canonicalRead.status, 404);
-  }, { overrides: { demoPublicReadonly: true } });
+  });
 });
 
-test('the canonical read surface serves canonical data to a visitor with a demo cookie, never the session\'s', async () => {
-  await withHarness(
-    async (h) => {
-      const { token } = await h.start();
-      const jobs = await h.call<{ jobs: Array<{ id: string }> }>('GET', '/api/jobs', { token });
-      assert.equal(jobs.status, 200);
-      assert.deepEqual(jobs.body.jobs.map((j) => j.id), [h.canonicalJobId], 'the cookie changed what the canonical route serves');
-    },
-    { overrides: { demoPublicReadonly: true } },
-  );
+test('the demo has no canonical read surface, and a demo cookie changes nothing about the real application\'s', async () => {
+  await withHarness(async (h) => {
+    const { token } = await h.start();
+
+    // The demo does not register the recruiter's reads at all.
+    for (const p of ['/api/jobs', `/api/jobs/${h.canonicalJobId}`, `/api/jobs/${h.canonicalJobId}/ranking`]) {
+      assert.equal((await h.call('GET', p, { token })).status, 404, `the demo serves ${p}`);
+    }
+
+    // The real application treats a demo cookie as what it is to it: nothing.
+    assert.equal((await h.callApp('GET', '/api/jobs', { rawCookie: `${DEMO_SESSION_COOKIE}=${token}` })).status, 401);
+
+    const op = await h.operator();
+    const jobs = await fetch(`${h.appBase}/api/jobs`, { headers: { cookie: `${op.cookie}; ${DEMO_SESSION_COOKIE}=${token}` } });
+    const body = (await jobs.json()) as { jobs: Array<{ id: string }> };
+    assert.equal(jobs.status, 200);
+    assert.deepEqual(body.jobs.map((j) => j.id), [h.canonicalJobId], 'the cookie changed what the canonical route serves');
+  });
 });
 
 // ================================== recruiter decision route stays protected
@@ -659,29 +642,37 @@ test('a demo session cannot be used to call the recruiter decision route', async
     const before = await canonicalSnapshot(h.ctx);
     const payload = { outcome: 'reject', reason: 'An anonymous visitor must not be able to record this.' };
 
-    const attempts: Array<[string, Reply]> = [
+    // On the demo the route does not exist.
+    const onDemo: Array<[string, Reply]> = [
       ['demo cookie, canonical id', await h.call('POST', `/api/evaluations/${canonicalId}/decision`, { token, body: payload })],
       ['demo cookie, session id', await h.call('POST', `/api/evaluations/${sessionEvaluationId}/decision`, { token, body: payload })],
       ['no cookie at all', await h.call('POST', `/api/evaluations/${canonicalId}/decision`, { body: payload })],
-      // The demo token presented as an operator session, with and without a CSRF header.
-      ['demo token as operator cookie', await h.call('POST', `/api/evaluations/${canonicalId}/decision`, { rawCookie: `${SESSION_COOKIE}=${token}`, body: payload })],
-      ['demo token as operator cookie + csrf cookie', await h.call('POST', `/api/evaluations/${canonicalId}/decision`, { rawCookie: `${SESSION_COOKIE}=${token}; ${CSRF_COOKIE}=${token}`, body: payload })],
+      ['look-alike under the demo namespace', await h.call('POST', `/api/demo/evaluations/${sessionEvaluationId}/decision`, { token, body: payload })],
     ];
-    for (const [label, result] of attempts) {
+    for (const [label, result] of onDemo) {
+      assert.equal(result.status, 404, `${label} reached something on the demo`);
+    }
+
+    // On the real application it exists and refuses everything a visitor holds.
+    const onApp: Array<[string, Reply]> = [
+      ['demo cookie, canonical id', await h.callApp('POST', `/api/evaluations/${canonicalId}/decision`, { rawCookie: `${DEMO_SESSION_COOKIE}=${token}`, body: payload })],
+      ['no cookie at all', await h.callApp('POST', `/api/evaluations/${canonicalId}/decision`, { body: payload })],
+      // The demo token presented as an operator session, with and without a CSRF cookie.
+      ['demo token as operator cookie', await h.callApp('POST', `/api/evaluations/${canonicalId}/decision`, { rawCookie: `${SESSION_COOKIE}=${token}`, body: payload })],
+      ['demo token as operator cookie + csrf cookie', await h.callApp('POST', `/api/evaluations/${canonicalId}/decision`, { rawCookie: `${SESSION_COOKIE}=${token}; ${CSRF_COOKIE}=${token}`, body: payload })],
+      ['look-alike under the demo namespace', await h.callApp('POST', `/api/demo/evaluations/${sessionEvaluationId}/decision`, { rawCookie: `${DEMO_SESSION_COOKIE}=${token}`, body: payload })],
+    ];
+    for (const [label, result] of onApp) {
       assert.equal(result.status, 401, `${label} was not refused`);
     }
 
     // The same, with the CSRF header forged to match.
-    const forged = await fetch(`${h.base}/api/evaluations/${canonicalId}/decision`, {
+    const forged = await fetch(`${h.appBase}/api/evaluations/${canonicalId}/decision`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=${token}`, [CSRF_HEADER]: token },
       body: JSON.stringify(payload),
     });
     assert.equal(forged.status, 401);
-
-    // The demo has its own decision route (demo-decision.test.ts). Nothing else under
-    // the demo namespace is one: a look-alike path is not served, and falls to the gate.
-    assert.equal((await h.call('POST', `/api/demo/evaluations/${sessionEvaluationId}/decision`, { token, body: payload })).status, 401);
 
     assert.equal(await canonicalSnapshot(h.ctx), before, 'a decision row appeared');
   });
@@ -696,12 +687,12 @@ test('the recruiter flow is unchanged: sign-in works, and the decision route sti
     const headers = { 'content-type': 'application/json', cookie: `${op.cookie}; ${DEMO_SESSION_COOKIE}=${token}` };
 
     // Signed in, but no CSRF header: refused, demo cookie or not.
-    const noCsrf = await fetch(`${h.base}/api/evaluations/${target}/decision`, { method: 'POST', headers, body });
+    const noCsrf = await fetch(`${h.appBase}/api/evaluations/${target}/decision`, { method: 'POST', headers, body });
     assert.equal(noCsrf.status, 403);
 
     // With it, the operator records a decision on the canonical record — the
     // demo cookie in the jar changes nothing about who may do that.
-    const ok = await fetch(`${h.base}/api/evaluations/${target}/decision`, {
+    const ok = await fetch(`${h.appBase}/api/evaluations/${target}/decision`, {
       method: 'POST',
       headers: { ...headers, [CSRF_HEADER]: op.csrf },
       body,
@@ -746,7 +737,6 @@ test('no response from the session surface carries a key, a credential, a protec
     for (const entry of ranking.entries) {
       replies.push(await h.call('GET', `/api/demo/session/evaluations/${entry.evaluationId}`, { token }));
       replies.push(await h.call('GET', `/api/demo/session/evaluations/${entry.evaluationId}/audit`, { token }));
-      replies.push(await h.call('POST', `/api/demo/session/scenarios/${entry.reference}/run`, { token }));
     }
 
     for (const r of replies) {
@@ -774,39 +764,20 @@ test('a visitor\'s session never contains the canonical database\'s extra record
   });
 });
 
-// ======================================================== 8. the public allow-list
+// ================================================== 8. no anonymous read window
 
-test('the existing public GET allow-list is exactly what it was', () => {
-  assert.deepEqual(
-    PUBLIC_DEMO_READS.map((r) => r.source),
-    [
-      String.raw`^\/jobs$`,
-      String.raw`^\/jobs\/[^/]+$`,
-      String.raw`^\/jobs\/[^/]+\/ranking$`,
-      String.raw`^\/evaluations\/[^/]+$`,
-      String.raw`^\/evaluations\/[^/]+\/audit$`,
-    ],
-  );
-
-  // The session surface is not on it, under any method — it is served by its
-  // own router, ahead of the gate, and never needed to be.
-  for (const p of ['/demo/session', '/demo/session/jobs', '/demo/session/jobs/x/ranking', '/demo/session/evaluations/x', '/demo/session/reset']) {
-    for (const method of ['GET', 'POST', 'DELETE']) {
-      assert.equal(isPublicDemoRead(method, p), false, `${method} ${p} joined the allow-list`);
-    }
-  }
-});
-
-test('with the demo window shut, canonical reads are still refused — a demo session does not open them', async () => {
+test('the demo serves no recruiter route, and the real application serves no anonymous one', async () => {
   await withHarness(async (h) => {
     const { token } = await h.start();
-    for (const p of ['/api/jobs', `/api/jobs/${h.canonicalJobId}`, `/api/jobs/${h.canonicalJobId}/ranking`, `/api/evaluations/${h.canonicalEvaluations.get('demo-001')}`]) {
-      assert.equal((await h.call('GET', p, { token })).status, 401, p);
+    const paths = ['/api/jobs', `/api/jobs/${h.canonicalJobId}`, `/api/jobs/${h.canonicalJobId}/ranking`, `/api/evaluations/${h.canonicalEvaluations.get('demo-001')}`];
+    for (const p of paths) {
+      assert.equal((await h.call('GET', p, { token })).status, 404, `the demo serves ${p}`);
+      assert.equal((await h.callApp('GET', p)).status, 401, `the real application serves ${p} to a stranger`);
     }
   });
 });
 
-test('routes under the session prefix that do not exist fall through to the gate, not to a handler', async () => {
+test('routes under the session prefix that do not exist are 404s, not handlers', async () => {
   await withHarness(async (h) => {
     const { token } = await h.start();
     for (const [method, p] of [
@@ -817,8 +788,7 @@ test('routes under the session prefix that do not exist fall through to the gate
       ['POST', '/api/demo/session/anything'],
     ] as const) {
       const reply = await h.call(method, p, { token });
-      assert.ok([401, 404, 405].includes(reply.status), `${method} ${p} answered ${reply.status}`);
-      assert.notEqual(reply.status, 200);
+      assert.equal(reply.status, 404, `${method} ${p} answered ${reply.status}`);
     }
   });
 });
@@ -829,8 +799,8 @@ test('the session surface has its own rate-limit classes, and reads stay unlimit
   assert.equal(classify('POST', '/demo/session'), 'demoSession');
   assert.equal(classify('POST', '/demo/session/reset'), 'demoSession');
   assert.equal(classify('DELETE', '/demo/session'), 'demoSession');
-  assert.equal(classify('POST', '/demo/session/scenarios/demo-001/run'), 'demoRun');
-  assert.equal(classify('POST', '/demo/scenarios/demo-001/run'), 'demoRun', 'the shared sandbox\'s class is unchanged');
+  // The retired run endpoints are not a class of their own: they are not routes.
+  assert.equal(classify('POST', '/demo/session/scenarios/demo-001/run'), 'mutation');
 
   assert.equal(classify('GET', '/demo/session'), null);
   assert.equal(classify('GET', '/demo/session/jobs'), null);
@@ -854,22 +824,6 @@ test('starting sessions is rate-limited, and the refusal carries Retry-After', a
       // Resetting and ending share the budget; reading does not.
       assert.equal((await h.call('POST', '/api/demo/session/reset')).status, 429);
       assert.equal((await h.call('GET', '/api/demo/session')).status, 200);
-    },
-    { rateLimiter: tiny },
-  );
-});
-
-test('scenario runs in a session are rate-limited as demo runs, apart from session starts', async () => {
-  const tiny = rateLimit({
-    limits: { ...RATE_LIMITS, demoSession: { limit: 100, windowMs: 60_000 }, demoRun: { limit: 2, windowMs: 60_000 } },
-  });
-  await withHarness(
-    async (h) => {
-      const { token } = await h.start();
-      const statuses: number[] = [];
-      for (let i = 0; i < 4; i++) statuses.push((await h.call('POST', '/api/demo/session/scenarios/demo-001/run', { token })).status);
-      assert.deepEqual(statuses, [200, 200, 429, 429]);
-      assert.equal((await h.call('POST', '/api/demo/session', { token })).status, 200, 'starts have their own budget');
     },
     { rateLimiter: tiny },
   );

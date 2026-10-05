@@ -56,10 +56,11 @@ export function setCsrfFailureHandler(handler: AuthListener | null): void {
 // --- which half of the API the dashboard is reading --------------------------
 //
 // The screens call `api.job(id)` and friends and know nothing about demos. In
-// the `demo` scope those same calls are answered by the visitor's own sandbox
-// (see `resolveApiPath`), so there is one set of screens and no second copy to
-// drift. Module-level, like the two handlers above, because exactly one thing
-// sets it — the app shell — and every request reads it.
+// the `demo` scope — the demo deployment's, where the recruiter API does not
+// exist — those same calls are answered by the visitor's own sandbox (see
+// `resolveApiPath`), so there is one set of screens and no second copy to drift.
+// Module-level, like the two handlers above, because exactly one thing sets it —
+// the running app (`RecruiterApp` or `DemoApp`) — and every request reads it.
 
 let apiScope: ApiScope = 'recruiter';
 
@@ -176,7 +177,7 @@ function safeParse(text: string): unknown {
 }
 
 export const api = {
-  /** Public. The only call that works without a session. */
+  /** Public. The only call both deployments answer, and how the page learns which one it is. */
   health: (): Promise<Health> => request<Health>('/health'),
 
   session: (): Promise<SessionResponse> => request<SessionResponse>('/auth/session'),
@@ -235,15 +236,4 @@ export const api = {
   endDemoSession: (): Promise<{ ended: boolean }> =>
     request<{ ended: boolean }>('/demo/session', { method: 'DELETE' }),
 
-  // --- the public demo runner (Option B) -------------------------------------
-  //
-  // `scenario` is a UX label only — one of the five fixed ids the server
-  // already enforces (`server/src/demo/runScenario.ts::DEMO_SCENARIO_IDS`).
-  // No other data is ever sent: the endpoint refuses any request body, so an
-  // empty one is sent explicitly, the same way `logout` does.
-  runDemoScenario: (scenario: string): Promise<{ evaluationId: string }> =>
-    request<{ evaluationId: string }>(`/demo/scenarios/${encodeURIComponent(scenario)}/run`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    }),
 };

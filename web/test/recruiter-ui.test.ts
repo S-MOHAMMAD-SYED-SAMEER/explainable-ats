@@ -14,7 +14,7 @@ import {
   verdictWording,
   outcomeWording,
 } from '../src/copy.ts';
-import { DEFAULT_ROUTE, ROUTES, parseRoute, routeToHash } from '../src/router.ts';
+import { DEFAULT_ROUTE, DEMO_ROUTES, RECRUITER_ROUTES, ROUTES, parseRoute, routeToHash } from '../src/router.ts';
 
 // The recruiter workflow's client-side guarantees (P3-F).
 //
@@ -200,13 +200,19 @@ test('the candidate screen shows protected attributes as categories, never value
 
 // --- routing -----------------------------------------------------------------
 
-test('every screen the app switches on is a real route', () => {
-  const source = code(read(path.join(SRC, 'App.tsx')));
-  const switched = [...source.matchAll(/route\.name === '([a-z]+)'/g)].map((match) => match[1] as string);
+test('every screen either app switches on is a real route, and one of its own', () => {
+  for (const [file, allowed] of [
+    ['RecruiterApp.tsx', RECRUITER_ROUTES],
+    ['DemoApp.tsx', DEMO_ROUTES],
+  ] as const) {
+    const source = code(read(path.join(SRC, file)));
+    const switched = [...source.matchAll(/route\.name === '([a-z]+)'/g)].map((match) => match[1] as string);
 
-  assert.ok(switched.length >= 3, `only ${switched.length} route branches found`);
-  for (const name of switched) {
-    assert.ok((ROUTES as readonly string[]).includes(name), `App switches on "${name}", which is not a route`);
+    assert.ok(switched.length >= 2, `${file}: only ${switched.length} route branches found`);
+    for (const name of switched) {
+      assert.ok((ROUTES as readonly string[]).includes(name), `${file} switches on "${name}", which is not a route`);
+      assert.ok((allowed as readonly string[]).includes(name), `${file} switches on "${name}", which is not one of its routes`);
+    }
   }
 });
 

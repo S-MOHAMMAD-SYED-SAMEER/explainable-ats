@@ -6,21 +6,20 @@ import { createFixedClock, systemClock, type Clock } from '../lib/clock.ts';
 import { createSequentialIds } from '../lib/ids.ts';
 import { DEMO_JOB } from './dataset.ts';
 import { seedDemoData } from './seed.ts';
-import { SANDBOX_CLOCK_START } from './sandbox.ts';
-import { isDemoScenarioId, type DemoScenarioId } from './runScenario.ts';
+import { isDemoScenarioId, type DemoScenarioId } from './scenarios.ts';
 import type { Database } from '../db/types.ts';
 import type { Logger } from '../lib/logger.ts';
 
 // Visitor-scoped demo sessions.
 //
-// WHY THIS IS NOT `sandbox.ts`
+// WHY EACH VISITOR GETS A DATABASE OF THEIR OWN
 //
-// `sandbox.ts` is process-global: one in-memory database per scenario, shared by
-// every visitor, which is exactly right for something nobody can change and
-// exactly wrong for anything a visitor can. The moment a visitor can act on the
-// demo — decide on a candidate, say — their action must not be visible to the
-// next stranger, so each visitor gets a database of their own. This file is that
-// mechanism and nothing else; the global sandbox is left as it was.
+// A visitor can act on the demo — decide on a candidate, say — and their action
+// must not be visible to the next stranger. A shared copy would be exactly right
+// for something nobody can change and exactly wrong for anything a visitor can,
+// so every visitor gets a private one. This file is that mechanism and nothing
+// else. It exists only in demo mode (`config/mode.ts`): the real application never
+// builds a session store.
 //
 // WHAT A SESSION IS
 //
@@ -53,6 +52,9 @@ import type { Logger } from '../lib/logger.ts';
 // repositories, so there is no path from a session to a recruiter's records: not
 // by id, not by mistake. A restart discards every session, and a visitor whose
 // session has gone is simply sent back to start another.
+
+/** Where a session's clock starts while the dataset is built. Fixed, so every session starts identical. */
+export const SANDBOX_CLOCK_START = '2026-01-01T00:00:00.000Z';
 
 export const DEFAULT_DEMO_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 export const DEFAULT_MAX_DEMO_SESSIONS = 100;

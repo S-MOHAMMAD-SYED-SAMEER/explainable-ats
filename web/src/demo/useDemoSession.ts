@@ -13,18 +13,18 @@ import { demoSessionFromResponse, type DemoSessionView, type DemoState } from '.
 //
 // A DEMO SESSION IS NOT A SIGN-IN
 //
-// Nothing here touches `useSession`, `SessionState` or an operator. The app
-// decides what to draw from the two side by side, and the server refuses every
-// recruiter action regardless of what either says.
+// Nothing here touches `useSession`, `SessionState` or an operator. The demo
+// deployment has no sign-in, and the real application has no demo session: each is
+// drawn by its own half of the client (`DemoApp`, `RecruiterApp`).
 
 export type { DemoState };
 
 export type DemoSessionHandle = {
   state: DemoState;
   /**
-   * Whether the visitor chose the demo during THIS page load, as opposed to a
-   * live session simply being found. It only matters to a signed-in operator —
-   * see `demoSessionInUse`.
+   * Whether the visitor started the demo during THIS page load, as opposed to a
+   * live session simply being found. It only changes what the front page says: a
+   * session that ended after the visitor was inside is reported as having ended.
    */
   entered: boolean;
   /** Bumped by a reset, so the app can remount its screens and re-read the fresh copy. */

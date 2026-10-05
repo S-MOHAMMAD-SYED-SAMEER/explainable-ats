@@ -15,8 +15,7 @@ import {
 } from '../src/adapters/llm/anthropic.ts';
 import { createLlmProvider, LlmError, type LlmRequest } from '../src/adapters/llm/index.ts';
 import { createApp } from '../src/app.ts';
-import { seedDemoData } from '../src/demo/seed.ts';
-import { configSummary, loadConfig } from '../src/config/env.ts';
+import { ConfigError, configSummary, loadConfig } from '../src/config/env.ts';
 import { handleHealth } from '../src/handlers/health.ts';
 import { extractEvidence } from '../src/agent/extract.ts';
 import { matchAndScore } from '../src/agent/match.ts';
@@ -849,34 +848,49 @@ test('the server refuses to start with anthropic selected and no key, and starts
   assert.doesNotThrow(() => createApp({ db: ctx.db, config: loadConfig({}).config, logger }));
 });
 
-test('the public demo keeps using the mock even when the server is configured for anthropic', async (t) => {
-  const ctx = await createTestContext();
-  t.after(() => ctx.close());
-  await seedDemoData({ repos: ctx.repos });
+test('the demo cannot be configured for anthropic, and its sessions are answered by the mock', async (t) => {
+  // A demo started with a key, or with the provider switched, is refused at
+  // configuration, and the refusal names the variables without echoing the key.
+  assert.throws(
+    () => loadConfig({ APP_MODE: 'demo', LLM_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: API_KEY }),
+    (err: unknown) => {
+      assert.ok(err instanceof ConfigError);
+      assert.match(err.message, /LLM_PROVIDER/);
+      assert.match(err.message, /ANTHROPIC_API_KEY/);
+      assert.ok(!err.message.includes(API_KEY), 'the refusal printed the key');
+      return true;
+    },
+  );
 
-  const config = {
-    ...loadConfig({ LLM_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: API_KEY }).config,
-    demoPublicReadonly: true,
-  };
-  const app = createApp({ db: ctx.db, config, logger: createMemoryLogger().logger });
+  // And what a demo visitor is shown was produced by the deterministic provider.
+  const config = { ...loadConfig({ APP_MODE: 'demo' }).config, cookieSecure: false };
+  assert.equal(config.llmProvider, 'mock');
+  assert.equal(config.anthropicApiKey, null);
+
+  const app = createApp({ config, logger: createMemoryLogger().logger });
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once('listening', () => resolve()));
   t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-  const run = await fetch(`${base}/api/demo/scenarios/demo-001/run`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: '{}',
-  });
-  assert.equal(run.status, 201, 'the demo should run without touching the configured provider');
-  const { evaluationId } = (await run.json()) as { evaluationId: string };
+  const started = await fetch(`${base}/api/demo/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(started.status, 201);
+  const cookie = (started.headers.getSetCookie()[0] ?? '').split(';')[0] ?? '';
+  const { jobId } = (await started.json()) as { jobId: string };
 
-  const detail = (await (await fetch(`${base}/api/evaluations/${evaluationId}`)).json()) as { model: string | null; status: string };
+  const ranking = (await (await fetch(`${base}/api/demo/session/jobs/${jobId}/ranking`, { headers: { cookie } })).json()) as {
+    entries: Array<{ evaluationId: string | null; reference: string }>;
+  };
+  const evaluationId = ranking.entries.find((entry) => entry.reference === 'demo-001')?.evaluationId ?? '';
+
+  const detail = (await (await fetch(`${base}/api/demo/session/evaluations/${evaluationId}`, { headers: { cookie } })).json()) as {
+    model: string | null;
+    status: string;
+  };
   assert.equal(detail.status, 'scored');
   assert.equal(detail.model, 'mock', 'a public visitor\'s click was answered by something other than the mock');
 
-  const audit = (await (await fetch(`${base}/api/evaluations/${evaluationId}/audit`)).json()) as {
+  const audit = (await (await fetch(`${base}/api/demo/session/evaluations/${evaluationId}/audit`, { headers: { cookie } })).json()) as {
     events: Array<{ eventType: string; actorId: string | null }>;
   };
   assert.equal(audit.events.find((event) => event.eventType === 'extraction_recorded')?.actorId, 'mock');
