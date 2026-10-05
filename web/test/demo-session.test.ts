@@ -58,7 +58,7 @@ test('a malformed answer is anonymous', () => {
 });
 
 test('the session state has three states, and none of them is a demo', () => {
-  const source = fs.readFileSync(path.join(SRC, 'auth/session.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(SRC, 'auth/session.ts'), 'utf8').replace(/\r\n/g, '\n');
   const type = /export type SessionState =([\s\S]*?);\n/.exec(source)?.[1] ?? '';
   assert.notEqual(type, '', 'precondition: found the type');
   assert.deepEqual([...type.matchAll(/status: '([a-z]+)'/g)].map((m) => m[1]), ['loading', 'anonymous', 'authenticated']);
