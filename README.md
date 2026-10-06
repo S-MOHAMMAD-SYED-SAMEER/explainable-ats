@@ -9,6 +9,25 @@ extraction, verbatim evidence verification, deterministic requirement matching,
 deterministic scoring and ranking, a mandatory-reason recruiter decision, and an
 append-only audit trail that ties all of it together.
 
+## Run it locally
+
+**Prerequisites:** Node.js 24 or newer (the `engines` field in `package.json`). Nothing else — no
+database, API key or account.
+
+```bash
+npm run demo
+```
+
+Run that from the repository root. It installs the dependencies, builds the dashboard and starts the
+app in demo mode. When it prints `Open http://localhost:3200/#/demo`, open that address.
+
+One terminal is enough: the server serves the dashboard on the same address as the API. The demo
+runs on five invented candidates, in a private in-memory session per browser, with the deterministic
+mock extractor — so **no API key is needed**, and no real applicant data is involved. The full
+recruiter application (sign-in, database, seeded data) is described in Section 10.
+
+<!-- DEMO_VIDEO: 60–90s screen recording of the app running locally goes here -->
+
 ## Status at a glance
 
 What exists today, stated plainly:
@@ -20,9 +39,9 @@ What exists today, stated plainly:
 | Anthropic / Claude provider | **Implemented, not yet verified against the real API.** `LLM_PROVIDER=anthropic` builds an adapter that forces a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a local stub server only: **no call to the live Anthropic API has been made**, whether the configured model accepts the request as built is unconfirmed, and **extraction quality has not been evaluated**. The demo deployment always uses the mock, and refuses to start with a key. |
 | Resume input | **Plain text only**, through the existing pipeline. There is no upload endpoint and no PDF or DOCX parsing. |
 | Job requirements | **Structured and typed** (label, criterion, must-have or nice-to-have, weight). They are not extracted from a free-text job description. |
-| Deployment modes and the demo | **One codebase, two deployments.** `APP_MODE=app` (the default) is the real application: recruiter sign-in, the recruiter routes, a canonical database, and no demo routes at all. `APP_MODE=demo` is the portfolio demo: no sign-in, no canonical database, no credentials, the mock provider only, and a private in-memory copy of five invented candidates per visitor (`/#/demo`: a project explanation, then the interactive demo). A route that does not belong to the running mode is never registered. See Sections 5, 6 and 14. |
+| Deployment modes and the demo | **One codebase, two modes.** `APP_MODE=app` (the default) is the real application: recruiter sign-in, the recruiter routes, a canonical database, and no demo routes at all. `APP_MODE=demo` is the demo: no sign-in, no canonical database, no credentials, the mock provider only, and a private in-memory copy of five invented candidates per visitor (`/#/demo`: a project explanation, then the interactive demo). A route that does not belong to the running mode is never registered. See Sections 5, 6 and 14. |
 | Evaluation harness / accuracy metrics | **None.** |
-| Docker / deployment configuration | **None** in this repository: there is no `render.yaml`. Section 14 documents how the two deployments are meant to be configured; nothing has been configured on any host. CI exists (Section 11). |
+| Docker / deployment configuration | **None** in this repository: there is no `render.yaml`. Section 14 documents how the two modes are meant to be hosted; nothing has been configured on any host. CI exists (Section 11). |
 
 ## 1. What It Does
 
@@ -162,8 +181,8 @@ not a general-purpose PII scrubber for arbitrary real-world resumes.
 
 ## 5. The Demo: Deterministic, Synthetic, Temporary
 
-The demo is its own deployment: `APP_MODE=demo` (Section 14). Everything below
-describes that deployment, and none of it exists in the real application.
+The demo is its own mode: `APP_MODE=demo` (Section 14). Everything below
+describes that mode, and none of it exists in the real application.
 
 - The demo runs against a **fixed, synthetic dataset**
   (`server/src/demo/dataset.ts::DEMO_JOB`, `DEMO_CANDIDATES`: one job, five
@@ -248,7 +267,7 @@ describes that deployment, and none of it exists in the real application.
     takes no body and no target: the session is whichever the cookie names.
   - **Bounded and ephemeral.** A session lapses after two hours without use (use
     slides the window), at most 100 exist (the least recently used is evicted), and
-    a restart discards them all — including a free-tier host going to sleep. Starting
+    a restart discards them all — including a host that sleeps and wakes. Starting
     one is the most expensive anonymous request, so it has its own rate-limit class
     (`demoSession`, 10 per minute).
   - **Survives a reload** because the browser keeps the cookie and the app asks the
@@ -472,8 +491,9 @@ Notes on running the server:
   every boot.
 - To serve the dashboard from the API, run `npm run build` in `web/` first; the
   server serves `web/dist` from the same origin.
-- To try the demo end to end: build the web app, then run
-  `APP_MODE=demo npm run start` in `server/` and open `/#/demo`. It needs no
+- To try the demo end to end: run `npm run demo` from the repository root (it
+  builds the web app and starts the server in demo mode), or build the web app and
+  run `APP_MODE=demo npm run start` in `server/` yourself, then open `/#/demo`. It needs no
   `migrate`, no `seed:demo` and no environment beyond that. To try the application:
   `migrate`, `seed:demo` (optional), set `OPERATOR_PASSWORD_HASH`, and start it with
   no `APP_MODE`.
@@ -680,17 +700,17 @@ at boot, where it is seen, rather than run with a database or a key it must not 
 HTTP 200; the body's `status` is `degraded` when the application's database is
 unreachable, so a platform health check against it is a liveness check only.
 
-**Intended hosting layout (documentation only).** This repository contains no
-`render.yaml`, and nothing below has been applied to any host. The plan is two
-separate Render web services built from the same repository and commit:
+**Intended hosting layout, if you host your own (documentation only).** This repository
+contains no `render.yaml`, and nothing below has been applied to any host. The plan is
+two separate Render web services built from the same repository and commit:
 
-- *Live application* — `APP_MODE=app`, `OPERATOR_PASSWORD_HASH` (from
+- *Application service* — `APP_MODE=app`, `OPERATOR_PASSWORD_HASH` (from
   `npm run hash-password`), a database (`DATABASE_URL`, or `SQLITE_PATH` on a
   persistent disk), `TRUST_PROXY=1`, migrations applied before start
   (`npm run migrate`). Cookies stay `Secure`.
-- *Live demo* — `APP_MODE=demo` and `TRUST_PROXY=1`, and **nothing else from the list
+- *Demo service* — `APP_MODE=demo` and `TRUST_PROXY=1`, and **nothing else from the list
   above**: no database, no password hash, no key, no provider, no disk. Sessions are
-  lost whenever the service restarts or a free instance sleeps; that is by design.
+  lost whenever the service restarts or an instance sleeps; that is by design.
 - Both: Node 24 or newer, the web app built (`npm run build` in `web/`) so the server
   can serve `web/dist` from the same origin, start with `npm run start` in `server/`,
   health check path `/api/health`. Do not share an environment group between the two
