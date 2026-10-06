@@ -215,22 +215,23 @@ test('the session-based interactive demo is still all there', () => {
   }
 });
 
-// ======================================================== the portfolio is left alone
+// ======================================================== the portfolio links to no hosted instance
 
 const PORTFOLIO_DATA = path.resolve(HERE, '../../../portfolio/src/data/projects.ts');
 
 // Skipped, like the parity suite, wherever the sibling portfolio checkout is absent (CI).
 test(
-  'the portfolio\'s Explainable ATS links are exactly what they were — this change does not touch them',
+  'the portfolio\'s Explainable ATS entry links to its interactive demo and its repository, and to no hosted instance',
   { skip: fs.existsSync(PORTFOLIO_DATA) ? false : 'the sibling portfolio repository is not checked out here' },
   () => {
     const source = fs.readFileSync(PORTFOLIO_DATA, 'utf8');
     const links =
-      /interactiveDemoHref:\s*"([^"]+)",\s*demoHref:\s*"([^"]+)",\s*repoHref:\s*"https:\/\/github\.com\/S-MOHAMMAD-SYED-SAMEER\/explainable-ats"/.exec(source);
+      /interactiveDemoHref:\s*"([^"]+)",\s*repoHref:\s*"https:\/\/github\.com\/S-MOHAMMAD-SYED-SAMEER\/explainable-ats"/.exec(source);
 
     assert.ok(links, 'could not find the Explainable ATS entry in the portfolio data');
     assert.equal(links[1], '/demo-explainable-ats.html', 'the portfolio\'s interactive demo link changed');
-    assert.equal(links[2], 'https://explainable-ats.onrender.com', 'the portfolio\'s live-app link changed');
+    assert.ok(!source.includes('explainable-ats.onrender.com'), 'the portfolio links to a hosted Explainable ATS');
+    assert.ok(!/demoHref:/.test(source.replace(/interactiveDemoHref:/g, '')), 'the portfolio carries a demoHref');
   },
 );
 
