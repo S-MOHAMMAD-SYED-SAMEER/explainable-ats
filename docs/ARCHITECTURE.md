@@ -51,7 +51,7 @@ Routes stay thin on purpose. `routes/recruiter.ts` contains no decisions; `handl
 | `RecruiterApp.tsx`, `DemoApp.tsx` | One per mode. Each owns its own screens and routes. |
 | `screens/` | `Login`, `Overview`, `Jobs`, `JobDetail`, `CandidateDetail`, `DemoEntry`. |
 | `components/` | Shared pieces, including the evidence highlighter, the pipeline view and the audit timeline. |
-| `copy.ts` | All recruiter-facing wording, in one pure module (see the [term table](../README.md#terms-and-what-the-screen-says)). |
+| `copy.ts` | All recruiter-facing wording, in one pure module (see the [term table](../README.md#terms-and-what-the-screen-says)). The decision buttons use the code's own outcome words: Shortlist, Reject, Hold. |
 | `api/client.ts` | The only place that calls `fetch`. Every failure becomes one `ApiError` shape. |
 | `router.ts` | A hash router. Hash routing needs no server rewrite rule, so a URL opens correctly from any static host. |
 | `demo/` | Pure builders for the demo's evidence, pipeline and timeline views. |

@@ -524,7 +524,7 @@ test('a demo decision becomes the timeline\'s final event, and the pipeline\'s l
 
     assert.equal(items.length, pristine.events.length + 1);
     assert.equal(last?.isDecision, true);
-    assert.equal(last?.title, 'Demo recruiter decision: Advance');
+    assert.equal(last?.title, 'Demo recruiter decision: Shortlist');
     assert.equal(last?.actor, 'Demo recruiter');
     assert.ok(Date.parse(last?.at ?? '') >= decidedAfter, 'the decision does not carry the time it was made');
     assert.deepEqual(items.slice(0, -1).map((i) => i.at), buildTimeline(pristine.events as never, pristine.detail as never).map((i) => i.at), 'earlier events changed');
