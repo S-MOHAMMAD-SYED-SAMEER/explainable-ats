@@ -245,6 +245,7 @@ There are no browser or end-to-end tests, and no evaluation set that measures ex
 - **Anthropic provider: smoke-tested, not evaluated.** `LLM_PROVIDER=anthropic` builds an adapter that offers (or, where the model allows it, forces) a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a loopback stub server, and the opt-in script `server/scripts/live-smoke-anthropic.ts` has made one real request each to `claude-sonnet-5-5` and `claude-haiku-4-5-20251001` on 2026-10-14: both returned a well-formed tool call whose quotes were all verified. That run found that Sonnet 5.5 rejects a forced tool call and rejects any `temperature`, so tool choice and temperature are settings. Extraction quality has not been evaluated. The running app calls the configured provider only when a signed-in recruiter starts an assessment.
 - **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes, as whole words: "Java" is not found in "JavaScript" and "run" is not found in "running". The other side of that is that word forms count as different terms ("mentored" and "mentoring", "service" and "services", "Postgres" and "PostgreSQL"), and paraphrase is missed. Each of these is pinned by a test.
 - **Negation is not understood.** "Never shipped a Node.js service" covers the same terms as "Shipped a Node.js service" and gets the same verdict. The rules count which words appear, not what the sentence says. A test pins the current behaviour so that changing it is a decision.
+- **Prompt injection is reduced, not removed.** The resume is untrusted input. The prompt tells the model so, and the section markers are stripped from the CV text, but the defence that does not depend on the model is structural: a model can only propose quotes, each is checked against the CV, and verdicts and scores are computed by code from quotes. The check on eight invented hostile CVs (instruction override, "score me 100%", marker spoofing, fabricated quotes, hidden instructions, keyword stuffing, an embedded requirement list, a 150,000-character CV) found no verdict or score raised above what the genuine content supports, on either model. It also found that Haiku 4.5, on two of them, quoted an irrelevant genuine line for mentoring and so lowered a verdict, and that both the deterministic stand-in and Haiku were taken in by keyword stuffing (Sonnet 5.5 quoted nothing for it). One run per model; results in `docs/results/`.
 - **Words can be stuffed.** A quote that lists every term of a requirement covers it. Verification makes sure the passage is really in the CV and at least 15 characters long (a bare "Node.js" is refused), but it cannot tell a skills list from an achievement.
 - **Synthetic data only.** Everything runs on five invented candidates and one invented role. Nothing has been measured on real resumes.
 - **Redaction is pattern-based.** It catches emails, phones, labelled fields and supplied names. Unlabelled personal details can pass through.
@@ -298,7 +299,7 @@ Key files:
 | `server/src/domain/ats.ts` | Every closed set: verdicts, tiers, outcomes, redaction categories |
 | `server/src/agent/redact.ts` | The masking patterns |
 | `server/src/agent/extractionSchema.ts` | The `record_evidence` tool the model must call |
-| `server/src/agent/extractionPrompt.ts` | The `extract-v1` prompt |
+| `server/src/agent/extractionPrompt.ts` | The `extract-v2` prompt, the untrusted-data clause and marker neutralisation |
 | `server/src/agent/verifyEvidence.ts` | The verbatim check against the original CV |
 | `server/src/agent/matchRules.ts` | Term coverage and the 75% and 35% thresholds |
 | `server/src/agent/score.ts` | The basis-point arithmetic and apportionment |
@@ -322,6 +323,7 @@ Key files:
 | `server/scripts/migrate.ts` | Applies the migrations (`npm run migrate`) |
 | `server/scripts/hash-password.ts` | Makes `OPERATOR_PASSWORD_HASH` |
 | `server/scripts/live-smoke-anthropic.ts` | An opt-in, by-hand check of the real Anthropic adapter, never in CI |
+| `server/scripts/live-injection-check.ts` | An opt-in, by-hand run of eight hostile CVs against the real API, saving counts to `docs/results/`, never in CI |
 | `server/scripts/live-failure-check.ts` | An opt-in, by-hand check of the cut-off, timeout and long-CV paths against the real API, never in CI |
 | `server/.env.example` | Every setting, with its default |
 | `docs/ARCHITECTURE.md` | Stages, data model, request flows, design decisions |

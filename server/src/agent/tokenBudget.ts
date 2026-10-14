@@ -1,3 +1,5 @@
+import { MAX_PASSAGES_PER_REQUIREMENT } from './extractionPrompt.ts';
+
 // How many output tokens an extraction may use.
 //
 // The answer a model gives is two things that both count against `max_tokens`:
@@ -21,8 +23,8 @@
 // says so, which is the honest outcome. These are estimates, and the live check in
 // `scripts/live-failure-check.ts` records the real usage to compare them with.
 
-/** Passages per requirement the budget has room for. The prompt asks for no more than this. */
-export const PASSAGES_PER_REQUIREMENT = 4;
+/** Passages per requirement the budget has room for: the number the prompt asks the model not to exceed. */
+export const PASSAGES_PER_REQUIREMENT = MAX_PASSAGES_PER_REQUIREMENT;
 
 /**
  * Tokens for one finding. A quote of a sentence or two (about 90), a requirement id

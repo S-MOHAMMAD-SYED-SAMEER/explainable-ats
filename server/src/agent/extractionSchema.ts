@@ -18,7 +18,7 @@ import type { LlmTool } from '../adapters/llm/types.ts';
 // turned into an empty string would become evidence that says nothing and
 // cites nothing.
 
-export const EXTRACTION_PROMPT_VERSION = 'extract-v1';
+export const EXTRACTION_PROMPT_VERSION = 'extract-v2';
 
 export const EXTRACTION_TOOL: LlmTool = {
   name: 'record_evidence',
