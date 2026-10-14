@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { LlmError, type LlmProvider, type LlmRequest, type LlmResponse } from './types.ts';
+import { LlmFailure, type LlmFailureKind } from './failures.ts';
 import type { Logger } from '../../lib/logger.ts';
 
 // The Anthropic provider.
@@ -115,6 +116,8 @@ export type AnthropicProviderOptions = {
 };
 
 type Failure = {
+  /** What the pipeline is told, once the retries (if any) are used up. */
+  kind: LlmFailureKind;
   /** Plausibly gone on a second attempt. */
   transient: boolean;
   /** A short, key-free description of what kind of failure it was. */
@@ -139,19 +142,23 @@ function scrub(text: string, secrets: readonly string[]): string {
 
 function classify(err: unknown): Failure {
   if (err instanceof Anthropic.APIConnectionTimeoutError) {
-    return { transient: true, label: 'timeout' };
+    return { kind: 'unavailable', transient: true, label: 'timeout' };
   }
   if (err instanceof Anthropic.APIUserAbortError) {
-    return { transient: false, label: 'aborted' };
+    return { kind: 'unexpected', transient: false, label: 'aborted' };
   }
   if (err instanceof Anthropic.APIConnectionError) {
-    return { transient: true, label: 'connection error' };
+    return { kind: 'unavailable', transient: true, label: 'connection error' };
   }
   if (err instanceof Anthropic.APIError) {
     const status = typeof err.status === 'number' ? err.status : undefined;
     const retryAfter = Number(err.headers?.get?.('retry-after'));
+    const transient = status !== undefined && (status === 408 || status === 429 || status >= 500);
     const failure: Failure = {
-      transient: status !== undefined && (status === 408 || status === 429 || status >= 500),
+      // A 4xx the service will not change its mind about means the request itself
+      // was refused (key, setting, model): a configuration problem, not an outage.
+      kind: transient ? 'unavailable' : 'rejected',
+      transient,
       label: status === undefined ? 'API error' : `HTTP ${status}`,
     };
     if (status !== undefined) failure.status = status;
@@ -160,7 +167,7 @@ function classify(err: unknown): Failure {
   }
   // Not an SDK error at all. Never retried: it is a bug, and repeating a bug
   // does not fix it.
-  return { transient: false, label: 'unexpected error' };
+  return { kind: 'unexpected', transient: false, label: 'unexpected error' };
 }
 
 /** The wait before retry number `attempt` (1-based). Deterministic. */
@@ -212,49 +219,8 @@ function buildBody(
  * model found nothing" and "the model did not answer properly" are different
  * facts, and only the first says anything about the candidate.
  */
-function readResponse(
-  message: Anthropic.Message,
-  toolName: string,
-  configuredModel: string,
-  latencyMs: number,
-): LlmResponse {
-  function fail(reason: string): never {
-    throw new LlmError(ANTHROPIC_PROVIDER, `The Anthropic response was rejected: ${reason}.`);
-  }
-
-  const stop = message.stop_reason;
-  if (stop === 'refusal') {
-    const category = (message as { stop_details?: { category?: string | null } }).stop_details?.category;
-    fail(`the model declined the request${category ? ` (${category})` : ''}`);
-  }
-  if (stop === 'max_tokens') fail('the output was cut off at max_tokens, so the tool call may be incomplete');
-  if (stop !== 'tool_use' && stop !== 'end_turn') fail(`unexpected stop_reason "${String(stop)}"`);
-
-  // Text, thinking and every other block type are ignored on purpose: only a
-  // tool call can become output, and exactly one is acceptable.
-  const calls = message.content.filter((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');
-  if (calls.length === 0) fail(`no "${toolName}" tool call was made`);
-  if (calls.length > 1) {
-    fail(`${calls.length} tool calls were made where exactly one was expected (${calls.map((c) => c.name).join(', ')})`);
-  }
-
-  const call = calls[0] as Anthropic.ToolUseBlock;
-  if (call.name !== toolName) fail(`the tool call was "${call.name}", not "${toolName}"`);
-
-  const input = call.input;
-  if (!isPlainObject(input)) fail('the tool input was not an object');
-  if (!Array.isArray((input as Record<string, unknown>).findings)) {
-    fail('the tool input has no "findings" array');
-  }
-
-  const response: LlmResponse = {
-    // A copy, so nothing downstream can mutate the SDK's parsed object.
-    output: structuredClone(input) as Record<string, unknown>,
-    model: typeof message.model === 'string' && message.model !== '' ? message.model : configuredModel,
-    latencyMs,
-  };
-
-  // Reported only when the provider reported it. Never estimated, never priced.
+/** Token counts, only when the provider reported them. Never estimated, never priced. */
+function usageOf(message: Anthropic.Message): { inputTokens: number; outputTokens: number } | undefined {
   const usage = message.usage;
   if (
     usage &&
@@ -263,8 +229,73 @@ function readResponse(
     usage.input_tokens >= 0 &&
     usage.output_tokens >= 0
   ) {
-    response.usage = { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+    return { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
   }
+  return undefined;
+}
+
+function readResponse(
+  message: Anthropic.Message,
+  toolName: string,
+  configuredModel: string,
+  latencyMs: number,
+): LlmResponse {
+  const model = typeof message.model === 'string' && message.model !== '' ? message.model : configuredModel;
+  const usage = usageOf(message);
+
+  // A reply that is refused still cost what it cost and said what it said, so the
+  // refusal carries both: the pipeline records them rather than losing them.
+  function fail(kind: LlmFailureKind, reason: string, raw?: unknown): never {
+    throw new LlmFailure(ANTHROPIC_PROVIDER, kind, `The Anthropic response was rejected: ${reason}.`, {
+      model,
+      latencyMs,
+      ...(usage ? { usage } : {}),
+      ...(raw === undefined ? {} : { raw }),
+    });
+  }
+
+  // The tool input, if the reply made a call at all. It may be partial.
+  const firstCall = message.content.find((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');
+  const partial = firstCall?.input;
+
+  const stop = message.stop_reason;
+  if (stop === 'refusal') {
+    const category = (message as { stop_details?: { category?: string | null } }).stop_details?.category;
+    fail('refusal', `the model declined the request${category ? ` (${category})` : ''}`);
+  }
+  if (stop === 'max_tokens') {
+    fail('truncated', 'the output was cut off at max_tokens, so the tool call may be incomplete', partial);
+  }
+  if (stop !== 'tool_use' && stop !== 'end_turn') fail('malformed', `unexpected stop_reason "${String(stop)}"`, partial);
+
+  // Text, thinking and every other block type are ignored on purpose: only a
+  // tool call can become output, and exactly one is acceptable.
+  const calls = message.content.filter((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use');
+  if (calls.length === 0) fail('malformed', `no "${toolName}" tool call was made`);
+  if (calls.length > 1) {
+    fail(
+      'malformed',
+      `${calls.length} tool calls were made where exactly one was expected (${calls.map((c) => c.name).join(', ')})`,
+      partial,
+    );
+  }
+
+  const call = calls[0] as Anthropic.ToolUseBlock;
+  if (call.name !== toolName) fail('malformed', `the tool call was "${call.name}", not "${toolName}"`, partial);
+
+  const input = call.input;
+  if (!isPlainObject(input)) fail('malformed', 'the tool input was not an object', input);
+  if (!Array.isArray((input as Record<string, unknown>).findings)) {
+    fail('malformed', 'the tool input has no "findings" array', input);
+  }
+
+  const response: LlmResponse = {
+    // A copy, so nothing downstream can mutate the SDK's parsed object.
+    output: structuredClone(input) as Record<string, unknown>,
+    model,
+    latencyMs,
+  };
+  if (usage) response.usage = usage;
 
   return response;
 }
@@ -331,9 +362,16 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LlmP
           }
 
           const detail = err instanceof Error ? scrub(err.message, [apiKey]) : 'no detail';
-          throw new LlmError(
+          throw new LlmFailure(
             ANTHROPIC_PROVIDER,
+            failure.kind,
             `The Anthropic request failed (${failure.label}) after ${attempt} attempt${attempt === 1 ? '' : 's'}: ${detail}`,
+            {
+              label: failure.label,
+              attempts: attempt,
+              model,
+              latencyMs: Math.max(0, Math.round(now() - started)),
+            },
           );
         }
       }

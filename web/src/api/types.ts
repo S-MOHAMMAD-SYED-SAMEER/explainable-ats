@@ -105,6 +105,19 @@ export type Decision = {
   decidedAt: string;
 };
 
+/** How the model call went. Never the model's raw answer, which stays on the server. */
+export type ExtractionView = {
+  /** `succeeded`, or the kind of failure. */
+  result: string;
+  model: string | null;
+  maxTokens: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number | null;
+  /** How many passages the model quoted, before any were checked. */
+  findingsReturned: number | null;
+};
+
 export type EvaluationDetail = {
   evaluationId: string;
   job: { id: string; title: string };
@@ -127,6 +140,10 @@ export type EvaluationDetail = {
   model: string | null;
   promptVersion: string | null;
   evidenceRejectedCount: number;
+  /** Null for an assessment that has no extraction record. */
+  extraction: ExtractionView | null;
+  /** The model answered properly and quoted nothing. */
+  modelFoundNothing: boolean;
   decision: Decision | null;
   createdAt: string;
 };

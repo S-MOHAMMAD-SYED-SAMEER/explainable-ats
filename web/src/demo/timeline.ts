@@ -183,7 +183,7 @@ function detailsFor(event: AuditEntry, detail: Named): DetailLine[] {
       break;
     }
 
-    // `evaluation_opened`, `resume_already_present`, `extraction_failed`,
+    // `evaluation_opened`, `resume_already_present`, the `extraction_*` failure events,
     // `no_sensitive_attributes_found` and anything not yet known: the summary
     // says it all, and the payload is not shown.
     default:

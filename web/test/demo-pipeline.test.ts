@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { AuditEntry } from '../src/api/types.ts';
 import { PIPELINE_STAGES, STATUS_LABEL, buildPipeline, type PipelineInput, type PipelineStage } from '../src/demo/pipeline.ts';
 import { buildTimeline, sortTrail } from '../src/demo/timeline.ts';
+import { EXTRACTION_EMPTY_EVENT, EXTRACTION_FAILURE_EVENTS } from '../src/failures.ts';
 
 // The pipeline and the audit timeline, built from audit events.
 //
@@ -238,11 +239,26 @@ test('a blocked event is a warning, in words, and says what was blocked', () => 
 test('a failed extraction is a failure, and does not claim evidence was gathered', () => {
   const trail = fullTrail()
     .filter((e) => !['extraction_recorded', 'evidence_verified', 'requirements_matched', 'score_computed'].includes(e.eventType))
-    .concat(event('extract', 'extraction_failed', 'failed', { provider: 'mock' }, '2026-01-01T00:00:05.000Z'));
+    .concat(event('extract', 'extraction_unavailable', 'failed', { provider: 'mock' }, '2026-01-01T00:00:05.000Z'));
   const extract = byId(pipeline({ events: trail }), 'extract');
   assert.equal(extract.status, 'failed');
   assert.equal(extract.statusLabel, 'Failed');
   assert.equal(extract.explanation, 'Extraction did not complete, so no evidence was gathered.');
+});
+
+test('every kind of extraction failure reads as a failure, and the model finding nothing does not', () => {
+  const base = fullTrail().filter(
+    (e) => !['extraction_recorded', 'evidence_verified', 'requirements_matched', 'score_computed'].includes(e.eventType),
+  );
+  for (const type of EXTRACTION_FAILURE_EVENTS) {
+    const trail = base.concat(event('extract', type, 'failed', { provider: 'mock' }, '2026-01-01T00:00:05.000Z'));
+    assert.equal(byId(pipeline({ events: trail }), 'extract').status, 'failed', `${type} did not read as a failure`);
+  }
+
+  const empty = fullTrail().concat(event('extract', EXTRACTION_EMPTY_EVENT, 'ok', {}, '2026-01-01T00:00:04.500Z'));
+  const stage = byId(pipeline({ events: empty }), 'extract');
+  assert.notEqual(stage.status, 'failed');
+  assert.ok(stage.facts.some((fact) => /quoted nothing/.test(fact)), 'the stage says the model quoted nothing');
 });
 
 test('a skipped duplicate ingest is still a recorded stage, and says nothing was written twice', () => {

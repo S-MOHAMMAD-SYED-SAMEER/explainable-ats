@@ -1,7 +1,10 @@
 import { EXTRACTION_PROMPT_VERSION, EXTRACTION_TOOL, validateExtraction } from './extractionSchema.ts';
 import { verifyEvidence } from './verifyEvidence.ts';
 import { buildSystemPrompt, buildUserMessage } from './extractionPrompt.ts';
+import { EXTRACTION_EMPTY_EVENT, FAILURE_WORDING } from './failures.ts';
+import { maxTokensFor } from './tokenBudget.ts';
 import { AppError } from '../lib/errors.ts';
+import { LlmFailure, failureKindOf } from '../adapters/llm/failures.ts';
 import type { LlmProvider } from '../adapters/llm/types.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -26,6 +29,12 @@ export type ExtractDeps = {
   repos: Repositories;
   provider: LlmProvider;
   logger?: Logger;
+  /**
+   * Overrides the output limit, which is otherwise sized from the CV and the
+   * requirements (`tokenBudget.ts`). For tests and for the live checks that need to
+   * provoke a cut-off; nothing in the application sets it.
+   */
+  maxTokens?: number;
 };
 
 export type ExtractionOutcome = {
@@ -37,8 +46,6 @@ export type ExtractionOutcome = {
   /** Findings the model returned in a shape the contract does not allow. */
   malformed: number;
 };
-
-const MAX_TOKENS = 2048;
 
 /**
  * Runs extraction for one evaluation.
@@ -74,6 +81,56 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
   // --- the model call ------------------------------------------------------
   //
   // `redactedText` and nothing else. The original never enters this scope.
+  const maxTokens = deps.maxTokens ?? maxTokensFor({ requirementCount: requirements.length, resumeChars: resume.redactedText.length });
+
+  // Every way this can fail is recorded as a failure of its own kind, with its own
+  // audit event and message. None of them becomes an empty result, because "the
+  // model found nothing" and "the model did not answer properly" are different
+  // facts and only the first says anything about the candidate.
+  const failExtraction = async (err: unknown): Promise<never> => {
+    const kind = failureKindOf(err);
+    const detail = err instanceof LlmFailure ? err.details : {};
+    const wording = FAILURE_WORDING[kind];
+
+    await repos.evaluations.recordFailure(evaluationId, wording.message);
+    await repos.evaluationRecords.record({
+      evaluationId,
+      result: kind,
+      model: detail.model ?? null,
+      maxTokens,
+      usage: detail.usage ?? null,
+      latencyMs: detail.latencyMs ?? null,
+      raw: detail.raw,
+    });
+    await repos.audit.append({
+      correlationId: evaluation.id,
+      stage: 'extract',
+      eventType: wording.eventType,
+      actor: 'system',
+      outcome: 'failed',
+      summary: wording.summary,
+      // Kinds, counts and the key-free label ("timeout", "HTTP 529"). Never the
+      // provider's own message, which may quote a request.
+      payload: {
+        provider: provider.name,
+        kind,
+        maxTokens,
+        ...(detail.label ? { label: detail.label } : {}),
+        ...(detail.attempts ? { attempts: detail.attempts } : {}),
+        ...(detail.model ? { model: detail.model } : {}),
+        ...(detail.usage ? { usage: detail.usage } : {}),
+      },
+      entityType: 'evaluation',
+      entityId: evaluation.id,
+    });
+    logger?.error('Extraction failed', {
+      evaluationId,
+      kind,
+      internal: err instanceof Error ? err.message : String(err),
+    });
+    throw new AppError('PROVIDER_UNAVAILABLE', wording.message);
+  };
+
   let output: Record<string, unknown>;
   let model: string;
   let latencyMs: number;
@@ -86,38 +143,67 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
       systemPrompt: buildSystemPrompt(),
       messages: [{ role: 'user', content: buildUserMessage(requirements, resume.redactedText) }],
       tool: EXTRACTION_TOOL,
-      maxTokens: MAX_TOKENS,
+      maxTokens,
     });
     output = response.output;
     model = response.model;
     latencyMs = response.latencyMs;
     usage = response.usage;
   } catch (err) {
-    // A provider failure is recorded as a failure. It never becomes an empty
-    // result, because "the model found nothing" and "the model could not be
-    // reached" are different facts and only one of them says anything about
-    // the candidate.
-    const message = err instanceof Error ? err.message : String(err);
-    await repos.evaluations.recordFailure(evaluationId, 'The extraction provider could not be reached.');
-    await repos.audit.append({
-      correlationId: evaluation.id,
-      stage: 'extract',
-      eventType: 'extraction_failed',
-      actor: 'system',
-      outcome: 'failed',
-      summary: 'The extraction provider could not be reached, so no evidence was gathered.',
-      payload: { provider: provider.name },
-      entityType: 'evaluation',
-      entityId: evaluation.id,
-    });
-    logger?.error('Extraction failed', { evaluationId, internal: message });
-    throw new AppError('PROVIDER_UNAVAILABLE', 'The extraction provider could not be reached.');
+    return failExtraction(err);
   }
+
+  // A reply with no `findings` list at all is not "no findings". The real adapter
+  // refuses it before it gets here; any other provider is held to the same rule.
+  if (!Array.isArray(output.findings)) {
+    return failExtraction(
+      new LlmFailure(provider.name, 'malformed', 'The reply had no "findings" list.', {
+        model,
+        latencyMs,
+        ...(usage ? { usage } : {}),
+        raw: output,
+      }),
+    );
+  }
+
+  // The model's answer is kept exactly as it came, before anything is validated or
+  // dropped, so a later reader can see what it actually said.
+  const findingsReturned = output.findings.length;
+  await repos.evaluationRecords.record({
+    evaluationId,
+    result: 'succeeded',
+    model,
+    maxTokens,
+    usage: usage ?? null,
+    latencyMs,
+    findingsReturned,
+    raw: output,
+  });
 
   // --- validate the shape --------------------------------------------------
 
   const known = new Set(requirements.map((requirement) => requirement.id));
   const { accepted, rejected: malformed } = validateExtraction(output, known);
+
+  // The model answered properly and quoted nothing. That is a real result and the
+  // evaluation goes on (every requirement ends up "not demonstrated"), but it is also
+  // exactly what an empty or garbled paste looks like, so it is flagged rather than
+  // left to pass as an ordinary assessment.
+  if (findingsReturned === 0) {
+    await repos.audit.append({
+      correlationId: evaluation.id,
+      stage: 'extract',
+      eventType: EXTRACTION_EMPTY_EVENT,
+      actor: 'ai',
+      actorId: model,
+      outcome: 'ok',
+      summary:
+        'The model read the resume and quoted nothing for any requirement. Every requirement will read as not demonstrated.',
+      payload: { model, requirements: requirements.length, resumeChars: resume.redactedText.length },
+      entityType: 'evaluation',
+      entityId: evaluation.id,
+    });
+  }
 
   if (malformed.length > 0) {
     await repos.audit.append({

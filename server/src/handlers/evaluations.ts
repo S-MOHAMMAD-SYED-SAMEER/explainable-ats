@@ -58,6 +58,22 @@ export type DecisionView = {
   decidedAt: string;
 };
 
+/**
+ * What the model call cost and how it went, for the details area. Never the model's
+ * raw answer: that is kept on the record and not sent to a browser.
+ */
+export type ExtractionView = {
+  /** `succeeded`, or the kind of failure. */
+  result: string;
+  model: string | null;
+  maxTokens: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number | null;
+  /** How many passages the model quoted, before any were checked. */
+  findingsReturned: number | null;
+};
+
 export type EvaluationDetail = {
   evaluationId: string;
   job: { id: string; title: string };
@@ -82,6 +98,14 @@ export type EvaluationDetail = {
   model: string | null;
   promptVersion: string | null;
   evidenceRejectedCount: number;
+  /** Null for an evaluation that has no extraction record (one made before records were kept). */
+  extraction: ExtractionView | null;
+  /**
+   * True when the model answered properly and quoted nothing. Every requirement then
+   * reads as not demonstrated, which is also what an empty or garbled paste looks
+   * like, so the screen says so instead of presenting it as an ordinary result.
+   */
+  modelFoundNothing: boolean;
   decision: DecisionView | null;
   createdAt: string;
 };
@@ -95,7 +119,7 @@ export async function handleEvaluationDetail(
   const evaluation = await repos.evaluations.getById(evaluationId);
   if (!evaluation) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
 
-  const [job, candidate, requirements, matches, verified, all, findings, decision] = await Promise.all([
+  const [job, candidate, requirements, matches, verified, all, findings, decision, record] = await Promise.all([
     repos.jobs.getById(evaluation.jobId),
     repos.candidates.getById(evaluation.candidateId),
     repos.requirements.listForJob(evaluation.jobId),
@@ -104,6 +128,7 @@ export async function handleEvaluationDetail(
     repos.evidence.listForEvaluation(evaluation.id),
     repos.sensitiveFindings.listForResume(evaluation.resumeId),
     repos.decisions.getForEvaluation(evaluation.id),
+    repos.evaluationRecords.getForEvaluation(evaluation.id),
   ]);
 
   if (!job || !candidate) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
@@ -161,6 +186,18 @@ export async function handleEvaluationDetail(
       // Reported as a number so the details area can say the check ran and what
       // it caught. The rejected quotes themselves are never sent.
       evidenceRejectedCount: all.length - verified.length,
+      extraction: record
+        ? {
+            result: record.result,
+            model: record.model,
+            maxTokens: record.maxTokens,
+            inputTokens: record.inputTokens,
+            outputTokens: record.outputTokens,
+            latencyMs: record.latencyMs,
+            findingsReturned: record.findingsReturned,
+          }
+        : null,
+      modelFoundNothing: record !== null && record.result === 'succeeded' && record.findingsReturned === 0,
       decision: decision
         ? {
             outcome: decision.outcome,

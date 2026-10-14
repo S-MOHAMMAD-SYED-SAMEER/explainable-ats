@@ -326,18 +326,26 @@ test('malformed findings are dropped with a reason, and their neighbours survive
   assert.deepEqual(dropped?.payload.reasons, ['empty_quote', 'unknown_requirement', 'not_an_object']);
 });
 
-test('output that is not the agreed shape at all leaves the evaluation with no evidence', async (t) => {
+test('output that is not the agreed shape at all is a failed extraction, not an empty one', async (t) => {
   const ctx = await createTestContext();
   t.after(() => ctx.close());
 
   const scenario = await seedScenario(ctx.repos, { deterministicExtractor: false });
   scenario.provider.register('extract_evidence', { results: 'the candidate looks strong' });
 
-  const outcome = await extractEvidence({ repos: ctx.repos, provider: scenario.provider }, scenario.evaluation.id);
+  const err = await rejects(() =>
+    extractEvidence({ repos: ctx.repos, provider: scenario.provider }, scenario.evaluation.id),
+  );
+  assert.match(err.message, /not in the form the system requires/);
 
-  assert.equal(outcome.verified, 0);
-  assert.equal(outcome.malformed, 1);
+  const evaluation = await ctx.repos.evaluations.getById(scenario.evaluation.id);
+  assert.equal(evaluation?.status, 'failed');
+  assert.match(evaluation?.failureReason ?? '', /not in the form the system requires/);
   assert.equal(await ctx.repos.evidence.count(), 0);
+
+  const events = await ctx.repos.audit.listForCorrelation(scenario.evaluation.id);
+  assert.equal(events.find((event) => event.eventType === 'extraction_malformed')?.outcome, 'failed');
+  assert.ok(!events.some((event) => event.eventType === 'extraction_empty'), 'a malformed answer is not "found nothing"');
 });
 
 test('a provider outage is recorded as a failure, never as an empty result', async (t) => {
@@ -352,14 +360,14 @@ test('a provider outage is recorded as a failure, never as an empty result', asy
   const err = await rejects(() =>
     extractEvidence({ repos: ctx.repos, provider: scenario.provider }, scenario.evaluation.id),
   );
-  assert.match(err.message, /could not be reached/);
+  assert.match(err.message, /could not be reached, or took too long/);
 
   const evaluation = await ctx.repos.evaluations.getById(scenario.evaluation.id);
   assert.equal(evaluation?.status, 'failed');
   assert.equal(await ctx.repos.evidence.count(), 0);
 
   const events = await ctx.repos.audit.listForCorrelation(scenario.evaluation.id);
-  const failure = events.find((event) => event.eventType === 'extraction_failed');
+  const failure = events.find((event) => event.eventType === 'extraction_unavailable');
   assert.equal(failure?.outcome, 'failed');
 
   // The provider's own message stays internal: it can carry a URL, a host name

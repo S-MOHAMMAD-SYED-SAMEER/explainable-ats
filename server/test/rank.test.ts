@@ -522,6 +522,7 @@ test('ranking added no table, and nothing stores a rank', async (t) => {
   assert.deepEqual(tables, [
     'audit_events',
     'candidates',
+    'evaluation_records',
     'evaluations',
     'evidence',
     'job_requirements',
@@ -535,7 +536,13 @@ test('ranking added no table, and nothing stores a rank', async (t) => {
   ]);
 
   const files = fs.readdirSync(MIGRATIONS_DIR).filter((file) => file.endsWith('.sql'));
-  assert.equal(files.length, 2, 'ranking must not have added a migration');
+  // The migrations that exist, by name: none of them is the ranking's. A new one
+  // for another reason (the extraction record) is added here deliberately.
+  assert.deepEqual(
+    [...files].sort(),
+    ['001_foundation.sql', '002_domain.sql', '003_evaluation_records.sql'],
+    'ranking must not have added a migration',
+  );
   for (const file of files) {
     const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8').replace(/--[^\n]*/g, '');
     assert.ok(!/CREATE TABLE\s+\w*rank/i.test(sql), `${file} creates a ranking table`);
