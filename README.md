@@ -243,6 +243,10 @@ There are no browser or end-to-end tests, and no evaluation set that measures ex
 - **No deployment configuration** (no Dockerfile or `render.yaml`) is included.
 - **No cost tracking.** Token usage from the provider is recorded in the audit trail when reported, but there is no cost calculation and no cost tracking.
 
+## License
+
+MIT. See [LICENSE](LICENSE).
+
 ## Project structure
 
 ```
