@@ -3,6 +3,7 @@ import { api } from '../api/client.ts';
 import { useLoad } from '../useLoad.ts';
 import { BackLink, Badge, Empty, Loading, Problem, Technical } from '../components/Bits.tsx';
 import { DemoOverview } from '../components/DemoOverview.tsx';
+import { AddCandidateForm } from './AddCandidateForm.tsx';
 import { kindLabel, tierWording } from '../copy.ts';
 import { routeToHash } from '../router.ts';
 import type { JobDetail as JobDetailData, RankedCandidate, Ranking } from '../api/types.ts';
@@ -194,6 +195,9 @@ export function JobDetail({
         {ranking.state.status === 'error' ? <Problem message={ranking.state.message} /> : null}
         {ranking.state.status === 'ready' ? <RankedList ranking={ranking.state.data} /> : null}
       </section>
+
+      {/* Only the signed-in recruiter adds CVs: the visitor's demo has a fixed set. */}
+      {demoSession ? null : <AddCandidateForm jobId={jobId} onChanged={ranking.reload} />}
     </div>
   );
 }

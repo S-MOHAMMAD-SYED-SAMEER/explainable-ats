@@ -110,6 +110,8 @@ export type EvaluationDetail = {
   job: { id: string; title: string };
   candidate: { id: string; reference: string; displayName: string | null };
   status: string;
+  /** A message for a person, set only when the status is "failed". */
+  failureReason: string | null;
   isCurrent: boolean;
   supersededBy: string | null;
   scoreBasisPoints: number | null;
@@ -140,6 +142,42 @@ export type AuditEntry = {
   summary: string;
   payload: Record<string, unknown>;
   createdAt: string;
+};
+
+// --- what the recruiter sends and what comes back ----------------------
+
+export type NewRequirementInput = {
+  label: string;
+  criterion: string;
+  kind: 'must_have' | 'nice_to_have';
+  weight: number;
+};
+
+export type NewJobInput = {
+  title: string;
+  seniority: string;
+  description: string;
+  requirements: NewRequirementInput[];
+};
+
+export type NewCandidateInput = { reference: string; displayName: string | null; text: string };
+
+export type AddedCandidate = {
+  evaluationId: string;
+  status: string;
+  candidate: { id: string; reference: string; displayName: string | null };
+  /** How many protected attributes were masked before anything could read the CV. */
+  redactedCount: number;
+};
+
+export type RunAccepted = { evaluationId: string; status: string; previousEvaluationId?: string };
+
+export type EvaluationStatusView = {
+  evaluationId: string;
+  status: string;
+  isCurrent: boolean;
+  supersededBy: string | null;
+  failureReason: string | null;
 };
 
 export type DecisionResult = { decision: Decision; evaluation: EvaluationDetail };

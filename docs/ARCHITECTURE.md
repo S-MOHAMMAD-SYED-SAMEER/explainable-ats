@@ -333,7 +333,7 @@ The Anthropic adapter's rules:
 
 **What happens when the provider fails.** `extractEvidence` catches the failure, marks the evaluation `failed` with a safe reason, appends an `extraction_failed` audit event and raises `PROVIDER_UNAVAILABLE` (HTTP 502 if it ever reaches a route). It never turns the failure into an empty list of findings. "The model found nothing" and "the model could not be reached" are different facts, and only one of them says anything about the candidate. The provider's own error text goes to the operator log, not to the response or the audit trail.
 
-No HTTP route runs extraction. In the real application the pipeline runs from `npm run seed:demo` and from tests; there is no upload or paste endpoint.
+**How a request reaches the model.** `POST /api/evaluations/:id/run` answers 202 and hands the evaluation to a small in-process runner (`agent/runner.ts`): extraction, then scoring, with at most three evaluations in flight so a batch of pasted CVs cannot fire a burst of model requests. The database, not the promise, is the record of progress: `pending` means not finished, and every ending writes `scored` or `failed` with an audit event. A failure the pipeline did not describe itself (a database error, a bug) is caught by the runner and recorded as `failed` with a fixed message, and the real error goes to the log. There is no queue and no retry schedule; a process that dies mid-run leaves a `pending` evaluation, which `POST .../rerun` accepts because nothing in the process is running it.
 
 ## 7. Two modes, one codebase
 
@@ -341,7 +341,7 @@ No HTTP route runs extraction. In the real application the pipeline runs from `n
 
 | | `app` (default) | `demo` |
 |---|---|---|
-| Routes | health, sign-in, recruiter API | health, `/api/demo/session/*` |
+| Routes | health, sign-in, recruiter API (reads, create a role, add a CV, run, re-run, decide) | health, `/api/demo/session/*` |
 | Sign-in | required for everything but health | none, and no sign-in route exists |
 | Database | the canonical database, migrated before start | none; each visitor gets a private in-memory SQLite database |
 | Model provider | `mock` or `anthropic` | `mock` only |
