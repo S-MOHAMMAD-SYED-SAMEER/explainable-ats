@@ -15,6 +15,8 @@ import { installDeterministicExtractor } from '../src/agent/mockExtractor.ts';
 import { createTestContext, type TestContext } from './helpers.ts';
 import { JOB_INPUT, RESUME_TEXT, SENSITIVE_VALUES } from './fixtures.ts';
 import { LlmError, type LlmProvider, type LlmRequest, type LlmResponse } from '../src/adapters/llm/types.ts';
+import { LlmFailure } from '../src/adapters/llm/failures.ts';
+import { FAILURE_WORDING } from '../src/agent/failures.ts';
 
 // The recruiter's write routes, over real HTTP, with the deterministic provider.
 //
@@ -34,6 +36,8 @@ type ControlledProvider = LlmProvider & {
   release(): void;
   /** While set, calls fail as an outage would. */
   failing: boolean;
+  /** While set, calls fail with exactly this. Takes precedence over `failing`. */
+  failWith: Error | null;
   started: number;
   /** The most calls that were ever in flight at once. */
   peak: number;
@@ -52,6 +56,7 @@ function createControlledProvider(): ControlledProvider {
     configured: true,
     inner,
     failing: false,
+    failWith: null,
     started: 0,
     peak: 0,
     hold() {
@@ -70,6 +75,7 @@ function createControlledProvider(): ControlledProvider {
       provider.peak = Math.max(provider.peak, inFlight);
       try {
         if (gate) await gate;
+        if (provider.failWith) throw provider.failWith;
         if (provider.failing) throw new LlmError('controlled', 'simulated outage');
         return await inner.complete(request);
       } finally {
@@ -435,7 +441,7 @@ test('a provider outage fails the evaluation with a record, and a re-run superse
     assert.ok(onNew.actorId);
     assert.equal(onNew.payload.previousEvaluationId, added.body.evaluationId);
     const onOld = (await ctx.repos.audit.listForCorrelation(added.body.evaluationId)).map((e) => e.eventType);
-    assert.ok(onOld.includes('extraction_failed'), 'the failure itself is on record');
+    assert.ok(onOld.includes('extraction_unavailable'), 'the failure itself is on record');
     assert.ok(onOld.includes('evaluation_superseded_by_rerun'));
 
     // One person, one current evaluation.
@@ -487,6 +493,66 @@ test('a pending evaluation that nothing is running (left by a restart) can be re
     const rerun = await client.post<{ evaluationId: string }>(`/api/evaluations/${orphan.body.evaluationId}/rerun`, {});
     assert.equal(rerun.status, 202);
     await waitForStatus(client, rerun.body.evaluationId, 'scored');
+  });
+});
+
+test('a cut-off answer shows its own message, keeps its usage, and a re-run recovers', async () => {
+  await withApi(async (client, ctx, provider) => {
+    const job = await createJobViaApi(client);
+    const added = await addCandidate(client, job.id, 'cv-cut');
+
+    provider.failWith = new LlmFailure('scripted', 'truncated', 'internal text', {
+      model: 'served-model',
+      latencyMs: 900,
+      usage: { inputTokens: 1000, outputTokens: 4096 },
+      raw: { findings: [{ quote: 'Desi' }] },
+    });
+    await client.post(`/api/evaluations/${added.body.evaluationId}/run`, {});
+    const failed = await waitForStatus(client, added.body.evaluationId, 'failed');
+    assert.equal(failed.failureReason, FAILURE_WORDING.truncated.message);
+
+    const detail = await client.get<{
+      failureReason: string;
+      modelFoundNothing: boolean;
+      extraction: { result: string; outputTokens: number; model: string; rawOutput?: unknown };
+    }>(`/api/evaluations/${added.body.evaluationId}`);
+    assert.equal(detail.body.extraction.result, 'truncated');
+    assert.equal(detail.body.extraction.outputTokens, 4096);
+    assert.equal(detail.body.extraction.model, 'served-model');
+    assert.equal(detail.body.modelFoundNothing, false, 'a cut-off answer is not "found nothing"');
+    assert.ok(!('rawOutput' in detail.body.extraction), 'the raw answer is never sent to the browser');
+    assert.ok(!JSON.stringify(detail.body).includes('Desi'), 'nor any part of it');
+    assert.equal((await ctx.repos.evaluationRecords.getForEvaluation(added.body.evaluationId))?.rawOutput, '{"findings":[{"quote":"Desi"}]}');
+
+    provider.failWith = null;
+    const rerun = await client.post<{ evaluationId: string }>(`/api/evaluations/${added.body.evaluationId}/rerun`, {});
+    await waitForStatus(client, rerun.body.evaluationId, 'scored');
+  });
+});
+
+test('when the model finds nothing the evaluation is scored with every requirement unclear, and flagged', async () => {
+  await withApi(async (client, _ctx, provider) => {
+    const job = await createJobViaApi(client);
+    const added = await addCandidate(client, job.id, 'cv-empty');
+    provider.inner.register('extract_evidence', { findings: [] });
+
+    await client.post(`/api/evaluations/${added.body.evaluationId}/run`, {});
+    await waitForStatus(client, added.body.evaluationId, 'scored');
+
+    const detail = await client.get<{
+      modelFoundNothing: boolean;
+      scoreBasisPoints: number;
+      extraction: { result: string; findingsReturned: number };
+      requirements: Array<{ verdict: string; evidence: unknown[] }>;
+    }>(`/api/evaluations/${added.body.evaluationId}`);
+    assert.equal(detail.body.modelFoundNothing, true);
+    assert.equal(detail.body.extraction.findingsReturned, 0);
+    assert.deepEqual([...new Set(detail.body.requirements.map((r) => r.verdict))], ['unclear']);
+    assert.ok(detail.body.requirements.every((r) => r.evidence.length === 0));
+    assert.equal(detail.body.scoreBasisPoints, 0);
+
+    const trail = await client.get<{ events: Array<{ eventType: string }> }>(`/api/evaluations/${added.body.evaluationId}/audit`);
+    assert.ok(trail.body.events.some((event) => event.eventType === 'extraction_empty'));
   });
 });
 

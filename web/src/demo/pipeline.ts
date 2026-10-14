@@ -1,6 +1,7 @@
 import type { AuditEntry, EvaluationDetail } from '../api/types.ts';
 import { outcomeWording } from '../copy.ts';
 import { DEMO_LABELS } from './copy.ts';
+import { EXTRACTION_EMPTY_EVENT, isExtractionFailureEvent } from '../failures.ts';
 import { asRecord, formatInt, readCount, readRecords, readText, readTextList, rejectionReason, wordsOf } from './audit.ts';
 
 // The pipeline a candidate went through, from what was actually recorded.
@@ -177,8 +178,9 @@ export function buildPipeline({ events, detail, ranking }: PipelineInput): Pipel
         if (own.length === 0) {
           return make('not_run', null, 'Extraction has not run for this candidate, so there is nothing further to show.');
         }
-        if (find(own, 'extraction_failed')) {
-          return make('failed', at, 'Extraction did not complete, so no evidence was gathered.');
+        const failure = own.find((event) => isExtractionFailureEvent(event.eventType));
+        if (failure) {
+          return make('failed', at, 'Extraction did not complete, so no evidence was gathered.', [failure.summary]);
         }
         const recorded = find(own, 'extraction_recorded');
         const payload = recorded ? (asRecord(recorded.payload) ?? {}) : {};
@@ -188,6 +190,7 @@ export function buildPipeline({ events, detail, ranking }: PipelineInput): Pipel
         if (requirements !== null) facts.push(`Read against ${plural(requirements, 'requirement', 'requirements')}`);
         const dropped = find(own, 'malformed_findings_dropped');
         if (dropped) facts.push('Some findings did not match the required shape and were dropped');
+        if (find(own, EXTRACTION_EMPTY_EVENT)) facts.push('It quoted nothing for any requirement, so every requirement reads as not demonstrated');
         return make(
           status,
           at,

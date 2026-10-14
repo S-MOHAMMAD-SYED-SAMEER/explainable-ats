@@ -554,6 +554,7 @@ test('no ranking table exists, and matching added no table at all', async (t) =>
   assert.deepEqual(tables, [
     'audit_events',
     'candidates',
+    'evaluation_records',
     'evaluations',
     'evidence',
     'job_requirements',

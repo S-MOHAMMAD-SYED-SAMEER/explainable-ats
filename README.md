@@ -240,7 +240,7 @@ There are no browser or end-to-end tests, and no evaluation set that measures ex
 
 - **There is no evaluation set.** Nothing measures how well extraction finds the right passages in real CVs. I would build a set of redacted CVs with hand-marked passages per requirement and measure recall first, because a missed passage becomes `unclear` rather than `not_met`.
 - **The demo's extractor is a keyword matcher.** Extraction defaults to the deterministic mock everywhere unless `LLM_PROVIDER=anthropic` is set. It quotes whole lines containing the most requirement terms. That exercises the pipeline but says nothing about how a real model would do.
-- **Anthropic provider: smoke-tested, not evaluated.** `LLM_PROVIDER=anthropic` builds an adapter that offers (or, where the model allows it, forces) a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a loopback stub server, and the opt-in script `server/scripts/live-smoke-anthropic.ts` has made one real request each to `claude-sonnet-5-5` and `claude-haiku-4-5-20251001` on 2026-10-14: both returned a well-formed tool call whose quotes were all verified. That run found that Sonnet 5.5 rejects a forced tool call and rejects any `temperature`, so tool choice and temperature are settings. Extraction quality has not been evaluated, and the running app does not call the provider yet.
+- **Anthropic provider: smoke-tested, not evaluated.** `LLM_PROVIDER=anthropic` builds an adapter that offers (or, where the model allows it, forces) a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a loopback stub server, and the opt-in script `server/scripts/live-smoke-anthropic.ts` has made one real request each to `claude-sonnet-5-5` and `claude-haiku-4-5-20251001` on 2026-10-14: both returned a well-formed tool call whose quotes were all verified. That run found that Sonnet 5.5 rejects a forced tool call and rejects any `temperature`, so tool choice and temperature are settings. Extraction quality has not been evaluated. The running app calls the configured provider only when a signed-in recruiter starts an assessment.
 - **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes. Paraphrase is missed, and word forms count as different terms ("mentored" and "mentoring").
 - **Synthetic data only.** Everything runs on five invented candidates and one invented role. Nothing has been measured on real resumes.
 - **Redaction is pattern-based.** It catches emails, phones, labelled fields and supplied names. Unlabelled personal details can pass through.
@@ -276,7 +276,7 @@ MIT. See [LICENSE](LICENSE).
 │   │   ├── routes/              thin Express routers
 │   │   ├── auth/, http/         sessions, CSRF, CORS, rate limiting
 │   │   └── config/, lib/        configuration and small shared utilities
-│   ├── migrations/              001_foundation.sql, 002_domain.sql
+│   ├── migrations/              001_foundation.sql, 002_domain.sql, 003_evaluation_records.sql
 │   ├── scripts/                 migrate, seed:demo, hash-password, demo
 │   └── test/                    28 test files and 4 helper modules
 ├── web/
@@ -312,11 +312,13 @@ Key files:
 | `server/src/config/mode.ts` | The two modes |
 | `server/migrations/001_foundation.sql` | Sessions and the audit table |
 | `server/migrations/002_domain.sql` | The domain tables |
+| `server/migrations/003_evaluation_records.sql` | What each extraction used and returned: model, tokens, latency, the raw answer |
 | `server/scripts/demo.ts` | What `npm run demo` runs |
 | `server/scripts/seed-demo.ts` | Runs the pipeline over the demo dataset (`npm run seed:demo`) |
 | `server/scripts/migrate.ts` | Applies the migrations (`npm run migrate`) |
 | `server/scripts/hash-password.ts` | Makes `OPERATOR_PASSWORD_HASH` |
 | `server/scripts/live-smoke-anthropic.ts` | An opt-in, by-hand check of the real Anthropic adapter, never in CI |
+| `server/scripts/live-failure-check.ts` | An opt-in, by-hand check of the cut-off, timeout and long-CV paths against the real API, never in CI |
 | `server/.env.example` | Every setting, with its default |
 | `docs/ARCHITECTURE.md` | Stages, data model, request flows, design decisions |
 | `docs/TESTING.md` | What the tests protect |

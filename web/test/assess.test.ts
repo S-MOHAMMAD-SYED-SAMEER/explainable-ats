@@ -169,3 +169,28 @@ test('the visitor\'s demo draws none of the recruiter\'s write controls', () => 
   const recruiter = read(ROOT, 'src/RecruiterApp.tsx');
   assert.equal((recruiter.match(/<Jobs canCreate \/>/g) ?? []).length, 2, 'the recruiter app enables creation on both routes to the list');
 });
+
+// --- failures and the empty answer ---------------------------------------------
+
+import { EXTRACTION_EMPTY_EVENT, EXTRACTION_FAILURE_EVENTS, isExtractionFailureEvent } from '../src/failures.ts';
+
+test('the failure events the pipeline view knows are exactly the server\'s', () => {
+  const server = read(SERVER_SRC, 'agent/failures.ts');
+  const fromServer = [...server.matchAll(/eventType: '([a-z_]+)'/g)].map((match) => match[1]);
+  const empty = /EXTRACTION_EMPTY_EVENT = '([a-z_]+)'/.exec(server)?.[1];
+
+  assert.ok(fromServer.length >= 6, 'precondition: the server\'s failure events were found');
+  assert.deepEqual([...EXTRACTION_FAILURE_EVENTS], fromServer);
+  assert.equal(EXTRACTION_EMPTY_EVENT, empty);
+  assert.ok(!isExtractionFailureEvent(EXTRACTION_EMPTY_EVENT), 'found-nothing is not a failure');
+  assert.ok(!isExtractionFailureEvent('extraction_recorded'));
+  assert.ok(isExtractionFailureEvent('extraction_truncated'));
+});
+
+test('the assessment screen says so when the model found nothing, and says what that does not mean', () => {
+  const screen = read(ROOT, 'src/screens/CandidateDetail.tsx');
+  assert.match(screen, /<NothingFound detail=\{detail\} \/>/);
+  assert.match(screen, /found nothing in this CV/);
+  assert.match(screen, /not the candidate/);
+  assert.match(screen, /detail\.modelFoundNothing/);
+});

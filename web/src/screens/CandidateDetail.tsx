@@ -5,6 +5,7 @@ import { BackLink, Badge, Loading, Problem, Technical } from '../components/Bits
 import { HighlightedText } from '../components/EvidenceText.ts';
 import { ResumeEvidence } from '../components/ResumeEvidence.tsx';
 import { AssessmentPanel } from '../components/AssessmentPanel.tsx';
+import { ModelCallFacts } from '../components/ModelCallFacts.tsx';
 import { PipelineView } from '../components/PipelineView.tsx';
 import { AuditTimeline } from '../components/AuditTimeline.tsx';
 import { buildPipeline, type RankingInput } from '../demo/pipeline.ts';
@@ -98,6 +99,7 @@ function Headline({ detail, demo = false }: { detail: EvaluationDetail; demo?: b
             quotes that were checked against the CV first.
           </p>
         )}
+        <ModelCallFacts extraction={detail.extraction} />
         {detail.evidenceRejectedCount > 0 ? (
           <p>
             <strong>{detail.evidenceRejectedCount}</strong> quoted passage
@@ -109,6 +111,33 @@ function Headline({ detail, demo = false }: { detail: EvaluationDetail; demo?: b
           <p>Every quoted passage was found in the CV exactly as quoted.</p>
         )}
       </Technical>
+    </section>
+  );
+}
+
+/**
+ * The model answered properly and quoted nothing.
+ *
+ * Every requirement then reads as "not demonstrated", which looks like a candidate who
+ * has none of the skills and is also exactly what an empty or garbled paste produces. So
+ * it is said out loud, with what it does and does not mean, rather than left to read as
+ * an ordinary result.
+ */
+function NothingFound({ detail }: { detail: EvaluationDetail }): ReactNode {
+  if (!detail.modelFoundNothing) return null;
+  const reader = detail.model === 'mock' ? 'The stand-in matcher' : 'The model';
+
+  return (
+    <section role="status" className="rounded-card border border-line bg-signal-tint p-4">
+      <h4 className="text-small font-semibold text-signal">{reader} found nothing in this CV</h4>
+      <p className="mt-1 text-small text-ink">
+        It read the CV and quoted no passage for any requirement, so every requirement below reads as not
+        demonstrated.
+      </p>
+      <p className="mt-1 text-small text-ink-muted">
+        That describes what was found, not the candidate. An empty or garbled paste looks exactly like this, so check
+        the CV text before relying on it, and re-run the assessment if it should have matched.
+      </p>
     </section>
   );
 }
@@ -566,6 +595,8 @@ export function CandidateDetail({
       ) : null}
 
       {demoSession ? null : <AssessmentPanel detail={detail} onChanged={reload} />}
+
+      <NothingFound detail={detail} />
 
       <Fairness detail={detail} />
 

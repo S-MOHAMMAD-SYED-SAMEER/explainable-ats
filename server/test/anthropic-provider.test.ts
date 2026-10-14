@@ -610,12 +610,12 @@ test('on the wire, a server that never answers is cut off by the timeout', async
   t.after(() => server.close());
 
   const started = Date.now();
-  const { provider } = build(sdkAt(server.baseURL, 150), { timeoutMs: 150, maxRetries: 1 });
+  const { provider } = build(sdkAt(server.baseURL, 600), { timeoutMs: 600, maxRetries: 1 });
   const err = await failure(provider.complete(extractionRequest()));
 
   assert.match(err.message, /timeout/);
   assert.equal(server.seen.length, 2, 'one attempt plus one bounded retry');
-  assert.ok(Date.now() - started < 3_000, 'the call did not return in bounded time');
+  assert.ok(Date.now() - started < 5_000, 'the call did not return in bounded time');
 });
 
 // --- K, M, N: inside the real pipeline -----------------------------------------
@@ -655,10 +655,15 @@ test('provider failure inside the pipeline is a recorded failure, never empty ev
   await rejects(() => matchAndScore({ repos: ctx.repos }, scenario.evaluation.id));
 
   const trail = await ctx.repos.audit.listForCorrelation(scenario.evaluation.id);
-  const failed = trail.find((event) => event.eventType === 'extraction_failed');
+  // A 401 is the service refusing the request itself, which is a different fact from an
+  // outage, so it has its own event and says what kind it was and nothing more.
+  const failed = trail.find((event) => event.eventType === 'extraction_rejected');
   assert.ok(failed, 'the failure was not audited');
   assert.equal(failed.outcome, 'failed');
-  assert.deepEqual(failed.payload, { provider: 'anthropic' });
+  assert.equal(failed.payload.provider, 'anthropic');
+  assert.equal(failed.payload.kind, 'rejected');
+  assert.equal(failed.payload.label, 'HTTP 401');
+  assert.equal(failed.payload.attempts, 1);
 
   const everything = JSON.stringify([trail, memory.entries, evaluation]);
   assert.ok(!everything.includes(API_KEY), 'the key reached the audit trail, the log or the evaluation');
@@ -804,7 +809,7 @@ const ADAPTER_CODE = ADAPTER.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\
 test('the adapter imports nothing that matches, scores, ranks or verifies', () => {
   const imports = [...ADAPTER_CODE.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
 
-  assert.deepEqual(imports.sort(), ['../../lib/logger.ts', './types.ts', '@anthropic-ai/sdk']);
+  assert.deepEqual(imports.sort(), ['../../lib/logger.ts', './failures.ts', './types.ts', '@anthropic-ai/sdk']);
   for (const forbidden of ['match', 'score', 'rank', 'verify', 'domain', 'db/', 'repositories']) {
     assert.ok(!imports.some((source) => source?.includes(forbidden)), `the adapter imports ${forbidden}`);
   }

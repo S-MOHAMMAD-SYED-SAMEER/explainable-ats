@@ -141,7 +141,7 @@ A `partial` must-have counts as a failure for the gate. Only `met` clears it.
 
 ## 3. Data model
 
-Two migrations create everything: `001_foundation.sql` (sessions) and `002_domain.sql` (the ten domain tables). The database refuses what the code must never produce: every closed set is a `CHECK` constraint, weights must be positive, scores are integers between 0 and 10000, and a requirement can be judged once per evaluation.
+Three migrations create everything: `001_foundation.sql` (sessions), `002_domain.sql` (the ten domain tables) and `003_evaluation_records.sql` (one row per extraction: model, tokens, latency, the model's raw answer). The database refuses what the code must never produce: every closed set is a `CHECK` constraint, weights must be positive, scores are integers between 0 and 10000, and a requirement can be judged once per evaluation.
 
 ```mermaid
 erDiagram
@@ -331,7 +331,24 @@ The Anthropic adapter's rules:
 - The model name is whatever `ANTHROPIC_MODEL` says. The adapter names no model itself. Checked against the live API on 2026-10-14: `claude-sonnet-5-5` rejects a forced tool call (400) and any `temperature`, because it always runs adaptive thinking; `claude-haiku-4-5-20251001` accepts both; `claude-haiku-5-5` accepts a forced call but rejects `temperature`. So tool choice and temperature are settings (`ANTHROPIC_TOOL_CHOICE`, `ANTHROPIC_TEMPERATURE`), and a model that rejects what is configured fails with the API's own message and is not retried.
 - The adapter never scores, matches or ranks. Its output is a set of candidate quotes that go through the same schema check and the same verification as the mock's.
 
-**What happens when the provider fails.** `extractEvidence` catches the failure, marks the evaluation `failed` with a safe reason, appends an `extraction_failed` audit event and raises `PROVIDER_UNAVAILABLE` (HTTP 502 if it ever reaches a route). It never turns the failure into an empty list of findings. "The model found nothing" and "the model could not be reached" are different facts, and only one of them says anything about the candidate. The provider's own error text goes to the operator log, not to the response or the audit trail.
+**What happens when the model call fails.** `extractEvidence` marks the evaluation `failed`, appends an audit event and raises `PROVIDER_UNAVAILABLE`. It never turns a failure into an empty list of findings: "the model found nothing" and "the model did not answer properly" are different facts, and only the first says anything about the candidate. Each way a call can go wrong is its own kind (`adapters/llm/failures.ts`), with its own audit event and its own message for a recruiter (`agent/failures.ts`):
+
+| Kind | Audit event | What it means |
+|---|---|---|
+| `refusal` | `extraction_refused` | The model declined to answer |
+| `truncated` | `extraction_truncated` | The answer hit the output limit before it was complete |
+| `malformed` | `extraction_malformed` | An answer arrived in the wrong shape: no tool call, two, the wrong tool, no `findings` list |
+| `unavailable` | `extraction_unavailable` | A timeout, a dropped connection, a 5xx or a 429 that outlasted the retries |
+| `rejected` | `extraction_rejected` | The service refused the request itself (key, setting, model): a configuration problem, not retried |
+| `unexpected` | `extraction_unexpected_error` | Anything else; a bug |
+
+Every message says that nothing was scored and what kind of problem it was, and none names a provider, a model or a setting. The audit payload carries the kind, the output limit and a key-free label such as `timeout` or `HTTP 529`; the provider's own text goes to the operator log only. A provider that throws a plain `LlmError` (the mock) is treated as `unavailable`.
+
+**The model found nothing.** An answer with a `findings` list that is empty is a real result, not a failure: the evaluation continues, every requirement ends `unclear`, and an `extraction_empty` event is written. It is also exactly what an empty or garbled paste looks like, so the assessment screen shows a notice saying what was found and what that does not mean. Findings that are all malformed are dropped (`malformed_findings_dropped`) but are not "found nothing", because the model did return findings.
+
+**What is kept about every extraction.** `evaluation_records` (migration 003) has one row per evaluation, written for failures as well as successes: the result, the model, the output limit that was requested, input and output tokens as the provider reported them (never estimated), latency, how many findings the model returned before validation, and its raw tool input as JSON text. The raw answer is the model's reply before anything was validated or verified, so findings that were later dropped or rejected are still in it. The model was only ever shown the redacted CV, so it holds redacted text; it is never sent to the browser. It is a separate table so that a list of evaluations never loads a model's answer, and so the vendored `Evaluation` type did not have to change.
+
+**The output limit is sized from the job.** `agent/tokenBudget.ts` computes `max_tokens` from the requirement count and the length of the CV: a thinking allowance (4,096 plus one token per 16 characters of CV, because Sonnet 5.5 always thinks and its thinking counts against the limit) plus room for four passages per requirement at about 220 tokens each, never below 4,096 and capped at 32,000. The fixed 2,048 it replaces was too small for a thinking model. A job that needs more than the cap fails as `truncated` and says so. These constants are estimates; `docs/TESTING.md` records what the live API actually used.
 
 **How a request reaches the model.** `POST /api/evaluations/:id/run` answers 202 and hands the evaluation to a small in-process runner (`agent/runner.ts`): extraction, then scoring, with at most three evaluations in flight so a batch of pasted CVs cannot fire a burst of model requests. The database, not the promise, is the record of progress: `pending` means not finished, and every ending writes `scored` or `failed` with an audit event. A failure the pipeline did not describe itself (a database error, a bug) is caught by the runner and recorded as `failed` with a fixed message, and the real error goes to the log. There is no queue and no retry schedule; a process that dies mid-run leaves a `pending` evaluation, which `POST .../rerun` accepts because nothing in the process is running it.
 

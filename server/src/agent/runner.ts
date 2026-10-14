@@ -1,5 +1,6 @@
 import { extractEvidence } from './extract.ts';
 import { matchAndScore } from './match.ts';
+import { FAILURE_WORDING } from './failures.ts';
 import type { LlmProvider } from '../adapters/llm/types.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -46,7 +47,7 @@ export const DEFAULT_MAX_CONCURRENT_EVALUATIONS = 3;
 
 // What a person sees when the code failed in a way the pipeline did not itself
 // describe. The real error goes to the log, never to a response.
-export const UNEXPECTED_FAILURE_MESSAGE = 'The assessment could not be completed. Try running it again.';
+export const UNEXPECTED_FAILURE_MESSAGE = FAILURE_WORDING.unexpected.message;
 
 export function createEvaluationRunner(deps: RunnerDeps): EvaluationRunner {
   const { repos, provider, logger } = deps;

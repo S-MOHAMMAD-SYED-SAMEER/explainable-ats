@@ -206,13 +206,23 @@ These protect the two guarantees the product is built on: nothing protected reac
 
 - **Scenario.** The extraction provider is unreachable.
 - **Input.** The mock is told to fail the `extract_evidence` call with `"connection reset"`.
-- **Expected.** The call raises an error containing "could not be reached". The evaluation is `failed`, zero evidence rows exist, and an `extraction_failed` audit event with outcome `failed` is recorded. The provider's own message, `connection reset`, appears nowhere in the audit trail.
+- **Expected.** The call raises an error whose message says the service "could not be reached, or took too long". The evaluation is `failed`, zero evidence rows exist, and an `extraction_unavailable` audit event with outcome `failed` is recorded. `failure-handling.test.ts` repeats this for every kind of failure (refusal, cut-off, malformed answer, outage, rejected request, unexpected error), each with its own event and message. The provider's own message, `connection reset`, appears nowhere in the audit trail.
 - **Bug it catches.** Treating "the model could not be reached" as "the model found nothing", which would score the candidate zero for an outage. It also catches a provider error message (which can carry a hostname or a key fragment) leaking into a recruiter-facing trail.
 
 ## What isn't tested yet
 
 - **Extraction quality.** There is no labelled set of CVs with the passages a good extractor should find, so nothing measures recall or precision. The mock extractor is a keyword matcher, so the pipeline's *mechanics* are tested, not the *accuracy* of a real model.
 - **The live Anthropic API.** The automated tests use a fake client and a local stub server only. `server/scripts/live-smoke-anthropic.ts` is an opt-in script that makes one real request; it sits outside `test/` and never runs in CI. It was run once on `claude-sonnet-5-5` and once on `claude-haiku-4-5-20251001` on 2026-10-14 (both passed). No evaluation of extraction quality has been run.
+- **The failure paths and the output limit, against the real API.** `server/scripts/live-failure-check.ts` makes four real requests per model (2026-10-14), through the real adapter and pipeline. Token counts are as the API reported them.
+
+| Case | `claude-sonnet-5-5` (tool choice auto, no temperature) | `claude-haiku-4-5-20251001` (forced, temperature 0) |
+|---|---|---|
+| Output limit forced to 200 | `truncated`: 1,202 in / 200 out, 3.0 s, own event and message | `truncated`: 1,251 in / 200 out, 2.4 s, own event and message |
+| Request timeout of 1 ms, no retries | `unavailable`, own event and message | `unavailable`, own event and message |
+| 31,000-character CV, 8 requirements, computed limit 13,072 | completed: 10,761 in / **4,664 out (36% of the limit)**, 30.6 s | completed: 7,736 in / **1,022 out (8%)**, 10.6 s |
+| A pastry chef's CV against a backend role | quoted 1 passage, so no `extraction_empty` | quoted 3 passages, so no `extraction_empty` |
+
+  So the computed limit left room on the largest case tried, and Sonnet 5.5 used about four times the output Haiku did for the same CV, mostly thinking. The last row is a finding, not a pass: given an unrelated CV, neither model returned nothing; both quoted real passages that happen to touch a requirement (such as training apprentices for "mentoring"). Whether those count as evidence is decided afterwards by matching and scoring, which is measured in the evaluation, not here. The empty-answer path is covered by automated tests only; no real model has been seen to return an empty list. A refusal was not provoked, because there is no reliable way to make a model refuse an innocent CV; that path is tested against the adapter's handling of a refusal reply, not against a real one.
 - **PostgreSQL in CI.** The PostgreSQL path has no automated test.
 - **Real CVs.** Everything runs on five invented candidates. Redaction is pattern-based and has not been run against real resumes.
 - **Prompt injection.** No test feeds a CV containing instructions to a model. The verifier limits the damage (a model can only cite text that really is in the CV, and it cannot score), but the prompt layer has no defence and no tests.
