@@ -241,7 +241,7 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
 /** Opens an evaluation for a job/candidate pair, superseding any earlier one. */
 export async function openEvaluation(
   deps: Pick<ExtractDeps, 'repos'>,
-  input: { jobId: string; candidateId: string; resume: Resume },
+  input: { jobId: string; candidateId: string; resume: Resume; openedBy?: string },
 ): Promise<Evaluation> {
   const evaluation = await deps.repos.evaluations.create({
     jobId: input.jobId,
@@ -254,6 +254,7 @@ export async function openEvaluation(
     stage: 'extract',
     eventType: 'evaluation_opened',
     actor: 'human',
+    ...(input.openedBy ? { actorId: input.openedBy } : {}),
     outcome: 'ok',
     summary: 'Opened an evaluation of this candidate against this job.',
     payload: { jobId: input.jobId, candidateId: input.candidateId },

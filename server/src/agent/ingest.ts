@@ -157,7 +157,7 @@ export type CreateJobInput = {
  * refused here rather than producing an evaluation that scores zero out of
  * zero and looks like a rejection.
  */
-export async function createJob(deps: IngestDeps, input: CreateJobInput) {
+export async function createJob(deps: IngestDeps, input: CreateJobInput, createdBy?: string) {
   const { repos } = deps;
 
   if (input.requirements.length === 0) {
@@ -182,6 +182,7 @@ export async function createJob(deps: IngestDeps, input: CreateJobInput) {
     stage: 'job',
     eventType: 'job_created',
     actor: 'human',
+    ...(createdBy ? { actorId: createdBy } : {}),
     outcome: 'ok',
     summary: `Created "${job.title}" with ${requirements.length} requirement(s).`,
     payload: {

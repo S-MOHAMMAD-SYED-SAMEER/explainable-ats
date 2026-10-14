@@ -4,6 +4,7 @@ import { useLoad, type Loaded } from '../useLoad.ts';
 import { BackLink, Badge, Loading, Problem, Technical } from '../components/Bits.tsx';
 import { HighlightedText } from '../components/EvidenceText.ts';
 import { ResumeEvidence } from '../components/ResumeEvidence.tsx';
+import { AssessmentPanel } from '../components/AssessmentPanel.tsx';
 import { PipelineView } from '../components/PipelineView.tsx';
 import { AuditTimeline } from '../components/AuditTimeline.tsx';
 import { buildPipeline, type RankingInput } from '../demo/pipeline.ts';
@@ -523,7 +524,7 @@ export function CandidateDetail({
   demoSession?: boolean;
 }): ReactNode {
   // Every hook above every return — see the note in App.tsx.
-  const { state, set } = useLoad(() => api.evaluation(evaluationId), [evaluationId]);
+  const { state, set, reload } = useLoad(() => api.evaluation(evaluationId), [evaluationId]);
   // Only a visitor's own session has a resume endpoint, so only there are these
   // two asked for; everywhere else they resolve at once to nothing and no request
   // is made. They are declared unconditionally because hooks cannot be conditional.
@@ -563,6 +564,8 @@ export function CandidateDetail({
           {GUIDE_STEPS.slice(1).map((step) => step.label).join(' → ')}.
         </p>
       ) : null}
+
+      {demoSession ? null : <AssessmentPanel detail={detail} onChanged={reload} />}
 
       <Fairness detail={detail} />
 

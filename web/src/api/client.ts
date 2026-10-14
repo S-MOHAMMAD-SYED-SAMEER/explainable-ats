@@ -5,11 +5,16 @@ import type {
   DecisionResult,
   DemoResume,
   ErrorEnvelope,
+  AddedCandidate,
   EvaluationDetail,
+  EvaluationStatusView,
   Health,
   JobDetail,
   JobSummary,
+  NewCandidateInput,
+  NewJobInput,
   Ranking,
+  RunAccepted,
 } from './types.ts';
 
 
@@ -204,6 +209,35 @@ export const api = {
 
   evaluationAudit: (evaluationId: string): Promise<{ events: AuditEntry[] }> =>
     request<{ events: AuditEntry[] }>(`/evaluations/${encodeURIComponent(evaluationId)}/audit`),
+
+  // The recruiter's writes. None of these exists in a visitor's demo session.
+
+  createJob: (input: NewJobInput): Promise<JobDetail> =>
+    request<JobDetail>('/jobs', { method: 'POST', body: JSON.stringify(input) }),
+
+  addCandidate: (jobId: string, input: NewCandidateInput): Promise<AddedCandidate> =>
+    request<AddedCandidate>(`/jobs/${encodeURIComponent(jobId)}/candidates`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  /** Starts the assessment. The server answers 202 and carries on in the background. */
+  runEvaluation: (evaluationId: string): Promise<RunAccepted> =>
+    request<RunAccepted>(`/evaluations/${encodeURIComponent(evaluationId)}/run`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  /** Re-runs a failed assessment as a new one that replaces it. */
+  rerunEvaluation: (evaluationId: string): Promise<RunAccepted> =>
+    request<RunAccepted>(`/evaluations/${encodeURIComponent(evaluationId)}/rerun`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  /** What a screen polls while an assessment runs. */
+  evaluationStatus: (evaluationId: string): Promise<EvaluationStatusView> =>
+    request<EvaluationStatusView>(`/evaluations/${encodeURIComponent(evaluationId)}/status`),
 
   /**
    * The redacted resume. Exists only in a visitor's demo session: the recruiter API

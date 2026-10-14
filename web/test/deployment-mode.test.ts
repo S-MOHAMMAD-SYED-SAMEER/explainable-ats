@@ -119,7 +119,7 @@ test('the recruiter application is the sign-in gate and the recruiter\'s screens
   const app = code('RecruiterApp.tsx');
 
   assert.ok(app.includes('<Login'));
-  assert.ok(app.includes('<Overview />') && app.includes('<Jobs />') && app.includes('<JobDetail') && app.includes('<CandidateDetail'));
+  assert.ok(app.includes('<Overview />') && app.includes('<Jobs canCreate />') && app.includes('<JobDetail') && app.includes('<CandidateDetail'));
   assert.match(app, /setApiScope\('recruiter'\)/);
   assert.match(app, /useRoute\(RECRUITER_ROUTES, DEFAULT_ROUTE\)/);
   assert.doesNotMatch(app, /[Dd]emo/, 'the application mentions the demo');

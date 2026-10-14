@@ -63,6 +63,8 @@ export type EvaluationDetail = {
   job: { id: string; title: string };
   candidate: { id: string; reference: string; displayName: string | null };
   status: string;
+  /** A message for a person, set only when the status is "failed". */
+  failureReason: string | null;
   /** False when a newer evaluation has replaced this one. */
   isCurrent: boolean;
   supersededBy: string | null;
@@ -124,6 +126,7 @@ export async function handleEvaluationDetail(
       job: { id: job.id, title: job.title },
       candidate: { id: candidate.id, reference: candidate.reference, displayName: candidate.displayName },
       status: evaluation.status,
+      failureReason: evaluation.status === 'failed' ? evaluation.failureReason : null,
       isCurrent: evaluation.supersededBy === null,
       supersededBy: evaluation.supersededBy,
       scoreBasisPoints: evaluation.scoreBasisPoints,

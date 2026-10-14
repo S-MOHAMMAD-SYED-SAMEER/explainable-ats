@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { api } from '../api/client.ts';
 import { useLoad } from '../useLoad.ts';
 import { Empty, Loading, Problem } from '../components/Bits.tsx';
-import { routeToHash } from '../router.ts';
+import { NewJobForm } from './NewJobForm.tsx';
+import { navigate, routeToHash } from '../router.ts';
 import type { JobSummary } from '../api/types.ts';
 
 // Roles — the first screen of the recruiter workflow.
@@ -35,18 +36,35 @@ function JobRow({ job }: { job: JobSummary }): ReactNode {
   );
 }
 
-export function Jobs(): ReactNode {
+export function Jobs({ canCreate = false }: { canCreate?: boolean }): ReactNode {
   // Every hook above every return — see the note in App.tsx.
   const { state } = useLoad(() => api.jobs(), []);
+  const [creating, setCreating] = useState(false);
 
   return (
     <div className="space-y-4">
-      <section>
-        <h3 className="text-subhead">Open roles</h3>
-        <p className="mt-1 text-small text-ink-muted">
-          Pick a role to see who has been assessed against it, and why each of them sits where they do.
-        </p>
+      <section className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-subhead">Open roles</h3>
+          <p className="mt-1 text-small text-ink-muted">
+            Pick a role to see who has been assessed against it, and why each of them sits where they do.
+          </p>
+        </div>
+        {/* Only the signed-in recruiter creates roles; a visitor's demo has none to create. */}
+        {canCreate && !creating ? (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="h-control rounded-control bg-brand px-5 text-small font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            New role
+          </button>
+        ) : null}
       </section>
+
+      {canCreate && creating ? (
+        <NewJobForm onCreated={(jobId) => navigate({ name: 'jobs', id: jobId })} />
+      ) : null}
 
       {state.status === 'loading' ? <Loading what="roles" /> : null}
       {state.status === 'error' ? <Problem message={state.message} /> : null}

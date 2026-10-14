@@ -9,6 +9,7 @@ import { cors } from './http/cors.ts';
 import { rateLimit } from './http/rateLimit.ts';
 import { createRepositories } from './db/repositories/index.ts';
 import { createLlmProvider } from './adapters/llm/index.ts';
+import { createEvaluationRunner } from './agent/runner.ts';
 import { createDemoSessionStore, type DemoSessionStore } from './demo/sessions.ts';
 import { config as defaultConfig, type AppConfig } from './config/env.ts';
 import { capabilitiesOf } from './config/mode.ts';
@@ -177,10 +178,10 @@ function mountApplication(app: Express, { db, logger, config, provider, rateLimi
   const repos = createRepositories(db);
 
   // Built here so a misconfigured provider (an unknown name, a missing key) fails
-  // at startup rather than on the first request. Nothing calls it yet: there is
-  // no HTTP route that runs extraction.
+  // at startup rather than on the first request. Demo mode never reaches this
+  // function, so a visitor's click can never call the configured provider.
   const llm = provider ?? createLlmProvider(config, { logger });
-  void llm;
+  const runner = createEvaluationRunner({ repos, provider: llm, logger });
 
   app.use('/api', attachSession({ repos }));
   app.use('/api', rateLimiter);
@@ -189,7 +190,7 @@ function mountApplication(app: Express, { db, logger, config, provider, rateLimi
   app.use('/api', requireSession());
 
   // Everything from here on is behind the gate.
-  app.use('/api', createRecruiterRouter({ repos, logger }));
+  app.use('/api', createRecruiterRouter({ repos, logger, runner }));
 }
 
 type DemoDeps = {

@@ -176,13 +176,22 @@ All routes are under `/api`. Errors share one envelope, `{ "error": { "code", "m
 | `GET /api/jobs/:jobId/ranking` | Session | The finished ranking: positions, ranks, tiers and sentences |
 | `GET /api/evaluations/:evaluationId` | Session | One candidate against one role: verdicts, quotes, score |
 | `GET /api/evaluations/:evaluationId/audit` | Session | The ordered history of that assessment |
-| `POST /api/evaluations/:evaluationId/decision` | Session + CSRF token | **The single write route.** Body `{ outcome, reason }` |
+| `GET /api/evaluations/:evaluationId/status` | Session | The cheap thing the dashboard polls while an assessment runs |
+| `POST /api/jobs` | Session + CSRF token | Create a role with its requirements (weight 1 to 10, essential or desirable) |
+| `POST /api/jobs/:jobId/candidates` | Session + CSRF token | Add a CV as pasted plain text: stores and redacts it, opens a pending evaluation, calls no model |
+| `POST /api/evaluations/:evaluationId/run` | Session + CSRF token | Start extraction and scoring. Answers **202** and works in the background |
+| `POST /api/evaluations/:evaluationId/rerun` | Session + CSRF token | Re-run a failed assessment as a new one that replaces it (audited) |
+| `POST /api/evaluations/:evaluationId/decision` | Session + CSRF token | Record the recruiter's decision. Body `{ outcome, reason }` |
 
 Every route except health and the three sign-in routes sits behind the session gate. There is no anonymous read of real data.
 
 `POST /api/evaluations/:evaluationId/decision` takes `outcome` (`shortlist`, `reject` or `hold`) and a `reason` of 10 to 2000 characters. It returns 201 with the decision and the resulting evaluation. It refuses with 403 (no CSRF token), 400 (bad outcome or short reason), 409 (not yet scored, superseded by a newer assessment, or already decided) and 404.
 
-No route uploads or accepts a resume, creates a job, or runs extraction. Resumes enter through the seeder (`npm run seed:demo`) and tests.
+**Adding and assessing a CV.** `POST /api/jobs/:jobId/candidates` takes `reference`, an optional `displayName` and the CV `text` (up to 200,000 characters). The same CV twice for the same person is a 409; a changed CV opens a new evaluation that replaces the old one. `POST .../run` starts the work and answers 202 at once: the model call and the scoring happen in the background, in this process, with at most three assessments in flight. The dashboard polls `GET .../status` until it reads `scored` or `failed`. There is no job queue, so an assessment that was running when the server restarted is left `pending`, and `POST .../rerun` accepts it. `POST .../rerun` is also how a `failed` assessment is retried: it opens a new evaluation that supersedes the failed one, which keeps its failure reason and its audit trail. Every write names the signed-in operator in the audit trail.
+
+The same provider is used by every route that runs extraction: the one `LLM_PROVIDER` names (`mock` by default). The public demo never builds a provider.
+
+There is no file upload. Every route above takes JSON.
 
 ### Public demo (`APP_MODE=demo`)
 
@@ -235,7 +244,7 @@ There are no browser or end-to-end tests, and no evaluation set that measures ex
 - **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes. Paraphrase is missed, and word forms count as different terms ("mentored" and "mentoring").
 - **Synthetic data only.** Everything runs on five invented candidates and one invented role. Nothing has been measured on real resumes.
 - **Redaction is pattern-based.** It catches emails, phones, labelled fields and supplied names. Unlabelled personal details can pass through.
-- **Plain text only.** There is no upload endpoint and no PDF or DOCX parsing. Requirements are typed input; nothing is inferred from a job advert, and no route creates a job.
+- **Plain text only.** There is no upload endpoint and no PDF or DOCX parsing. Requirements are typed input; nothing is inferred from a job advert.
 - **One operator, one password.** There are no accounts or roles.
 - **Rate limiting is in-memory and single-process.**
 - **Prompt injection has no prompt-layer defence** and no tests against a real model.

@@ -54,8 +54,8 @@ export function RecruiterApp(): ReactNode {
           detail route with no id is a stale or mistyped link, so it falls back
           to the list it belongs to rather than to an error. */}
       {route.name === 'overview' ? <Overview /> : null}
-      {route.name === 'jobs' ? route.id === null ? <Jobs /> : <JobDetail jobId={route.id} /> : null}
-      {route.name === 'candidates' ? route.id === null ? <Jobs /> : <CandidateDetail evaluationId={route.id} /> : null}
+      {route.name === 'jobs' ? route.id === null ? <Jobs canCreate /> : <JobDetail jobId={route.id} /> : null}
+      {route.name === 'candidates' ? route.id === null ? <Jobs canCreate /> : <CandidateDetail evaluationId={route.id} /> : null}
     </AppShell>
   );
 }

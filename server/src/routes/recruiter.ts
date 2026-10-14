@@ -6,6 +6,14 @@ import {
   handleEvaluationDetail,
   type EvaluationDeps,
 } from '../handlers/evaluations.ts';
+import {
+  handleAddCandidate,
+  handleCreateJob,
+  handleEvaluationStatus,
+  handleRerunEvaluation,
+  handleRunEvaluation,
+  type ManageDeps,
+} from '../handlers/manage.ts';
 import { operatorOf } from '../auth/middleware.ts';
 import { AppError } from '../lib/errors.ts';
 
@@ -32,7 +40,7 @@ function readId(value: unknown, what: string): string {
   return value;
 }
 
-export type RecruiterDeps = JobDeps & EvaluationDeps;
+export type RecruiterDeps = JobDeps & EvaluationDeps & ManageDeps;
 
 export function createRecruiterRouter(deps: RecruiterDeps): Router {
   const router = Router();
@@ -77,9 +85,51 @@ export function createRecruiterRouter(deps: RecruiterDeps): Router {
     }),
   );
 
-  // The one write in this router. `operatorOf` reads only what `attachSession`
-  // set from a verified session — never a header — so a decision about a person
-  // is always attributable to a signed-in operator.
+  router.get(
+    '/evaluations/:evaluationId/status',
+    wrap(async (req, res) => {
+      const result = await handleEvaluationStatus(deps, readId(req.params.evaluationId, 'assessment'));
+      res.status(result.status).json(result.body);
+    }),
+  );
+
+  // The writes. `operatorOf` reads only what `attachSession` set from a verified
+  // session — never a header — so everything done to a job or a person is
+  // attributable to a signed-in operator.
+  router.post(
+    '/jobs',
+    wrap(async (req, res) => {
+      const result = await handleCreateJob(deps, req.body, operatorOf(req));
+      res.status(result.status).json(result.body);
+    }),
+  );
+
+  router.post(
+    '/jobs/:jobId/candidates',
+    wrap(async (req, res) => {
+      const result = await handleAddCandidate(deps, readId(req.params.jobId, 'job'), req.body, operatorOf(req));
+      res.status(result.status).json(result.body);
+    }),
+  );
+
+  // Answers 202: the work continues in the background and the caller polls
+  // `/evaluations/:id/status`.
+  router.post(
+    '/evaluations/:evaluationId/run',
+    wrap(async (req, res) => {
+      const result = await handleRunEvaluation(deps, readId(req.params.evaluationId, 'assessment'), operatorOf(req));
+      res.status(result.status).json(result.body);
+    }),
+  );
+
+  router.post(
+    '/evaluations/:evaluationId/rerun',
+    wrap(async (req, res) => {
+      const result = await handleRerunEvaluation(deps, readId(req.params.evaluationId, 'assessment'), operatorOf(req));
+      res.status(result.status).json(result.body);
+    }),
+  );
+
   router.post(
     '/evaluations/:evaluationId/decision',
     wrap(async (req, res) => {
