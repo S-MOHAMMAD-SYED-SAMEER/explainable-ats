@@ -4,15 +4,17 @@ This project makes a claim that a recruiter can check: *every score is built fro
 
 ## The numbers
 
-Run from a clean checkout, with the portfolio repository checked out beside this one so the parity tests run:
+Run from a clean checkout, with the two portfolio repositories checked out beside this one so the parity tests run (CI does exactly that):
 
 | Suite | `npm test` reports | Test cases | Passed | Failed | Skipped |
 |---|---|---|---|---|---|
 | Server (`server/test/`) | 500 | 496 | 500 | 0 | 0 |
-| Web (`web/test/`) | 189 | 188 | 189 | 0 | 0 |
-| **Total** | **689** | **684** | **689** | **0** | **0** |
+| Web (`web/test/`) | 193 | 192 | 193 | 0 | 0 |
+| **Total** | **693** | **688** | **693** | **0** | **0** |
 
-Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Five such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts` and `portfolioFixture.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 496 and 188, so 684.
+In a standalone clone, with no portfolio repository beside it, the same commands report 693 with **681 passed and 12 skipped** (11 server parity tests and 1 web test that read the portfolio's code). Nothing fails: the skipped tests say where they looked.
+
+Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Five such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts` and `portfolioFixture.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 496 and 192, so 688.
 
 Typecheck, lint and the web build also pass. There are no browser or end-to-end tests: the web tests run as plain Node, over pure modules and static scans of the source.
 
@@ -49,11 +51,11 @@ The 2D copy is found at `../portfolio/src/demo/p3`, or at `PORTFOLIO_2D_DEMO_DIR
 PORTFOLIO_DEMO_DIR=../sameer-3d-portfolio/src/demo/p3 npm test
 ```
 
-If no copy holds `run.ts`, the 11 parity tests are reported as **skipped**, not failed, and the message lists every place searched. That is what happens in CI, where the portfolio is not checked out. The lookup logic itself (`portfolio-fixture.test.ts`, 9 tests) always runs.
+If no copy holds `run.ts`, the 11 parity tests are reported as **skipped**, not failed, and the message lists every place searched. That is what happens in a standalone clone. CI checks both portfolio repositories out, so there the parity tests run and nothing is skipped. The lookup logic itself (`portfolio-fixture.test.ts`, 9 tests) always runs.
 
 ## What the tests protect
 
-Thirty-eight test files, in seven groups.
+Thirty-nine test files, in seven groups.
 
 | Group | Files | Test cases |
 |---|---|---|
@@ -62,9 +64,9 @@ Thirty-eight test files, in seven groups.
 | [Data integrity](#data-integrity) | 4 | 53 |
 | [API and auth](#api-and-auth) | 4 | 74 |
 | [LLM provider behaviour](#llm-provider-behaviour) | 2 | 55 |
-| [Demo and UI](#demo-and-ui) | 16 (6 server, 10 web) | 318 |
+| [Demo and UI](#demo-and-ui) | 17 (6 server, 11 web) | 322 |
 | [Repo hygiene](#repo-hygiene) | 1 | 13 |
-| **Total** | **38** | **684** |
+| **Total** | **39** | **688** |
 
 ### Trust and safety
 
@@ -126,6 +128,7 @@ These protect the two guarantees the product is built on: nothing protected reac
 | `portfolio-fixture.test.ts` | 9 | The lookup for the parity runner. | A misconfigured override fails loudly, not silently. |
 | `demo-landing`, `demo-entry`, `demo-session`, `demo-decision`, `demo-evidence`, `demo-insights`, `demo-pipeline` (web) | 150 | The demo's first page, entry, session state, decision form, evidence highlighter, pipeline and timeline builders: wording, routes, accessibility conventions, hostile input, and that no wording claims a live model. | The demo says only what is true of it. |
 | `recruiter-ui`, `deployment-mode`, `hook-order` (web) | 38 | Every verdict, outcome and tier has recruiter wording. No screen computes a score or re-sorts the ranking. The mode is read from the server and never guessed. No component calls a hook after an early return. | The browser shows what the server decided and nothing else. |
+| `decision-wording` (web) | 4 | A recruiter's three outcomes are labelled Shortlist, Reject and Hold. The word "advance" appears nowhere in `web/src`, and "review" is never listed as a decision. | The demo's prose once kept saying "advance, review or reject" after the buttons were renamed, so the demo contradicted the app it describes. |
 
 ### Repo hygiene
 

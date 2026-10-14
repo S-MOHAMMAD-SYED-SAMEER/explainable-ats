@@ -100,6 +100,6 @@ test('the mock provider is what the default configuration builds', () => {
 test('the configured model tier is Sonnet 5 and does not drift', () => {
   // Sonnet 5 is the intended tier for ranking, and API spend is real money. The
   // default is asserted so a change to it has to be deliberate.
-  assert.equal(loadConfig({}).config.anthropicModel, 'claude-sonnet-5');
+  assert.equal(loadConfig({}).config.anthropicModel, 'claude-sonnet-5-5');
   assert.equal(loadConfig({}).config.llmProvider, 'mock', 'the default provider should cost nothing to run');
 });
