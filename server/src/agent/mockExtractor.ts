@@ -1,5 +1,6 @@
 import { parseExtractionPrompt, type PromptRequirement } from './extractionPrompt.ts';
-import { significantTerms } from './matchRules.ts';
+import { significantTerms, wordsOf } from './matchRules.ts';
+import { MIN_QUOTE_CHARS } from './verifyEvidence.ts';
 import { MASK_CHAR } from './redact.ts';
 import type { LlmRequest } from '../adapters/llm/types.ts';
 import type { MockLlmProvider } from '../adapters/llm/mock.ts';
@@ -79,11 +80,16 @@ export function createDeterministicExtractor(options: MockExtractorOptions = {})
       const scored: Array<{ line: Line; hits: number }> = [];
       for (const line of lines) {
         const trimmed = line.text.trim();
-        if (trimmed.length < 8) continue;
+        // Shorter than the verifier's minimum would be refused, and this stand-in
+        // behaves like a well-behaved model: it never offers a quote the verifier
+        // has to turn away.
+        if (trimmed.length < MIN_QUOTE_CHARS) continue;
         if (trimmed.includes(MASK_CHAR)) continue;
 
-        const haystack = trimmed.toLowerCase();
-        const hits = keywords.filter((keyword) => haystack.includes(keyword)).length;
+        // Whole words, as the matcher counts them, so the line picked is the line
+        // that will actually be credited.
+        const words = wordsOf(trimmed);
+        const hits = keywords.filter((keyword) => words.has(keyword)).length;
         if (hits > 0) scored.push({ line, hits });
       }
 

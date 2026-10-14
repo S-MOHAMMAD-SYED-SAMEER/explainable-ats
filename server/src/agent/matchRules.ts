@@ -18,6 +18,21 @@ import type { ConfidenceLevel, JobRequirement, MatchVerdict } from '../domain/at
 // rationale states exactly what was counted, so a recruiter can see when the
 // rule has misjudged and overrule it.
 //
+// KNOWN LIMITATIONS OF TERM COVERAGE (each is pinned by a test, so changing one
+// is a decision rather than an accident)
+//
+//   * A term counts only as a WHOLE WORD. "Java" is not found in "JavaScript" and
+//     "run" is not found in "running". The price is the other direction: "service"
+//     does not satisfy "services", and "Postgres" does not satisfy "PostgreSQL".
+//     No stemming and no synonyms are applied.
+//   * NEGATION IS NOT UNDERSTOOD. "Never shipped a Node.js service" covers exactly
+//     the terms "Shipped a Node.js service" covers, and gets the same verdict. The
+//     rules count which words appear, not what the sentence claims.
+//   * Words can be stuffed. A passage that merely lists every term of a criterion
+//     covers it. The verifier makes sure the passage is really in the CV and long
+//     enough to be a phrase; it cannot tell a skills list from an achievement.
+//
+
 // NOTHING UNVERIFIED IS EVER COUNTED
 //
 // `decideMatch` filters on `verified` itself rather than trusting its caller.
@@ -44,13 +59,36 @@ const STOPWORDS = new Set([
  * stand-in supply it.
  */
 export function significantTerms(text: string): string[] {
-  const words = text
+  const words = tokenize(text).filter((word) => word.length >= 3 && !STOPWORDS.has(word));
+
+  return [...new Set(words)].sort();
+}
+
+/**
+ * The words of a text, in the one sense used everywhere in matching.
+ *
+ * Lower case, split on anything that is not a letter, digit, `+`, `#` or `.`, with
+ * leading and trailing dots removed. So `Node.js` is one word, `C++` is one word,
+ * and the full stop ending a sentence is not part of the word before it.
+ */
+function tokenize(text: string): string[] {
+  return text
     .toLowerCase()
     .split(/[^a-z0-9+#.]+/)
     .map((word) => word.replace(/^\.+|\.+$/g, ''))
-    .filter((word) => word.length >= 3 && !STOPWORDS.has(word));
+    .filter((word) => word.length > 0);
+}
 
-  return [...new Set(words)].sort();
+/**
+ * The set of whole words in a text.
+ *
+ * A term is "in" a passage only if it is one of these words. Substring matching
+ * would find "java" in "javascript" and "run" in "running", which is a different
+ * claim from the one the criterion makes; the stand-in extractor shares this so
+ * the lines it picks are the lines the matcher will count.
+ */
+export function wordsOf(text: string): Set<string> {
+  return new Set(tokenize(text));
 }
 
 /** What a requirement asks for: its criterion, plus its label. */
@@ -152,9 +190,9 @@ export function decideMatch(
     };
   }
 
-  const haystack = usable.map((item) => item.quote.toLowerCase()).join('\n');
-  const matched = terms.filter((term) => haystack.includes(term));
-  const missing = terms.filter((term) => !haystack.includes(term));
+  const words = wordsOf(usable.map((item) => item.quote).join('\n'));
+  const matched = terms.filter((term) => words.has(term));
+  const missing = terms.filter((term) => !words.has(term));
 
   // Integer comparison: matched/total >= threshold/100, without the division.
   const covered = matched.length * 100;

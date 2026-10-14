@@ -21,6 +21,18 @@ import type { RawFinding } from './extractionSchema.ts';
 // error, and searching for a quote that is not there cannot invent one — so
 // this is strict where it matters and forgiving where it does not.
 
+/**
+ * The shortest passage that counts as evidence, in characters, after trimming and
+ * collapsing whitespace.
+ *
+ * A one- or two-word "quote" ("Node.js", "Docker, Kubernetes") is a keyword, not a
+ * statement of what someone did, and it is exactly what a keyword-stuffed CV offers.
+ * A passage this short is refused even if it really is in the CV: it is genuine, it is
+ * just not enough to stand as a quotation. A short phrase such as "Led a Node.js
+ * team" (18) passes.
+ */
+export const MIN_QUOTE_CHARS = 15;
+
 export type VerifiedEvidence = {
   finding: RawFinding;
   /** Where the quote really is in `content_text`. */
@@ -32,7 +44,7 @@ export type VerifiedEvidence = {
 
 export type EvidenceRejection = {
   finding: RawFinding;
-  reason: 'not_found_in_resume' | 'quotes_redacted_text';
+  reason: 'not_found_in_resume' | 'quotes_redacted_text' | 'quote_too_short';
   detail: string;
 };
 
@@ -64,6 +76,18 @@ export function verifyEvidence(findings: readonly RawFinding[], options: VerifyO
 
   for (const finding of findings) {
     const quote = finding.quote;
+
+    // 0. Is it long enough to be a quotation at all? Checked first: it does not
+    //    matter where a two-word fragment sits.
+    const length = quote.trim().replace(/\s+/g, ' ').length;
+    if (length < MIN_QUOTE_CHARS) {
+      rejected.push({
+        finding,
+        reason: 'quote_too_short',
+        detail: `A passage of ${length} character${length === 1 ? '' : 's'} is too short to count as evidence; at least ${MIN_QUOTE_CHARS} are needed.`,
+      });
+      continue;
+    }
 
     // 1. Does it sit exactly where the model said?
     const atHint = contentText.slice(finding.charStart, finding.charEnd);
