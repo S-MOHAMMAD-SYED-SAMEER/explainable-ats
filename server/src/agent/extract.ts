@@ -2,7 +2,6 @@ import { EXTRACTION_PROMPT_VERSION, EXTRACTION_TOOL, validateExtraction } from '
 import { verifyEvidence } from './verifyEvidence.ts';
 import { buildSystemPrompt, buildUserMessage } from './extractionPrompt.ts';
 import { AppError } from '../lib/errors.ts';
-import { systemClock, type Clock } from '../lib/clock.ts';
 import type { LlmProvider } from '../adapters/llm/types.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -27,7 +26,6 @@ export type ExtractDeps = {
   repos: Repositories;
   provider: LlmProvider;
   logger?: Logger;
-  clock?: Clock;
 };
 
 export type ExtractionOutcome = {
@@ -51,7 +49,6 @@ const MAX_TOKENS = 2048;
  */
 export async function extractEvidence(deps: ExtractDeps, evaluationId: string): Promise<ExtractionOutcome> {
   const { repos, provider, logger } = deps;
-  const clock = deps.clock ?? systemClock;
 
   const evaluation = await repos.evaluations.getById(evaluationId);
   if (!evaluation) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
@@ -77,7 +74,6 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
   // --- the model call ------------------------------------------------------
   //
   // `redactedText` and nothing else. The original never enters this scope.
-  const started = clock.nowIso();
   let output: Record<string, unknown>;
   let model: string;
   let latencyMs: number;
@@ -117,7 +113,6 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
     logger?.error('Extraction failed', { evaluationId, internal: message });
     throw new AppError('PROVIDER_UNAVAILABLE', 'The extraction provider could not be reached.');
   }
-  void started;
 
   // --- validate the shape --------------------------------------------------
 

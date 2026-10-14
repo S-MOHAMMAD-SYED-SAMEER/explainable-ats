@@ -276,12 +276,6 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
   },
 ];
 
-/** Everything the seeder writes, as one value a test can read. */
-export const DEMO_DATASET = {
-  job: DEMO_JOB,
-  candidates: DEMO_CANDIDATES,
-} as const;
-
 /** Ingestion input for one demo candidate. */
 export function ingestInputFor(candidate: DemoCandidate): IngestResumeInput {
   return {

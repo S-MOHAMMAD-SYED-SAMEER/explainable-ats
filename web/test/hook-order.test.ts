@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 // browser. A `useState` sat below an early return, so the first render
 // registered five hooks and the second registered six: React error #310,
 // uncaught, no error boundary, blank white page. It survived 800 passing tests
-// because nothing in a `node:test` suite renders a component — NFR-9 rules out
+// because nothing in a `node:test` suite renders a component — the project avoids
 // jsdom, Playwright and Cypress, and that is not going to change here.
 //
 // So the guard is a source scan. It cannot prove a component renders; it can
@@ -141,7 +141,7 @@ test('the scan actually reads the components it claims to', () => {
     'screens/DemoEntry.tsx',
     'screens/Overview.tsx',
     'components/AppShell.tsx',
-    // The recruiter workflow (P3-F). Named explicitly so a renamed or deleted
+    // The recruiter workflow. Named explicitly so a renamed or deleted
     // screen drops out of the assertion rather than out of the scan.
     'screens/Jobs.tsx',
     'screens/JobDetail.tsx',

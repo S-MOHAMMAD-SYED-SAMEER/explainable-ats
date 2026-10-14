@@ -205,7 +205,7 @@ test('a fabrication that survived into the table cannot reach the score', async 
   const ctx = await createTestContext();
   t.after(() => ctx.close());
 
-  // This is the shape P3-C leaves behind: the rejected quote is deliberately
+  // This is the shape evidence verification leaves behind: the rejected quote is deliberately
   // stored so it stays visible in the audit view. Scoring it would be the single
   // most damaging bug this codebase could contain.
   const scenario = await seedScenario(ctx.repos, { deterministicExtractor: false });
@@ -541,7 +541,7 @@ test('there is no way to update or delete an audit event', async () => {
 
 // --- ranking stays derived ---------------------------------------------------
 
-test('no ranking table exists, and P3-D added no table at all', async (t) => {
+test('no ranking table exists, and matching added no table at all', async (t) => {
   const ctx = await createTestContext();
   t.after(() => ctx.close());
 

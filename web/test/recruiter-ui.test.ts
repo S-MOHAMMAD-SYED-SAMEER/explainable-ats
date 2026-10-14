@@ -16,9 +16,9 @@ import {
 } from '../src/copy.ts';
 import { DEFAULT_ROUTE, DEMO_ROUTES, RECRUITER_ROUTES, ROUTES, parseRoute, routeToHash } from '../src/router.ts';
 
-// The recruiter workflow's client-side guarantees (P3-F).
+// The recruiter workflow's client-side guarantees.
 //
-// NFR-9 rules out jsdom, Playwright and Cypress, so nothing here renders a
+// The project avoids jsdom, Playwright and Cypress, so nothing here renders a
 // component. What can still be proved without a browser is the part that
 // actually goes wrong: that the words a recruiter reads exist for every value
 // the server can send, and that no screen quietly recomputes something the

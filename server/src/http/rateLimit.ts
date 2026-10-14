@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../lib/errors.ts';
 import { systemClock, type Clock } from '../lib/clock.ts';
 
-// Rate limiting (M5-C, audit F-02, spec §11).
+// Rate limiting.
 //
 // IN-MEMORY AND SINGLE-PROCESS. THIS IS NOT DISTRIBUTED RATE LIMITING.
 //
@@ -14,7 +14,7 @@ import { systemClock, type Clock } from '../lib/clock.ts';
 // abuse when it is protected only from accidents and casual scripts.
 //
 // It is the right shape for this application today — one process, one operator,
-// no Redis — and the spec asked for exactly this. When it needs to be real,
+// no Redis — which is exactly what is wanted here. When it needs to be real,
 // the interface below is what a shared store would implement.
 //
 // WHY A FIXED WINDOW AND NOT A TOKEN BUCKET
@@ -107,7 +107,7 @@ export class FixedWindowLimiter {
 }
 
 /**
- * The classes of traffic, per spec §11 plus the demo's session lifecycle.
+ * The classes of traffic, plus the demo's session lifecycle.
  *
  * There is no class for endpoints that call a model, because there is no such
  * endpoint yet: extraction is a deterministic mock. When one exists it needs

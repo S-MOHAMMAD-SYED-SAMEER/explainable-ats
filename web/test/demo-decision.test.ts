@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { api, setApiScope } from '../src/api/client.ts';
 import { OUTCOMES, MIN_REASON_CHARS, outcomeWording } from '../src/copy.ts';
 
-// A visitor's decision in the public demo (Phase 3C.2), from the browser's side.
+// A visitor's decision in the public demo, from the browser's side.
 //
-// NFR-9 rules out jsdom and Playwright, so nothing here renders a component.
+// The project avoids jsdom and Playwright, so nothing here renders a component.
 // What can be proved without a browser is what matters: the form is drawn for a
 // visitor's own session and for nobody else, the recruiter's screen is exactly
 // what it was, the demo says honestly what it is, and the decision goes where

@@ -60,31 +60,3 @@ export function buildUpdate(
     params: [...entries.map(([, value]) => value), id],
   };
 }
-
-/**
- * Like `buildUpdate`, but only touches `updated_at` when something else
- * actually changed.
- *
- * Without this, an update with an empty patch still writes a new `updated_at`,
- * and the record claims to have been modified when nothing was. That matters
- * because `updated_at` is what "recently changed" sorting and the Deals board
- * order read — a no-op write would quietly reorder the pipeline view.
- */
-export function buildTouchUpdate(
-  table: string,
-  id: string,
-  values: Record<string, SqlParam | undefined>,
-  now: string,
-): { sql: string; params: SqlParam[] } | null {
-  const changed = Object.values(values).some((value) => value !== undefined);
-  if (!changed) return null;
-  return buildUpdate(table, id, { ...values, updated_at: now });
-}
-
-/** Guard used by list queries that accept a caller-supplied sort column. */
-export function safeColumn(name: string, allowed: readonly string[]): string {
-  if (!allowed.includes(name)) {
-    throw new Error(`Unsupported sort column: ${JSON.stringify(name)}`);
-  }
-  return assertIdentifier(name);
-}

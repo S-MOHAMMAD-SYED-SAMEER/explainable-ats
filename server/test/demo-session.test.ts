@@ -16,7 +16,7 @@ import { DEMO_SESSION_COOKIE } from '../src/routes/demoSession.ts';
 import { createFixedClock } from '../src/lib/clock.ts';
 import { MIGRATIONS_DIR } from './helpers.ts';
 
-// The visitor-scoped public demo (Phase 3C.1).
+// The visitor-scoped public demo.
 //
 // WHAT THIS FILE IS DEFENDING
 //

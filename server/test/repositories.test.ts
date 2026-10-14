@@ -6,13 +6,13 @@ import type { Repositories } from '../src/db/repositories/index.ts';
 
 // The domain repositories.
 //
-// Nothing here extracts, matches, scores or ranks — that is P3-C onwards. What
+// Nothing here extracts, matches, scores or ranks — that is for the later stages. What
 // is being pinned is that the storage layer cannot be used to build a state the
 // domain forbids: a requirement judged twice, a score with no evidence behind
 // it, two current evaluations for one pair, or a protected attribute stored
 // where the scorer could reach it.
 
-/** A job with two must-haves and one nice-to-have — the shape P3-D will score. */
+/** A job with two must-haves and one nice-to-have — the shape the scorer will score. */
 async function seedJob(repos: Repositories) {
   const job = await repos.jobs.create({ title: 'Senior Backend Engineer', seniority: 'senior' });
 
@@ -300,7 +300,7 @@ test('a score outside the basis-point range is refused', async () => {
 // ================================================================= evidence
 
 test('evidence is unverified until something verifies it', async () => {
-  // P3-C sets this only after finding the quote verbatim at those offsets.
+  // Verification sets this only after finding the quote verbatim at those offsets.
   // Storing it unverified rather than discarding it means a fabrication is
   // visible in the audit trail — but nothing downstream may score or show it.
   const { repos, close } = await createTestContext();

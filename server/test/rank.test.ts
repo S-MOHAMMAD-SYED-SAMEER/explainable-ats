@@ -509,7 +509,7 @@ test('ranking twice returns the identical list', async (t) => {
 
 // --- ranking stays derived ---------------------------------------------------
 
-test('P3-E added no table, and nothing stores a rank', async (t) => {
+test('ranking added no table, and nothing stores a rank', async (t) => {
   const ctx = await createTestContext();
   t.after(() => ctx.close());
 
@@ -535,7 +535,7 @@ test('P3-E added no table, and nothing stores a rank', async (t) => {
   ]);
 
   const files = fs.readdirSync(MIGRATIONS_DIR).filter((file) => file.endsWith('.sql'));
-  assert.equal(files.length, 2, 'P3-E must not have added a migration');
+  assert.equal(files.length, 2, 'ranking must not have added a migration');
   for (const file of files) {
     const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8').replace(/--[^\n]*/g, '');
     assert.ok(!/CREATE TABLE\s+\w*rank/i.test(sql), `${file} creates a ranking table`);

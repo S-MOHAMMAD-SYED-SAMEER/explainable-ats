@@ -24,7 +24,7 @@ import {
   type Reply,
 } from './demoHarness.ts';
 
-// A public visitor's decision on a demo candidate (Phase 3C.2).
+// A public visitor's decision on a demo candidate.
 //
 // WHAT THIS FILE IS DEFENDING
 //

@@ -8,9 +8,9 @@ import { demoSessionFromResponse, isDemoSessionPath, resolveApiPath } from '../s
 import { api, setApiScope, setDemoSessionLostHandler, setUnauthorizedHandler } from '../src/api/client.ts';
 import { openingTags } from './jsxScan.ts';
 
-// The public demo's entry and session (Phase 3C.1), from the browser's side.
+// The public demo's entry and session, from the browser's side.
 //
-// NFR-9 rules out jsdom and Playwright, so nothing here renders a component. What
+// The project avoids jsdom and Playwright, so nothing here renders a component. What
 // can be proved without a browser is what matters most here: the pure functions
 // that decide where a call goes and whether the demo is "on", the real client
 // against a stubbed `fetch`, and — by source scan — that the demo files cannot

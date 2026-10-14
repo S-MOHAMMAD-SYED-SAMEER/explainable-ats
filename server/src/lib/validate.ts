@@ -68,23 +68,6 @@ export function requireString(
   return value;
 }
 
-export function optionalString(
-  value: unknown,
-  field: string,
-  problems: ProblemCollector,
-  options: { maxLength?: number } = {},
-): string | null {
-  if (value === undefined || value === null || value === '') return null;
-  if (typeof value !== 'string') {
-    problems.add(`"${field}" must be a string when present (received ${typeOf(value)})`);
-    return null;
-  }
-  if (options.maxLength !== undefined && value.length > options.maxLength) {
-    problems.add(`"${field}" must be at most ${options.maxLength} characters (received ${value.length})`);
-  }
-  return value;
-}
-
 export function requireOneOf<T extends string>(
   value: unknown,
   field: string,
@@ -96,78 +79,4 @@ export function requireOneOf<T extends string>(
     return allowed[0] as T;
   }
   return value as T;
-}
-
-export function optionalOneOf<T extends string>(
-  value: unknown,
-  field: string,
-  allowed: readonly T[],
-  problems: ProblemCollector,
-): T | null {
-  if (value === undefined || value === null || value === '') return null;
-  return requireOneOf(value, field, allowed, problems);
-}
-
-// Deliberately permissive: one @, a dot in the domain, no whitespace. Stricter
-// email regexes reject addresses that genuinely exist and genuinely send mail,
-// and this validator's job is to catch "not an address at all", not to
-// adjudicate RFC 5322.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function requireEmail(value: unknown, field: string, problems: ProblemCollector): string {
-  const raw = requireString(value, field, problems);
-  if (raw !== '' && !EMAIL_RE.test(raw.trim())) {
-    problems.add(`"${field}" must be a valid email address`);
-    return '';
-  }
-  return raw.trim().toLowerCase();
-}
-
-export function requireIsoTimestamp(value: unknown, field: string, problems: ProblemCollector): string {
-  const raw = requireString(value, field, problems);
-  if (raw === '') return '';
-  const parsed = Date.parse(raw);
-  if (Number.isNaN(parsed)) {
-    problems.add(`"${field}" must be an ISO-8601 timestamp`);
-    return '';
-  }
-  return new Date(parsed).toISOString();
-}
-
-export function requireNumberInRange(
-  value: unknown,
-  field: string,
-  min: number,
-  max: number,
-  problems: ProblemCollector,
-): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    problems.add(`"${field}" must be a finite number (received ${typeOf(value)})`);
-    return min;
-  }
-  if (value < min || value > max) {
-    problems.add(`"${field}" must be between ${min} and ${max} (received ${value})`);
-    return min;
-  }
-  return value;
-}
-
-export function optionalInteger(
-  value: unknown,
-  field: string,
-  problems: ProblemCollector,
-  options: { min?: number; max?: number } = {},
-): number | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== 'number' || !Number.isInteger(value)) {
-    problems.add(`"${field}" must be an integer when present (received ${typeOf(value)})`);
-    return null;
-  }
-  if (options.min !== undefined && value < options.min) {
-    problems.add(`"${field}" must be at least ${options.min}`);
-  }
-  if (options.max !== undefined && value > options.max) {
-    problems.add(`"${field}" must be at most ${options.max}`);
-  }
-  return value;
 }

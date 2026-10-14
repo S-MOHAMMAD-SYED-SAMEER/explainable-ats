@@ -4,7 +4,7 @@ import type { AuditEntry } from '../src/api/types.ts';
 import { PIPELINE_STAGES, STATUS_LABEL, buildPipeline, type PipelineInput, type PipelineStage } from '../src/demo/pipeline.ts';
 import { buildTimeline, sortTrail } from '../src/demo/timeline.ts';
 
-// The pipeline and the audit timeline (Phase 3C.4), built from audit events.
+// The pipeline and the audit timeline, built from audit events.
 //
 // These tests feed the builders events shaped exactly like the ones the pipeline
 // writes — the field names and payloads are taken from `agent/ingest.ts`,

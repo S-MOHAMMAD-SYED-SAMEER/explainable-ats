@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, setCsrfFailureHandler, setUnauthorizedHandler } from '../api/client.ts';
 import { sessionFromResponse, type SessionState } from './session.ts';
 
-// The session gate (M6-A).
+// The session gate.
 //
 // One hook owns the answer to "is anyone signed in?", and it gets that answer
 // from the server every time — at startup, after a sign-in, after a sign-out,

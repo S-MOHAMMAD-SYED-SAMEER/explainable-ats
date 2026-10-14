@@ -6,7 +6,7 @@ import type { LlmTool } from '../adapters/llm/types.ts';
 //
 // A finding is a quote and where it came from. There is no verdict field and no
 // number, because a verdict is a judgement about whether evidence satisfies a
-// criterion — that is P3-D's stage, working from evidence that has already been
+// criterion — that is the matching stage's job, working from evidence that has already been
 // verified. Letting the model return a score here would make the number
 // unexplainable and unreproducible, which is the exact failure this product
 // exists to avoid.
