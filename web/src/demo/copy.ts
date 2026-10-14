@@ -110,7 +110,7 @@ export const PROJECT_SECTIONS: readonly ProjectSection[] = [
     id: 'decision',
     heading: 'Recruiter decision and audit trail',
     body: [
-      'A person records advance, review or reject, with a written reason, once per assessment. Every stage writes to an append-only audit trail: who acted (the system, a model or a person), what happened, and the data behind it.',
+      'A person records shortlist, reject or hold, with a written reason, once per assessment. Every stage writes to an append-only audit trail: who acted (the system, a model or a person), what happened, and the data behind it.',
       'In this demo your decision is saved only to your own private session.',
     ],
   },
@@ -210,7 +210,7 @@ export const WORKFLOW_STAGES: ReadonlyArray<{ id: string; label: string; summary
     id: 'decide',
     label: 'Recruiter decision',
     summary:
-      'A person records advance, review or reject with a written reason. In this demo it is saved only to your private session.',
+      'A person records shortlist, reject or hold with a written reason. In this demo it is saved only to your private session.',
   },
 ];
 
@@ -220,7 +220,7 @@ export const GUIDE_STEPS: ReadonlyArray<{ label: string; detail: string }> = [
   { label: 'Inspect the evidence', detail: 'Read the passages quoted from their CV under each requirement.' },
   { label: 'Inspect the match breakdown', detail: 'See how each requirement was judged, and why.' },
   { label: 'Review the score', detail: 'Open “How this score was reached” to see the parts add up.' },
-  { label: 'Make a demo decision', detail: 'Record advance, review or reject, with a reason.' },
+  { label: 'Make a demo decision', detail: 'Record shortlist, reject or hold, with a reason.' },
 ];
 
 /** What the two header controls do, said in full wherever they are offered. */
