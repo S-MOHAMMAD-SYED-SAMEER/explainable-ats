@@ -48,7 +48,7 @@ test('a built prompt parses back into exactly what went in', () => {
   ]);
 });
 
-test('a resume containing the section marker as ordinary text does not confuse the parser', () => {
+test('a resume containing the section marker as ordinary text is neutralised and does not confuse the parser', () => {
   // Precondition: the resume really does carry the marker, so this is not
   // passing because there was nothing to trip over.
   const awkward = `SUMMARY\nWrote a tool that printed ${RESUME_MARKER} as a banner.\nMentored junior engineers.`;
@@ -56,7 +56,10 @@ test('a resume containing the section marker as ordinary text does not confuse t
 
   const parsed = parseExtractionPrompt(buildUserMessage(REQUIREMENTS, awkward));
 
-  assert.equal(parsed.resumeText, awkward);
+  // The marker is turned into dashes, so the model never sees a second one, and the
+  // text keeps its length so every offset into it stays valid.
+  assert.equal(parsed.resumeText, awkward.replace(RESUME_MARKER, '--- RESUME ---'));
+  assert.equal(parsed.resumeText.length, awkward.length);
   assert.equal(parsed.requirements.length, 2);
 });
 
