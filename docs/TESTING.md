@@ -8,13 +8,13 @@ Run from a clean checkout, with the two portfolio repositories checked out besid
 
 | Suite | `npm test` reports | Test cases | Passed | Failed | Skipped |
 |---|---|---|---|---|---|
-| Server (`server/test/`) | 500 | 496 | 500 | 0 | 0 |
-| Web (`web/test/`) | 193 | 192 | 193 | 0 | 0 |
-| **Total** | **693** | **688** | **693** | **0** | **0** |
+| Server (`server/test/`) | 503 | 499 | 503 | 0 | 0 |
+| Web (`web/test/`) | 194 | 193 | 194 | 0 | 0 |
+| **Total** | **697** | **692** | **697** | **0** | **0** |
 
-In a standalone clone, with no portfolio repository beside it, the same commands report 693 with **681 passed and 12 skipped** (11 server parity tests and 1 web test that read the portfolio's code). Nothing fails: the skipped tests say where they looked.
+In a standalone clone, with no portfolio repository beside it, the same commands report 697 with **685 passed and 12 skipped** (11 server parity tests and 1 web test that read the portfolio's code). Nothing fails: the skipped tests say where they looked.
 
-Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Five such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts` and `portfolioFixture.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 496 and 192, so 688.
+Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Five such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts` and `portfolioFixture.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 499 and 193, so 692.
 
 Typecheck, lint and the web build also pass. There are no browser or end-to-end tests: the web tests run as plain Node, over pure modules and static scans of the source.
 
@@ -64,9 +64,9 @@ Thirty-nine test files, in seven groups.
 | [Data integrity](#data-integrity) | 4 | 53 |
 | [API and auth](#api-and-auth) | 4 | 74 |
 | [LLM provider behaviour](#llm-provider-behaviour) | 2 | 55 |
-| [Demo and UI](#demo-and-ui) | 17 (6 server, 11 web) | 322 |
-| [Repo hygiene](#repo-hygiene) | 1 | 13 |
-| **Total** | **39** | **688** |
+| [Demo and UI](#demo-and-ui) | 17 (6 server, 11 web) | 324 |
+| [Repo hygiene](#repo-hygiene) | 1 | 15 |
+| **Total** | **39** | **692** |
 
 ### Trust and safety
 
@@ -125,16 +125,16 @@ These protect the two guarantees the product is built on: nothing protected reac
 | `demo-evidence.test.ts` (server) | 21 | The resume endpoint returns only the redacted text. Hostile markup is returned as inert text. Every verified quote is highlighted exactly. Timeline arithmetic adds up to the real score. | What a visitor reads is the real pipeline's output. |
 | `demo-dataset.test.ts` | 17 | The synthetic dataset really produces the outcomes it declares: every candidate lands in the declared tier, with the declared verdicts. Seeding twice gives byte-identical rankings. | The demo's story is derived, not asserted. |
 | `demo-parity.test.ts` | 11 | Both portfolio browser demos (3D and 2D) give the same ranking, verdicts, contributions and audit trail as the real pipeline. Needs a sibling checkout. | The portfolio demos can't drift from the system they describe. |
-| `portfolio-fixture.test.ts` | 9 | The lookup for the parity runner. | A misconfigured override fails loudly, not silently. |
+| `portfolio-fixture.test.ts` | 10 | The lookup for the parity runner. | A misconfigured override fails loudly, not silently. |
 | `demo-landing`, `demo-entry`, `demo-session`, `demo-decision`, `demo-evidence`, `demo-insights`, `demo-pipeline` (web) | 150 | The demo's first page, entry, session state, decision form, evidence highlighter, pipeline and timeline builders: wording, routes, accessibility conventions, hostile input, and that no wording claims a live model. | The demo says only what is true of it. |
-| `recruiter-ui`, `deployment-mode`, `hook-order` (web) | 38 | Every verdict, outcome and tier has recruiter wording. No screen computes a score or re-sorts the ranking. The mode is read from the server and never guessed. No component calls a hook after an early return. | The browser shows what the server decided and nothing else. |
+| `recruiter-ui`, `deployment-mode`, `hook-order` (web) | 39 | Every verdict, outcome and tier has recruiter wording. No screen computes a score or re-sorts the ranking. The mode is read from the server and never guessed. No component calls a hook after an early return. | The browser shows what the server decided and nothing else. |
 | `decision-wording` (web) | 4 | A recruiter's three outcomes are labelled Shortlist, Reject and Hold. The word "advance" appears nowhere in `web/src`, and "review" is never listed as a decision. | The demo's prose once kept saying "advance, review or reject" after the buttons were renamed, so the demo contradicted the app it describes. |
 
 ### Repo hygiene
 
 | File | Tests | What it proves | Why it matters |
 |---|---|---|---|
-| `repo-hygiene.test.ts` | 13 | Every file the README names exists. Every `npm run` command in it is a real script. It doesn't repeat claims that were once true. It states the things that are true now. The CI workflow runs real commands and needs no secrets. No source names another project's cookies or routes. | Documentation fails when it describes something that isn't there. |
+| `repo-hygiene.test.ts` | 15 | Every file the README names exists. Every `npm run` command in it is a real script. It doesn't repeat claims that were once true. It states the things that are true now. The CI workflow runs real commands, audits dependencies, checks the portfolio repositories out before testing, runs on every push and pull request, and needs no secrets. No source names another project's cookies or routes, and no source or test file carries a milestone label. | Documentation fails when it describes something that isn't there. |
 
 ## Eight tests explained
 
