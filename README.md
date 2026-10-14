@@ -138,7 +138,7 @@ The weights add up to 7. Here are three of the five candidates, as the running s
 | Requirement | Quote found in the CV | Verdict | Points earned |
 |---|---|---|---|
 | Node.js | "Designed and shipped production Node.js services behind a payments API." | `met` (4 of 4 terms) | 3 × 10000 = 30000 |
-| PostgreSQL | "Running PostgreSQL at scale for a multi-tenant billing system." | `met` (3 of 3 terms) | 2 × 10000 = 20000 |
+| PostgreSQL | "Run PostgreSQL at scale for a multi-tenant billing system." | `met` (3 of 3 terms) | 2 × 10000 = 20000 |
 | Mentoring | none | `unclear` | 2 × 0 = 0 |
 
 `(30000 + 20000 + 0) / 7 = 7142.857…`, and the floor is **7142** (71%). The per-requirement shares are 30000/7 = 4285, 20000/7 = 2857 and 0, which add up to 7142 with nothing left over.
@@ -156,6 +156,8 @@ The resulting order:
 | 3 | Ines | 57% | Worth a look | PostgreSQL is `unclear`, so it is unresolved, not failed |
 | 4 | Marcus | 71% | Missing an essential | The PostgreSQL evidence fell short |
 | — | Toby | — | Not assessed yet | Received but not yet assessed |
+
+Terms match as whole words, so the invented CVs say "Run PostgreSQL at scale" to cover the criterion's word "run". An earlier version said "Running", which only counted because matching was by substring; under whole-word matching that wording leaves PostgreSQL `partial` for Rowan and Devi, which moves both from qualified to gated. The CV text was changed, not the rule, and the case is a fair picture of what whole-word matching costs: a CV that says the same thing in another word form is read as saying less.
 
 Ines ranks above Marcus although her score is lower, because `needs_review` sits above `gated`. The tiers and their order are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#how-ranking-works).
 
@@ -241,7 +243,9 @@ There are no browser or end-to-end tests, and no evaluation set that measures ex
 - **There is no evaluation set.** Nothing measures how well extraction finds the right passages in real CVs. I would build a set of redacted CVs with hand-marked passages per requirement and measure recall first, because a missed passage becomes `unclear` rather than `not_met`.
 - **The demo's extractor is a keyword matcher.** Extraction defaults to the deterministic mock everywhere unless `LLM_PROVIDER=anthropic` is set. It quotes whole lines containing the most requirement terms. That exercises the pipeline but says nothing about how a real model would do.
 - **Anthropic provider: smoke-tested, not evaluated.** `LLM_PROVIDER=anthropic` builds an adapter that offers (or, where the model allows it, forces) a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a loopback stub server, and the opt-in script `server/scripts/live-smoke-anthropic.ts` has made one real request each to `claude-sonnet-5-5` and `claude-haiku-4-5-20251001` on 2026-10-14: both returned a well-formed tool call whose quotes were all verified. That run found that Sonnet 5.5 rejects a forced tool call and rejects any `temperature`, so tool choice and temperature are settings. Extraction quality has not been evaluated. The running app calls the configured provider only when a signed-in recruiter starts an assessment.
-- **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes. Paraphrase is missed, and word forms count as different terms ("mentored" and "mentoring").
+- **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes, as whole words: "Java" is not found in "JavaScript" and "run" is not found in "running". The other side of that is that word forms count as different terms ("mentored" and "mentoring", "service" and "services", "Postgres" and "PostgreSQL"), and paraphrase is missed. Each of these is pinned by a test.
+- **Negation is not understood.** "Never shipped a Node.js service" covers the same terms as "Shipped a Node.js service" and gets the same verdict. The rules count which words appear, not what the sentence says. A test pins the current behaviour so that changing it is a decision.
+- **Words can be stuffed.** A quote that lists every term of a requirement covers it. Verification makes sure the passage is really in the CV and at least 15 characters long (a bare "Node.js" is refused), but it cannot tell a skills list from an achievement.
 - **Synthetic data only.** Everything runs on five invented candidates and one invented role. Nothing has been measured on real resumes.
 - **Redaction is pattern-based.** It catches emails, phones, labelled fields and supplied names. Unlabelled personal details can pass through.
 - **Plain text only.** There is no upload endpoint and no PDF or DOCX parsing. Requirements are typed input; nothing is inferred from a job advert.

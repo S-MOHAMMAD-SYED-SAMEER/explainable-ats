@@ -261,7 +261,7 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
       actor: 'system',
       outcome: 'blocked',
       summary:
-        `${rejected.length} quoted passage(s) could not be found in the resume and were rejected. ` +
+        `${rejected.length} quoted passage(s) were rejected: not found in the resume, over a masked detail, or too short to count. ` +
         'Nothing that cannot be found in the document is shown or counted.',
       payload: { reasons: rejected.map((entry) => entry.reason) },
       entityType: 'evaluation',

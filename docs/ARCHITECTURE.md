@@ -89,7 +89,7 @@ Each row below names the file, what the stage reads and writes, and what it guar
 | **Redact** | `agent/redact.ts` | The resume text, plus the candidate's own name if known | The redacted text; one `sensitive_findings` row per masked span; audit `sensitive_attributes_masked` | Spans are replaced with `█` runs of the *same length*, so offsets are identical in both copies. Only a category and a character range are recorded in `sensitive_findings`, never the value. The original text is stored (`resumes.content_text`) because quote verification checks against it. |
 | **Open evaluation** | `agent/extract.ts` (`openEvaluation`) | A job and a candidate's resume | `evaluations` row in status `pending`; marks any earlier evaluation for the same job and candidate as superseded | Done in one transaction, so a current evaluation and the one it replaces can never both look current. |
 | **Extract** | `agent/extract.ts` (`extractEvidence`) | The job's requirements and **only** `redacted_text` | Calls the provider; audit `extraction_recorded` | The prompt is built from the requirements and the redacted text. The original never enters the function's scope. The provider must answer through a forced tool call (`record_evidence`) against a fixed schema that has no verdict or score field. Malformed findings are dropped with a reason and audited. |
-| **Verify** | `agent/verifyEvidence.ts` | Each accepted quote and the **original** `content_text` | `evidence` rows (`verified` true or false); audit `evidence_verified` and, if any were rejected, `unverifiable_evidence_rejected` | A quote counts only if it is found in the original text, character for character (whitespace differences are tolerated; case and wording are not). The model's offsets are a hint: the quote is located in the source and the stored offsets are the real ones. A quote overlapping a masked span is refused. Rejected quotes are stored unverified so a fabrication stays visible, and are never used again. The evaluation moves to `extracted`. |
+| **Verify** | `agent/verifyEvidence.ts` | Each accepted quote and the **original** `content_text` | `evidence` rows (`verified` true or false); audit `evidence_verified` and, if any were rejected, `unverifiable_evidence_rejected` | A quote counts only if it is found in the original text, character for character (whitespace differences are tolerated; case and wording are not). The model's offsets are a hint: the quote is located in the source and the stored offsets are the real ones. A quote overlapping a masked span is refused, and so is one shorter than 15 characters after whitespace is collapsed (`quote_too_short`): a bare "Node.js" is a keyword, not a statement of what someone did, even if it really is in the CV. Rejected quotes are stored unverified so a fabrication stays visible, and are never used again. The evaluation moves to `extracted`. |
 | **Match** | `agent/matchRules.ts`, `agent/match.ts` | Verified evidence only | `requirement_matches` (verdict, confidence, rationale) | One verdict per requirement from term coverage (see below). No model is imported by these files. Evidence is filtered on `verified` twice: by the repository query and again inside `decideMatch`. |
 | **Score** | `agent/score.ts`, `agent/match.ts` | The matches and the weights | `evaluations` (`score_basis_points`, `must_haves_met`, `must_haves_total`), in one transaction with the matches; audit `requirements_matched`, `score_computed` | Integer arithmetic in basis points (0 to 10000). Contributions sum exactly to the score. The audit payload holds every input, so the score can be recomputed from the trail alone. Status becomes `scored`. |
 | **Rank** | `agent/rankRules.ts`, `agent/rank.ts` | The current evaluations and their matches | **Nothing** | Computed on every read. No ranking table, no cached order. Five queries however many candidates there are. |
@@ -100,7 +100,7 @@ Each row below names the file, what the stage reads and writes, and what it guar
 `decideMatch` takes a requirement and the verified quotes cited for it.
 
 1. The requirement's **terms** are the significant words of its label and criterion: lower-cased, at least three characters, minus a short stop-word list, de-duplicated.
-2. It joins the verified quotes, lower-cases them, and counts how many terms appear in that text (a substring test).
+2. It joins the verified quotes and counts how many terms appear in that text **as whole words** (`wordsOf`: lower-cased, split on anything that is not a letter, digit, `+`, `#` or `.`, so `Node.js` and `C++` are one word each and a sentence-ending full stop is not part of the word before it). "Java" is not found in "JavaScript" and "run" is not found in "running". There is no stemming and no synonym list, so "service" does not satisfy "services".
 3. With *covered* as the share of terms found:
    - 75% or more: `met`
    - 35% or more: `partial`
@@ -110,7 +110,11 @@ Each row below names the file, what the stage reads and writes, and what it guar
 
 The comparisons are integer (`covered * 100 >= terms * 75`), and the score is integer arithmetic with one floor-division.
 
-This is term coverage, not comprehension. It is crude on purpose, and the rationale shows exactly what it counted so a recruiter can see when it is wrong.
+This is term coverage, not comprehension. It is crude on purpose, and the rationale shows exactly what it counted so a recruiter can see when it is wrong. Three limits are known and each is pinned by a test, so changing one is a decision rather than an accident:
+
+- **Word forms and synonyms count as different terms.** "service" is not "services", "Postgres" is not "PostgreSQL". The precision gained over substring matching is paid for in recall.
+- **Negation is not understood.** "Never shipped a Node.js service" covers exactly the terms "Shipped a Node.js service" covers and gets the same verdict.
+- **Words can be stuffed.** A quote that merely lists the terms of a criterion covers it. Verification stops a fabricated quote and a bare keyword (see the Verify row: at least 15 characters), but not a skills list quoted as evidence.
 
 ### How scoring works
 
