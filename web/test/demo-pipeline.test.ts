@@ -265,7 +265,7 @@ test('with no decision the last stage says so; with one it is recorded, at the e
   assert.equal(decide.status, 'recorded');
   assert.equal(decide.explanation, 'Demo recruiter decision recorded in this private demo session.');
   assert.equal(decide.at, '2026-10-04T12:00:00.500Z');
-  assert.deepEqual(decide.facts, ['Outcome: Advance']);
+  assert.deepEqual(decide.facts, ['Outcome: Shortlist']);
 
   // If the trail is not available the decision is still known from the evaluation.
   assert.equal(byId(pipeline({ events: null, detail: { ...DETAIL, decision } }), 'decide').at, decision.decidedAt);
@@ -439,12 +439,12 @@ test('a demo decision is the final event, named as one, and says it affects only
 
   assert.equal(last?.isDecision, true, 'the decision is not the last event');
   assert.equal(items.filter((i) => i.isDecision).length, 1);
-  assert.equal(last?.title, 'Demo recruiter decision: Advance', 'the raw outcome word must not reach the screen');
+  assert.equal(last?.title, 'Demo recruiter decision: Shortlist', 'the raw outcome word must not reach the screen');
   assert.equal(last?.actor, 'Demo recruiter');
   assert.equal(last?.stageLabel, 'Recruiter decision');
 
   const lines = Object.fromEntries((last?.details ?? []).map((d) => [d.label, d.value]));
-  assert.equal(lines['Outcome'], 'Advance');
+  assert.equal(lines['Outcome'], 'Shortlist');
   assert.equal(lines['Reason'], 'Strong evidence on both essentials.');
   assert.match(lines['Recorded by'] ?? '', /Demo recruiter \(demo-visitor\)/);
   assert.match(lines['Recorded by'] ?? '', /not a real recruiter/);

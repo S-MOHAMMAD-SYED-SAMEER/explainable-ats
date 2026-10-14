@@ -37,17 +37,19 @@ npm run typecheck && npm run lint && npm run build
 
 ### The portfolio parity test
 
-`server/test/demo-parity.test.ts` runs the real pipeline and the portfolio's browser-demo runner over the same dataset and checks that they agree: the same ranking, the same verdict, confidence and contribution for every requirement, the same masked attributes and the same audit trail. It needs the runner from the `sameer-3d-portfolio` repository. It is found in this order (`server/test/portfolioFixture.ts`):
+`server/test/demo-parity.test.ts` runs the real pipeline and the portfolio sites' browser-demo runners over the same dataset and checks that they agree. There are two copies of the runner, one in `sameer-3d-portfolio` (the 3D site) and one in `portfolio` (the 2D site), and every comparison runs against each copy it finds, naming the copy in any failure. What it checks: the same ranking, the same verdict, confidence and contribution for every requirement, the same masked attributes and the same audit trail. The 3D copy is found in this order (`server/test/portfolioFixture.ts`):
 
 1. `PORTFOLIO_DEMO_DIR`, an explicit override (relative to this repository's root if not absolute). If it is set it is authoritative: a value that does not contain `run.ts` fails the suite instead of skipping.
 2. `../sameer-3d-portfolio/src/demo/p3`, with the two repositories side by side.
 3. `../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3`, the old monorepo layout.
 
+The 2D copy is found at `../portfolio/src/demo/p3`, or at `PORTFOLIO_2D_DEMO_DIR` if that is set (a wrong value fails, as above).
+
 ```bash
 PORTFOLIO_DEMO_DIR=../sameer-3d-portfolio/src/demo/p3 npm test
 ```
 
-If none of them holds `run.ts`, the 11 parity tests are reported as **skipped**, not failed, and the message lists every place searched. That is what happens in CI, where the portfolio is not checked out. The lookup logic itself (`portfolio-fixture.test.ts`, 9 tests) always runs.
+If no copy holds `run.ts`, the 11 parity tests are reported as **skipped**, not failed, and the message lists every place searched. That is what happens in CI, where the portfolio is not checked out. The lookup logic itself (`portfolio-fixture.test.ts`, 9 tests) always runs.
 
 ## What the tests protect
 
@@ -120,7 +122,7 @@ These protect the two guarantees the product is built on: nothing protected reac
 | `demo-decision.test.ts` (server) | 31 | A visitor's decision lands in their own sandbox only. The canonical database is byte-for-byte unchanged. A demo session satisfies neither recruiter auth nor CSRF. Two simultaneous decisions record exactly one. | The one anonymous write is safely contained. |
 | `demo-evidence.test.ts` (server) | 21 | The resume endpoint returns only the redacted text. Hostile markup is returned as inert text. Every verified quote is highlighted exactly. Timeline arithmetic adds up to the real score. | What a visitor reads is the real pipeline's output. |
 | `demo-dataset.test.ts` | 17 | The synthetic dataset really produces the outcomes it declares: every candidate lands in the declared tier, with the declared verdicts. Seeding twice gives byte-identical rankings. | The demo's story is derived, not asserted. |
-| `demo-parity.test.ts` | 11 | The portfolio's browser demo gives the same ranking, verdicts, contributions and audit trail as the real pipeline. Needs the sibling checkout. | The portfolio demo can't drift from the system it describes. |
+| `demo-parity.test.ts` | 11 | Both portfolio browser demos (3D and 2D) give the same ranking, verdicts, contributions and audit trail as the real pipeline. Needs a sibling checkout. | The portfolio demos can't drift from the system they describe. |
 | `portfolio-fixture.test.ts` | 9 | The lookup for the parity runner. | A misconfigured override fails loudly, not silently. |
 | `demo-landing`, `demo-entry`, `demo-session`, `demo-decision`, `demo-evidence`, `demo-insights`, `demo-pipeline` (web) | 150 | The demo's first page, entry, session state, decision form, evidence highlighter, pipeline and timeline builders: wording, routes, accessibility conventions, hostile input, and that no wording claims a live model. | The demo says only what is true of it. |
 | `recruiter-ui`, `deployment-mode`, `hook-order` (web) | 38 | Every verdict, outcome and tier has recruiter wording. No screen computes a score or re-sorts the ranking. The mode is read from the server and never guessed. No component calls a hook after an early return. | The browser shows what the server decided and nothing else. |

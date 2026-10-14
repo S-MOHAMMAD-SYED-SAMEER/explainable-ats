@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  PORTFOLIO_2D_FIXTURE_ENV,
   PORTFOLIO_FIXTURE_ENV,
+  resolvePortfolio2dFixture,
   resolvePortfolioFixture,
   skipReason,
 } from './portfolioFixture.ts';
@@ -22,6 +24,7 @@ const REPO_ROOT = path.resolve(HERE, '..', '..');
 /** A repository root that does not depend on the machine running the test. */
 const ROOT = path.resolve('/workspace', 'explainable-ats');
 const SIBLING = path.resolve(ROOT, '..', 'sameer-3d-portfolio', 'src', 'demo', 'p3');
+const SIBLING_2D = path.resolve(ROOT, '..', 'portfolio', 'src', 'demo', 'p3');
 const LEGACY = path.resolve(ROOT, '..', '..', 'sameer-3d-portfolio', 'sameer-3d-portfolio', 'src', 'demo', 'p3');
 
 const present = (...dirs: string[]) => {
@@ -34,6 +37,16 @@ test('the standalone layout is found when the portfolio sits beside this reposit
   assert.equal(lookup.dir, SIBLING);
   assert.equal(lookup.runner, path.join(SIBLING, 'run.ts'));
   assert.equal(lookup.explicitButMissing, false);
+
+  // The 2D portfolio's runner is looked for beside this repository too, and its
+  // absence is "not found", not a misconfiguration.
+  const lookup2d = resolvePortfolio2dFixture({ repoRoot: ROOT, env: {}, exists: present(SIBLING_2D) });
+  assert.equal(lookup2d.dir, SIBLING_2D);
+  assert.equal(lookup2d.runner, path.join(SIBLING_2D, 'run.ts'));
+  const absent = resolvePortfolio2dFixture({ repoRoot: ROOT, env: {}, exists: present() });
+  assert.equal(absent.dir, null);
+  assert.equal(absent.explicitButMissing, false);
+  assert.deepEqual(absent.tried, [SIBLING_2D]);
 });
 
 test('the layout from the monorepo days is still found', () => {
@@ -54,6 +67,16 @@ test('an explicit directory overrides the defaults', () => {
     exists: present(elsewhere, SIBLING),
   });
   assert.equal(lookup.dir, elsewhere);
+
+  // The 2D runner has its own override, and a wrong one is not silently replaced.
+  const wrong = path.resolve('/nowhere', 'p3');
+  const lookup2d = resolvePortfolio2dFixture({
+    repoRoot: ROOT,
+    env: { [PORTFOLIO_2D_FIXTURE_ENV]: wrong },
+    exists: present(SIBLING_2D),
+  });
+  assert.equal(lookup2d.dir, null);
+  assert.equal(lookup2d.explicitButMissing, true);
 });
 
 test('a relative override is resolved against the repository root', () => {

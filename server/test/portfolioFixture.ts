@@ -140,3 +140,28 @@ export type PortfolioDemoModule = {
   DEMO_TIMESTAMP: string;
   runDemo(): Promise<PortfolioDemoResult>;
 };
+
+// --- the 2D portfolio's copy of the runner -----------------------------------
+//
+// The 2D portfolio site (`portfolio`) runs the same vendored pipeline over the
+// same generated dataset as the 3D one, from its own `src/demo/p3`. It is a
+// separate copy that can drift on its own, so the parity suite runs against it
+// too. The lookup is the same shape as the one above, with its own override.
+
+export const PORTFOLIO_2D_FIXTURE_ENV = 'PORTFOLIO_2D_DEMO_DIR';
+
+export function resolvePortfolio2dFixture(options: FixtureLookupOptions): FixtureLookup {
+  const { repoRoot } = options;
+  const env = options.env ?? process.env;
+  const exists = options.exists ?? ((file: string) => fs.existsSync(file));
+
+  const explicit = env[PORTFOLIO_2D_FIXTURE_ENV]?.trim();
+  const dir = explicit
+    ? path.resolve(repoRoot, explicit)
+    : path.resolve(repoRoot, '..', 'portfolio', 'src', 'demo', 'p3');
+  const runner = path.join(dir, RUNNER_FILE);
+
+  return exists(runner)
+    ? { dir, runner, tried: [dir], explicitButMissing: false }
+    : { dir: null, runner: null, tried: [dir], explicitButMissing: Boolean(explicit) };
+}

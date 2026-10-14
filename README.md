@@ -83,8 +83,8 @@ The code uses one set of words and the screens use another. This is the mapping 
 | `needs_review` | No must-have failed, but at least one was `unclear` | **Worth a look** |
 | `gated` | A must-have was addressed and is `partial` or `not_met` | **Missing an essential** |
 | `not_evaluated` | No scored evaluation for this job | **Not assessed yet** |
-| `shortlist` | Decision: move the candidate forward | **Advance** |
-| `hold` | Decision: park for a closer look | **Review** |
+| `shortlist` | Decision: move the candidate forward | **Shortlist** |
+| `hold` | Decision: park for a closer look | **Hold** |
 | `reject` | Decision: do not take further | **Reject** |
 | `must_have` / `nice_to_have` | A requirement's kind | **Essential** / **Desirable** |
 | `scoreBasisPoints` | The score as an integer from 0 to 10000 | A whole percent (7142 shows as 71%) |
@@ -223,7 +223,7 @@ cd server && npm test        # 500 reported: 496 test cases and 4 helper modules
 cd web && npm test           # 189 reported: 188 test cases and 1 helper module
 ```
 
-`server/test/demo-parity.test.ts` compares this pipeline with the browser-demo runner in the separate `sameer-3d-portfolio` repository. It finds the runner through `PORTFOLIO_DEMO_DIR`, then `../sameer-3d-portfolio/src/demo/p3`, then `../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3`. If none holds `run.ts` the 11 parity tests are reported as skipped, as they are in CI (`.github/workflows/ci.yml`, two jobs on Node 24, no secrets).
+`server/test/demo-parity.test.ts` compares this pipeline with the browser-demo runner in the separate `sameer-3d-portfolio` repository, and with the copy of that runner in the `portfolio` repository (the 2D site). Each comparison runs against every copy it can find. It finds the 3D runner through `PORTFOLIO_DEMO_DIR`, then `../sameer-3d-portfolio/src/demo/p3`, then `../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3`. The 2D copy is looked for at `../portfolio/src/demo/p3`, or at `PORTFOLIO_2D_DEMO_DIR` if that is set. If no copy holds `run.ts` the 11 parity tests are reported as skipped, as they are in CI (`.github/workflows/ci.yml`, two jobs on Node 24, no secrets).
 
 There are no browser or end-to-end tests, and no evaluation set that measures extraction quality.
 

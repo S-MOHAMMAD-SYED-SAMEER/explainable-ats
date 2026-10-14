@@ -76,9 +76,9 @@ test('every decision outcome has recruiter wording', () => {
   }
 
   // The three buttons a recruiter actually sees.
-  assert.equal(OUTCOME_WORDING.shortlist.label, 'Advance');
+  assert.equal(OUTCOME_WORDING.shortlist.label, 'Shortlist');
   assert.equal(OUTCOME_WORDING.reject.label, 'Reject');
-  assert.equal(OUTCOME_WORDING.hold.label, 'Review');
+  assert.equal(OUTCOME_WORDING.hold.label, 'Hold');
 });
 
 test('every ranking tier has recruiter wording', () => {

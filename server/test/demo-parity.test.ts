@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, type TestContext as NodeTestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,7 +9,9 @@ import { rankJob } from '../src/agent/rank.ts';
 import { handleEvaluationDetail } from '../src/handlers/evaluations.ts';
 import { createTestContext, type TestContext } from './helpers.ts';
 import {
+  PORTFOLIO_2D_FIXTURE_ENV,
   PORTFOLIO_FIXTURE_ENV,
+  resolvePortfolio2dFixture,
   resolvePortfolioFixture,
   skipReason,
   type PortfolioDemoModule,
@@ -43,9 +45,21 @@ import {
 // instead of skipping, so a typo cannot masquerade as a passing suite.
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(HERE, '..', '..');
 
-const lookup = resolvePortfolioFixture({ repoRoot: path.resolve(HERE, '..', '..') });
-const skip = lookup.runner !== null ? false : skipReason(lookup);
+// Two portfolio sites carry a copy of the runner: the 3D one (sameer-3d-portfolio)
+// and the 2D one (portfolio). Every comparison below runs against each copy that
+// can be found, so neither can drift from this project without a test failing. The
+// suite skips only when NEITHER is present.
+const lookup = resolvePortfolioFixture({ repoRoot: REPO_ROOT });
+const lookup2d = resolvePortfolio2dFixture({ repoRoot: REPO_ROOT });
+
+type Target = { label: string; runner: string };
+const targets: Target[] = [
+  ...(lookup.runner !== null ? [{ label: '3D portfolio', runner: lookup.runner }] : []),
+  ...(lookup2d.runner !== null ? [{ label: '2D portfolio', runner: lookup2d.runner }] : []),
+];
+const skip = targets.length > 0 ? false : skipReason(lookup) + ' ' + `The 2D portfolio's runner was not found at ${lookup2d.tried.join(', ')} either (override: ${PORTFOLIO_2D_FIXTURE_ENV}).`;
 
 if (lookup.explicitButMissing) {
   test(`${PORTFOLIO_FIXTURE_ENV} points at a directory that holds the demo runner`, () => {
@@ -53,11 +67,37 @@ if (lookup.explicitButMissing) {
   });
 }
 
-async function loadRunner(): Promise<PortfolioDemoModule> {
-  if (lookup.runner === null) throw new Error(skipReason(lookup));
+if (lookup2d.explicitButMissing) {
+  test(`${PORTFOLIO_2D_FIXTURE_ENV} points at a directory that holds the demo runner`, () => {
+    assert.fail(`${PORTFOLIO_2D_FIXTURE_ENV} is set, but no run.ts exists at ${lookup2d.tried.join(', ')}.`);
+  });
+}
+
+async function importRunner(runner: string): Promise<PortfolioDemoModule> {
   // A file URL, not a path: an absolute Windows path is not a valid ESM
-  // specifier, and the namespaced form (`\\?\C:\...`) is read as a package name.
-  return (await import(pathToFileURL(lookup.runner).href)) as PortfolioDemoModule;
+  // specifier, and the namespaced form (`\?C:...`) is read as a package name.
+  return (await import(pathToFileURL(runner).href)) as PortfolioDemoModule;
+}
+
+/**
+ * Registers one test that runs its body once per runner found, and says which
+ * copy failed. The body receives `loadRunner` for the copy it is being run
+ * against, so a test reads as if there were one runner.
+ */
+function parityTest(
+  name: string,
+  body: (t: NodeTestContext, loadRunner: () => Promise<PortfolioDemoModule>) => Promise<void>,
+): void {
+  test(name, { skip }, async (t) => {
+    for (const target of targets) {
+      try {
+        await body(t, () => importRunner(target.runner));
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`[${target.label}] ${reason}`, { cause: error });
+      }
+    }
+  });
 }
 
 /** The real thing: a seeded database driven through the real stages. */
@@ -146,7 +186,7 @@ async function realAuditFor(
 
 // --- the headline: same order, same numbers, same words ----------------------
 
-test('the demo runner produces the same ranking as the real pipeline', { skip }, async (t) => {
+parityTest('the demo runner produces the same ranking as the real pipeline', async (t, loadRunner) => {
   const { ctx, jobId } = await real(t);
   const { runDemo } = await loadRunner();
 
@@ -212,7 +252,7 @@ test('no placement depends on a tie-break the two systems cannot share', { skip 
 
 // --- per requirement ---------------------------------------------------------
 
-test('every requirement gets the same verdict, confidence and contribution', { skip }, async (t) => {
+parityTest('every requirement gets the same verdict, confidence and contribution', async (t, loadRunner) => {
   const { ctx, jobId } = await real(t);
   const { runDemo } = await loadRunner();
 
@@ -286,7 +326,7 @@ test('every requirement gets the same verdict, confidence and contribution', { s
 
 // --- redaction and verification ----------------------------------------------
 
-test('the same protected attributes are found and masked', { skip }, async (t) => {
+parityTest('the same protected attributes are found and masked', async (t, loadRunner) => {
   const { ctx, jobId } = await real(t);
   const { runDemo } = await loadRunner();
 
@@ -322,7 +362,7 @@ test('the same protected attributes are found and masked', { skip }, async (t) =
   }
 });
 
-test('the same evidence is verified, and the same amount rejected', { skip }, async (t) => {
+parityTest('the same evidence is verified, and the same amount rejected', async (t, loadRunner) => {
   const { ctx, jobId } = await real(t);
   const { runDemo } = await loadRunner();
 
@@ -365,7 +405,7 @@ test('the same evidence is verified, and the same amount rejected', { skip }, as
 
 // --- audit -------------------------------------------------------------------
 
-test('the audit trail has the same stages, events and outcomes', { skip }, async (t) => {
+parityTest('the audit trail has the same stages, events and outcomes', async (t, loadRunner) => {
   const { ctx, jobId } = await real(t);
   const { runDemo } = await loadRunner();
 
@@ -425,7 +465,7 @@ test('the audit trail has the same stages, events and outcomes', { skip }, async
   }
 });
 
-test('audit sequence numbers restart per correlation id, as the repository does', { skip }, async () => {
+parityTest('audit sequence numbers restart per correlation id, as the repository does', async (_t, loadRunner) => {
   const { runDemo } = await loadRunner();
   const demo = await runDemo();
 
@@ -456,7 +496,7 @@ test('audit sequence numbers restart per correlation id, as the repository does'
 
 // --- determinism -------------------------------------------------------------
 
-test('two runs of the demo runner are byte-identical', { skip }, async () => {
+parityTest('two runs of the demo runner are byte-identical', async (_t, loadRunner) => {
   const { runDemo } = await loadRunner();
 
   const first = await runDemo();
@@ -471,7 +511,7 @@ test('two runs of the demo runner are byte-identical', { skip }, async () => {
   );
 });
 
-test('the demo runner carries no wall-clock or random values', { skip }, async () => {
+parityTest('the demo runner carries no wall-clock or random values', async (_t, loadRunner) => {
   const { runDemo, DEMO_TIMESTAMP } = await loadRunner();
   const demo = await runDemo();
 
@@ -494,7 +534,7 @@ test('the demo runner carries no wall-clock or random values', { skip }, async (
 
 // --- the dataset's own promises still hold on the demo side ------------------
 
-test('the demo reproduces every outcome the dataset says it will', { skip }, async () => {
+parityTest('the demo reproduces every outcome the dataset says it will', async (_t, loadRunner) => {
   const { runDemo } = await loadRunner();
   const demo = await runDemo();
 
@@ -521,7 +561,7 @@ test('the demo reproduces every outcome the dataset says it will', { skip }, asy
   }
 });
 
-test('the gate is visible in the demo too: same score, one tier apart', { skip }, async () => {
+parityTest('the gate is visible in the demo too: same score, one tier apart', async (_t, loadRunner) => {
   // The single thing this dataset exists to show, asserted against the demo
   // rather than the server — because the demo is what a client will look at.
   const { runDemo } = await loadRunner();

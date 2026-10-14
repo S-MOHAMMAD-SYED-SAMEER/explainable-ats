@@ -74,8 +74,8 @@ export const VERDICT_WORDING: Readonly<Record<Verdict, Wording>> = Object.freeze
 });
 
 export const OUTCOME_WORDING: Readonly<Record<Outcome, Wording>> = Object.freeze({
-  shortlist: { label: 'Advance', detail: 'Move this candidate forward.', tone: 'good' },
-  hold: { label: 'Review', detail: 'Park this one for a closer look or a conversation.', tone: 'warn' },
+  shortlist: { label: 'Shortlist', detail: 'Move this candidate forward.', tone: 'good' },
+  hold: { label: 'Hold', detail: 'Park this one for a closer look or a conversation.', tone: 'warn' },
   reject: { label: 'Reject', detail: 'Do not take this candidate further.', tone: 'bad' },
 });
 
