@@ -12,7 +12,7 @@ Screens a CV against a role and explains every placement with the exact sentence
 - **Nothing counts until it is checked.** Every quote is looked up verbatim in the original CV. A quote that isn't there is stored as rejected and never shown or scored.
 - **Everything after extraction is reproducible.** Matching is rule-based, scores are integers you can recompute by hand, rankings are derived on every read, and an append-only audit trail records each step.
 - **Stack.** Node 24 and TypeScript (run directly, no build step), Express 5, SQLite or PostgreSQL behind one interface, React 19 with Vite and Tailwind. The server has three runtime dependencies: `express`, `pg` and the Anthropic SDK.
-- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 693 passing, 0 failing and 0 skipped (500 server, 193 web). Five of those are helper modules the runner counts, so there are 688 test cases. In a standalone clone, 681 pass and 12 skipped: the parity tests need the portfolio sites. [What they protect](docs/TESTING.md).
+- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 697 passing, 0 failing and 0 skipped (503 server, 194 web). Five of those are helper modules the runner counts, so there are 692 test cases. In a standalone clone, 685 pass and 12 skipped: the parity tests need the portfolio sites. [What they protect](docs/TESTING.md).
 - **Where it stands.** A portfolio project. The demo uses the deterministic mock extractor, a keyword matcher, in place of the model, on five invented candidates. The Anthropic adapter exists and has not been run against the real API. There is no evaluation set yet. See [Limitations](#limitations).
 
 ## Run it locally
@@ -219,8 +219,8 @@ A demo decision is recorded as the fixed actor `demo-visitor` and reuses the rec
 Tests use Node's built-in runner on both sides. No test needs a credential, a network or a database server. [docs/TESTING.md](docs/TESTING.md) explains what each group of tests protects and walks through eight of them.
 
 ```bash
-cd server && npm test        # 500 reported: 496 test cases and 4 helper modules
-cd web && npm test           # 193 reported: 192 test cases and 1 helper module
+cd server && npm test        # 503 reported: 499 test cases and 4 helper modules
+cd web && npm test           # 194 reported: 193 test cases and 1 helper module
 ```
 
 `server/test/demo-parity.test.ts` compares this pipeline with the browser-demo runner in the separate `sameer-3d-portfolio` repository, and with the copy of that runner in the `portfolio` repository (the 2D site). Each comparison runs against every copy it can find. It finds the 3D runner through `PORTFOLIO_DEMO_DIR`, then `../sameer-3d-portfolio/src/demo/p3`, then `../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3`. The 2D copy is looked for at `../portfolio/src/demo/p3`, or at `PORTFOLIO_2D_DEMO_DIR` if that is set. If no copy holds `run.ts` the 11 parity tests are reported as skipped, as they are in a standalone clone. CI (`.github/workflows/ci.yml`, two jobs on Node 24, no secrets) checks both portfolio repositories out first (the branch of the same name if there is one, otherwise `main`), runs `npm audit --audit-level=high`, and treats a missing sibling as a failure, not a skip, so nothing is skipped there.
