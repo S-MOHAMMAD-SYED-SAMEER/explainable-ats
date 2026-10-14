@@ -127,6 +127,7 @@ function build(client: AnthropicMessagesClient, overrides: Partial<AnthropicProv
     model: MODEL,
     timeoutMs: 5_000,
     maxRetries: 2,
+    toolChoice: 'forced', // the explicit setting these tests were written against; the default is 'auto'
     client,
     sleep: async (ms) => {
       sleeps.push(ms);
@@ -894,4 +895,77 @@ test('the demo cannot be configured for anthropic, and its sessions are answered
     events: Array<{ eventType: string; actorId: string | null }>;
   };
   assert.equal(audit.events.find((event) => event.eventType === 'extraction_recorded')?.actorId, 'mock');
+});
+
+// --- what the live service taught us (2026-10-14): tool choice and temperature are settings ----------------
+
+test('with toolChoice "auto" the tool is offered, not forced, and one call is still the only acceptable reply', async () => {
+  const { client, calls } = fakeClient(reply());
+  const { provider } = build(client, { toolChoice: 'auto' });
+
+  const response = await provider.complete(extractionRequest());
+
+  const { body } = calls[0] as (typeof calls)[number];
+  assert.deepEqual(body.tool_choice, { type: 'auto', disable_parallel_tool_use: true });
+  assert.equal(body.tools?.length, 1);
+  assert.deepEqual(response.output, FINDINGS);
+});
+
+test('the default tool choice is "auto", which every model accepts', async () => {
+  const { client, calls } = fakeClient(reply());
+  const provider = createAnthropicProvider({ apiKey: API_KEY, model: MODEL, timeoutMs: 5_000, maxRetries: 0, client });
+
+  await provider.complete(extractionRequest());
+
+  assert.deepEqual((calls[0] as (typeof calls)[number]).body.tool_choice, { type: 'auto', disable_parallel_tool_use: true });
+});
+
+test('with "auto", a reply that makes no tool call is a rejected response, not an empty result', async () => {
+  const { client } = fakeClient(reply({ content: [{ type: 'text', text: 'I could not find anything.' }], stop_reason: 'end_turn' }));
+  const { provider } = build(client, { toolChoice: 'auto' });
+
+  const err = await failure(provider.complete(extractionRequest()));
+
+  assert.match(err.message, /no "record_evidence" tool call was made/);
+});
+
+test('a reply with thinking blocks and one tool call is read normally (Sonnet 5.5 always thinks)', async () => {
+  const { client } = fakeClient(
+    reply({ content: [{ type: 'thinking', thinking: 'weighing the quotes', signature: 'sig' }, toolUse(FINDINGS)] }),
+  );
+  const { provider } = build(client, { toolChoice: 'auto' });
+
+  const response = await provider.complete(extractionRequest());
+
+  assert.deepEqual(response.output, FINDINGS);
+});
+
+test('a temperature is sent only when one is configured', async () => {
+  const unset = fakeClient(reply());
+  await build(unset.client).provider.complete(extractionRequest());
+  assert.ok(!('temperature' in (unset.calls[0] as (typeof unset.calls)[number]).body), 'no temperature by default');
+
+  const zero = fakeClient(reply());
+  await build(zero.client, { temperature: 0 }).provider.complete(extractionRequest());
+  assert.equal((zero.calls[0] as (typeof zero.calls)[number]).body.temperature, 0, 'a configured zero is sent, not dropped');
+});
+
+test('a model that rejects temperature fails with its own message, once, and is not retried', async () => {
+  const { client, calls } = fakeClient(apiError(400, '`temperature` is deprecated for this model.'));
+  const { provider, sleeps } = build(client, { temperature: 0 });
+
+  const err = await failure(provider.complete(extractionRequest()));
+
+  assert.match(err.message, /temperature/);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(sleeps, []);
+});
+
+test('an unknown tool choice or an out-of-range temperature is refused when the provider is built', () => {
+  const { client } = fakeClient(reply());
+  const base = { apiKey: API_KEY, model: MODEL, timeoutMs: 5_000, maxRetries: 0, client };
+  assert.throws(() => createAnthropicProvider({ ...base, toolChoice: 'any' as never }), /tool choice must be one of: auto, forced/);
+  for (const temperature of [-0.1, 1.5, Number.NaN]) {
+    assert.throws(() => createAnthropicProvider({ ...base, temperature }), /temperature must be a number from 0 to 1/);
+  }
 });

@@ -103,3 +103,23 @@ test('the configured model tier is Sonnet 5 and does not drift', () => {
   assert.equal(loadConfig({}).config.anthropicModel, 'claude-sonnet-5-5');
   assert.equal(loadConfig({}).config.llmProvider, 'mock', 'the default provider should cost nothing to run');
 });
+
+// --- tool choice and temperature are configuration -------------------------------------------------------
+
+test('the tool choice defaults to auto and the temperature to none', () => {
+  const { config } = loadConfig({});
+  assert.equal(config.anthropicToolChoice, 'auto');
+  assert.equal(config.anthropicTemperature, null);
+});
+
+test('ANTHROPIC_TOOL_CHOICE and ANTHROPIC_TEMPERATURE are read, and bad values fall back with a problem noted', () => {
+  const ok = loadConfig({ ANTHROPIC_TOOL_CHOICE: 'forced', ANTHROPIC_TEMPERATURE: '0' });
+  assert.equal(ok.config.anthropicToolChoice, 'forced');
+  assert.equal(ok.config.anthropicTemperature, 0);
+
+  const bad = loadConfig({ ANTHROPIC_TOOL_CHOICE: 'always', ANTHROPIC_TEMPERATURE: '2' });
+  assert.equal(bad.config.anthropicToolChoice, 'auto');
+  assert.equal(bad.config.anthropicTemperature, null);
+  assert.ok(bad.problems.some((problem) => problem.includes('ANTHROPIC_TOOL_CHOICE')));
+  assert.ok(bad.problems.some((problem) => problem.includes('ANTHROPIC_TEMPERATURE')));
+});

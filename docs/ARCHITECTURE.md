@@ -319,7 +319,7 @@ Every automated test runs on SQLite. I also ran the PostgreSQL path by hand agai
 | Provider | Selected by | Behaviour |
 |---|---|---|
 | `mock` | the default | Replays registered fixtures or deterministic responder functions. Anything unregistered raises instead of inventing a reply. In the demo, a responder (`agent/mockExtractor.ts`) reads the prompt and quotes whole lines that contain the most requirement terms. It is a keyword matcher, not a model. |
-| `anthropic` | `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` | Uses the official SDK. Sends the redacted prompt, **forces** the `record_evidence` tool with parallel tool use disabled, and accepts exactly one well-formed tool call. |
+| `anthropic` | `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` | Uses the official SDK. Sends the redacted prompt with the `record_evidence` tool and parallel tool use disabled (`ANTHROPIC_TOOL_CHOICE=forced` makes the call mandatory; the default `auto` leaves it to the model and rejects a reply without it), and accepts exactly one well-formed tool call. |
 
 There is no fallback between them. Asking for `anthropic` without a key stops the server at startup, rather than quietly replaying fixtures and presenting them as a real run.
 
@@ -328,7 +328,7 @@ The Anthropic adapter's rules:
 - Hard timeout per request (`ANTHROPIC_TIMEOUT_MS`, default 60000, maximum 300000).
 - Bounded retries (`ANTHROPIC_MAX_RETRIES`, default 2, maximum 5) with a doubling delay, only for transient failures: timeout, dropped connection, HTTP 408, 429 and 5xx. `Retry-After` is honoured within a cap. The SDK's own retries are switched off so there is one policy.
 - A bad request, a bad key, a refusal, a truncated answer, a missing or repeated tool call, or a payload that is not a `findings` object is an `LlmError`, never an empty result.
-- The model name is whatever `ANTHROPIC_MODEL` says. The adapter names no model itself. Some newer models reject a forced tool call with a 400; if the configured one does, extraction fails with the API's own message and is not retried.
+- The model name is whatever `ANTHROPIC_MODEL` says. The adapter names no model itself. Checked against the live API on 2026-10-14: `claude-sonnet-5-5` rejects a forced tool call (400) and any `temperature`, because it always runs adaptive thinking; `claude-haiku-4-5-20251001` accepts both; `claude-haiku-5-5` accepts a forced call but rejects `temperature`. So tool choice and temperature are settings (`ANTHROPIC_TOOL_CHOICE`, `ANTHROPIC_TEMPERATURE`), and a model that rejects what is configured fails with the API's own message and is not retried.
 - The adapter never scores, matches or ranks. Its output is a set of candidate quotes that go through the same schema check and the same verification as the mock's.
 
 **What happens when the provider fails.** `extractEvidence` catches the failure, marks the evaluation `failed` with a safe reason, appends an `extraction_failed` audit event and raises `PROVIDER_UNAVAILABLE` (HTTP 502 if it ever reaches a route). It never turns the failure into an empty list of findings. "The model found nothing" and "the model could not be reached" are different facts, and only one of them says anything about the candidate. The provider's own error text goes to the operator log, not to the response or the audit trail.

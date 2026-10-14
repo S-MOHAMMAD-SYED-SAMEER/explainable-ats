@@ -40,16 +40,28 @@ import type { Logger } from '../../lib/logger.ts';
 // model that answered badly is a provider failure to be recorded, not a coin to
 // be flipped again.
 //
-// KNOWN LIMIT, UNVERIFIED AGAINST THE LIVE SERVICE
+// WHAT THE LIVE SERVICE ACCEPTS (checked against the real API on 2026-10-14)
 //
-// The tool call is forced with `tool_choice`. Some current models reject forced
-// tool choice with a 400; the model is whatever `ANTHROPIC_MODEL` names, and this
-// file does not hard-code or special-case one. If the configured model refuses,
-// the failure surfaces as a non-retried `LlmError` carrying the API's own message.
-// Whether the default model accepts the request exactly as built here is
-// something only a real call can show.
+//   claude-sonnet-5-5          forced tool choice REJECTED (400 "tool_choice: type
+//                              \"tool\" and \"any\" are not supported for this model");
+//                              `tool_choice: auto` accepted; `temperature` REJECTED
+//                              (400 "deprecated for this model"). It always thinks
+//                              (adaptive thinking cannot be turned off), so its
+//                              thinking counts against max_tokens.
+//   claude-haiku-4-5-20251001  forced tool choice accepted; `temperature: 0` accepted.
+//   claude-haiku-5-5           forced tool choice accepted; `temperature` REJECTED.
+//
+// So two behaviours are configuration, not code: `toolChoice` ("forced" makes the
+// tool call mandatory, "auto" lets the model decide and treats a reply with no tool
+// call as the failure it is) and `temperature` (sent only when set). The adapter
+// still hard-codes no model: the model is whatever `ANTHROPIC_MODEL` names, and a
+// model that refuses a setting fails with a non-retried `LlmError` carrying the
+// API's own message.
 
 export const ANTHROPIC_PROVIDER = 'anthropic';
+
+export const TOOL_CHOICE_MODES = ['auto', 'forced'] as const;
+export type ToolChoiceMode = (typeof TOOL_CHOICE_MODES)[number];
 
 /** Delay before the first retry; it doubles each time, up to the ceiling. */
 const BASE_DELAY_MS = 500;
@@ -85,6 +97,14 @@ export type AnthropicProviderOptions = {
   timeoutMs: number;
   /** Retries after the first attempt, for transient failures only. */
   maxRetries: number;
+  /**
+   * "forced": the model must call the tool. "auto": the model may answer in text
+   * instead, and a reply with no tool call is rejected. Some models (Sonnet 5.5)
+   * refuse "forced". Default "auto", which every model accepts.
+   */
+  toolChoice?: ToolChoiceMode;
+  /** Sampling temperature. Sent only when set: several current models reject it. */
+  temperature?: number;
   logger?: Logger;
   /** Injectable for tests. Defaults to the real SDK client. */
   client?: AnthropicMessagesClient;
@@ -150,7 +170,12 @@ export function retryDelayMs(attempt: number, retryAfterSeconds?: number): numbe
   return Math.min(MAX_DELAY_MS, Math.max(backoff, asked));
 }
 
-function buildBody(request: LlmRequest, model: string): Anthropic.MessageCreateParamsNonStreaming {
+function buildBody(
+  request: LlmRequest,
+  model: string,
+  toolChoice: ToolChoiceMode,
+  temperature: number | undefined,
+): Anthropic.MessageCreateParamsNonStreaming {
   const schema = request.tool.inputSchema;
   if (schema.type !== 'object') {
     throw new LlmError(ANTHROPIC_PROVIDER, `The "${request.tool.name}" tool schema must be an object schema.`);
@@ -168,9 +193,15 @@ function buildBody(request: LlmRequest, model: string): Anthropic.MessageCreateP
         input_schema: schema as Anthropic.Tool.InputSchema,
       },
     ],
-    // Forced, so the reply is a structure to validate rather than prose to parse.
-    // At most one call: two would be ambiguous, and are refused below anyway.
-    tool_choice: { type: 'tool', name: request.tool.name, disable_parallel_tool_use: true },
+    // Forced where the model allows it, so the reply is a structure to validate
+    // rather than prose to parse. Where it does not ("auto"), a reply without the
+    // tool call is refused in `readResponse`. At most one call either way: two
+    // would be ambiguous, and are refused there too.
+    tool_choice:
+      toolChoice === 'forced'
+        ? { type: 'tool', name: request.tool.name, disable_parallel_tool_use: true }
+        : { type: 'auto', disable_parallel_tool_use: true },
+    ...(temperature === undefined ? {} : { temperature }),
   };
 }
 
@@ -240,6 +271,8 @@ function readResponse(
 
 export function createAnthropicProvider(options: AnthropicProviderOptions): LlmProvider {
   const { apiKey, model, timeoutMs, maxRetries, logger } = options;
+  const toolChoice: ToolChoiceMode = options.toolChoice ?? 'auto';
+  const { temperature } = options;
 
   if (apiKey.trim() === '') {
     throw new LlmError(ANTHROPIC_PROVIDER, 'ANTHROPIC_API_KEY is not set.');
@@ -252,6 +285,12 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LlmP
   }
   if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > MAX_RETRIES_CEILING) {
     throw new LlmError(ANTHROPIC_PROVIDER, `The Anthropic retry count must be between 0 and ${MAX_RETRIES_CEILING}.`);
+  }
+  if (!(TOOL_CHOICE_MODES as readonly string[]).includes(toolChoice)) {
+    throw new LlmError(ANTHROPIC_PROVIDER, `The Anthropic tool choice must be one of: ${TOOL_CHOICE_MODES.join(', ')}.`);
+  }
+  if (temperature !== undefined && !(Number.isFinite(temperature) && temperature >= 0 && temperature <= 1)) {
+    throw new LlmError(ANTHROPIC_PROVIDER, 'The Anthropic temperature must be a number from 0 to 1.');
   }
 
   // The configured key is the only credential. `authToken: null` stops an
@@ -268,7 +307,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LlmP
 
     async complete(request: LlmRequest): Promise<LlmResponse> {
       const started = now();
-      const body = buildBody(request, model);
+      const body = buildBody(request, model, toolChoice, temperature);
 
       let message: Anthropic.Message | undefined;
       for (let attempt = 1; message === undefined; attempt++) {
