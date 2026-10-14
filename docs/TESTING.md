@@ -212,7 +212,7 @@ These protect the two guarantees the product is built on: nothing protected reac
 ## What isn't tested yet
 
 - **Extraction quality.** There is no labelled set of CVs with the passages a good extractor should find, so nothing measures recall or precision. The mock extractor is a keyword matcher, so the pipeline's *mechanics* are tested, not the *accuracy* of a real model.
-- **The live Anthropic API.** No call to it has been made. The adapter is tested against a fake client and a local stub server only. `server/scripts/live-smoke-anthropic.ts` is an opt-in script that makes one real request, but it sits outside `test/`, never runs in CI, and I have not run it. Whether the configured model accepts a forced tool call is unconfirmed.
+- **The live Anthropic API.** The automated tests use a fake client and a local stub server only. `server/scripts/live-smoke-anthropic.ts` is an opt-in script that makes one real request; it sits outside `test/` and never runs in CI. It was run once on `claude-sonnet-5-5` and once on `claude-haiku-4-5-20251001` on 2026-10-14 (both passed). No evaluation of extraction quality has been run.
 - **PostgreSQL in CI.** The PostgreSQL path has no automated test.
 - **Real CVs.** Everything runs on five invented candidates. Redaction is pattern-based and has not been run against real resumes.
 - **Prompt injection.** No test feeds a CV containing instructions to a model. The verifier limits the damage (a model can only cite text that really is in the CV, and it cannot score), but the prompt layer has no defence and no tests.

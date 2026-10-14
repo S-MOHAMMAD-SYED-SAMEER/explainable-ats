@@ -52,6 +52,7 @@ export class ConfigError extends Error {
 }
 
 export const LLM_PROVIDERS = ['mock', 'anthropic'] as const;
+export const ANTHROPIC_TOOL_CHOICES = ['auto', 'forced'] as const;
 
 /** Anthropic request limits. Both are bounded: nothing here may wait forever. */
 export const ANTHROPIC_DEFAULT_TIMEOUT_MS = 60_000;
@@ -119,6 +120,18 @@ function readBoundedInt(
   if (parsed > ceiling) {
     problems.push(`${key} is ${parsed}, above the maximum of ${ceiling}. Using ${ceiling}.`);
     return ceiling;
+  }
+  return parsed;
+}
+
+/** An optional temperature from 0 to 1. Unset (or invalid, with a problem noted) means "do not send one". */
+function readTemperature(key: string, problems: string[]): number | null {
+  const raw = readString(key, '').trim();
+  if (raw === '') return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    problems.push(`${key} must be a number from 0 to 1. Not sending a temperature.`);
+    return null;
   }
   return parsed;
 }
@@ -194,6 +207,10 @@ export type AppConfig = {
   anthropicTimeoutMs: number;
   /** Retries after the first attempt, for transient failures only. */
   anthropicMaxRetries: number;
+  /** "forced" makes the tool call mandatory; "auto" is accepted by every model. */
+  anthropicToolChoice: (typeof ANTHROPIC_TOOL_CHOICES)[number];
+  /** Sent only when set; several current models reject it. */
+  anthropicTemperature: number | null;
   operatorPasswordHash: string | null;
   sessionTtlHours: number;
   cookieSecure: boolean;
@@ -288,6 +305,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
           true,
           problems,
         ),
+        anthropicToolChoice: readEnum('ANTHROPIC_TOOL_CHOICE', ANTHROPIC_TOOL_CHOICES, 'auto', problems),
+        anthropicTemperature: readTemperature('ANTHROPIC_TEMPERATURE', problems),
         operatorPasswordHash,
         sessionTtlHours: readInt('SESSION_TTL_HOURS', 12, problems),
         cookieSecure,

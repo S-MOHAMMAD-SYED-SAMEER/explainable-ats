@@ -13,7 +13,7 @@ Screens a CV against a role and explains every placement with the exact sentence
 - **Everything after extraction is reproducible.** Matching is rule-based, scores are integers you can recompute by hand, rankings are derived on every read, and an append-only audit trail records each step.
 - **Stack.** Node 24 and TypeScript (run directly, no build step), Express 5, SQLite or PostgreSQL behind one interface, React 19 with Vite and Tailwind. The server has three runtime dependencies: `express`, `pg` and the Anthropic SDK.
 - **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 697 passing, 0 failing and 0 skipped (503 server, 194 web). Five of those are helper modules the runner counts, so there are 692 test cases. In a standalone clone, 685 pass and 12 skipped: the parity tests need the portfolio sites. [What they protect](docs/TESTING.md).
-- **Where it stands.** A portfolio project. The demo uses the deterministic mock extractor, a keyword matcher, in place of the model, on five invented candidates. The Anthropic adapter exists and has not been run against the real API. There is no evaluation set yet. See [Limitations](#limitations).
+- **Where it stands.** A portfolio project. The demo uses the deterministic mock extractor, a keyword matcher, in place of the model, on five invented candidates. The Anthropic adapter has been run against the real API (a smoke test on 2026-10-14, one request each on Claude Sonnet 5.5 and Claude Haiku 4.5), but nothing in the running app calls it yet and no evaluation set exists yet. See [Limitations](#limitations).
 
 ## Run it locally
 
@@ -56,13 +56,13 @@ flowchart LR
     style A fill:#e8f0fe,stroke:#1d4ed8
 ```
 
-The orange box is the only place a model runs. Every other box is plain code. In that stage the adapter **forces the `record_evidence` tool**, so the provider can answer only with a list of quotes, and it is given redacted resume text only.
+The orange box is the only place a model runs. Every other box is plain code. In that stage the adapter **offers the `record_evidence` tool** (and forces it where the model allows), so the only reply the pipeline accepts is a list of quotes, and the model is given redacted resume text only.
 
 | Stage | What it does | File |
 |---|---|---|
 | Ingest | Stores the CV text and its redacted copy; refuses empty or oversized input; the same document twice is one resume | `server/src/agent/ingest.ts` |
 | Redact | Masks protected attributes with `█` runs of equal length, so offsets match in both copies | `server/src/agent/redact.ts` |
-| Extract | Sends the requirements and the redacted text to the provider, which must answer through a forced `record_evidence` tool call | `server/src/agent/extract.ts`, `server/src/agent/extractionSchema.ts` |
+| Extract | Sends the requirements and the redacted text to the provider, which must answer through a `record_evidence` tool call (forced where the model allows it) | `server/src/agent/extract.ts`, `server/src/agent/extractionSchema.ts` |
 | Verify | Looks each quote up in the original text; rejects anything not found or overlapping a mask | `server/src/agent/verifyEvidence.ts` |
 | Match | One verdict per requirement from how many of its significant terms the verified quotes contain | `server/src/agent/matchRules.ts`, `server/src/agent/match.ts` |
 | Score | `floor(Σ weight × verdict points / Σ weight)`, with contributions that sum exactly to it | `server/src/agent/score.ts` |
@@ -231,7 +231,7 @@ There are no browser or end-to-end tests, and no evaluation set that measures ex
 
 - **There is no evaluation set.** Nothing measures how well extraction finds the right passages in real CVs. I would build a set of redacted CVs with hand-marked passages per requirement and measure recall first, because a missed passage becomes `unclear` rather than `not_met`.
 - **The demo's extractor is a keyword matcher.** Extraction defaults to the deterministic mock everywhere unless `LLM_PROVIDER=anthropic` is set. It quotes whole lines containing the most requirement terms. That exercises the pipeline but says nothing about how a real model would do.
-- **Anthropic provider: implemented, not yet verified against the real API.** `LLM_PROVIDER=anthropic` builds an adapter that forces a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a loopback stub server only. No call to the live Anthropic API has been made (there is an opt-in script for it, `server/scripts/live-smoke-anthropic.ts`, which I have not run), whether the configured model accepts a forced tool call is unconfirmed, and extraction quality has not been evaluated.
+- **Anthropic provider: smoke-tested, not evaluated.** `LLM_PROVIDER=anthropic` builds an adapter that offers (or, where the model allows it, forces) a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a loopback stub server, and the opt-in script `server/scripts/live-smoke-anthropic.ts` has made one real request each to `claude-sonnet-5-5` and `claude-haiku-4-5-20251001` on 2026-10-14: both returned a well-formed tool call whose quotes were all verified. That run found that Sonnet 5.5 rejects a forced tool call and rejects any `temperature`, so tool choice and temperature are settings. Extraction quality has not been evaluated, and the running app does not call the provider yet.
 - **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes. Paraphrase is missed, and word forms count as different terms ("mentored" and "mentoring").
 - **Synthetic data only.** Everything runs on five invented candidates and one invented role. Nothing has been measured on real resumes.
 - **Redaction is pattern-based.** It catches emails, phones, labelled fields and supplied names. Unlabelled personal details can pass through.
@@ -325,7 +325,9 @@ Copy `server/.env.example` to a file named `.env` in the same folder and set onl
 | `SQLITE_PATH` | the file `explainable-ats.sqlite` in the `data` folder of `server` | Where the local SQLite file lives |
 | `LLM_PROVIDER` | `mock` | `mock` or `anthropic` |
 | `ANTHROPIC_API_KEY` | empty | Required only for `LLM_PROVIDER=anthropic`. With it selected and no key, the server refuses to start |
-| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Sent verbatim; the adapter names no model of its own. **Not yet verified against the live API** (it has never been called) |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Sent verbatim; the adapter names no model of its own. The ID was confirmed against the live Models API on 2026-10-14, and the smoke script ran on it |
+| `ANTHROPIC_TOOL_CHOICE` | `auto` | `auto` lets the model call the tool (and a reply without the call is rejected); `forced` makes the call mandatory. `claude-sonnet-5-5` rejects `forced`; both Haiku models accept it |
+| `ANTHROPIC_TEMPERATURE` | unset | 0 to 1, sent only when set. `claude-haiku-4-5-20251001` accepts 0; `claude-sonnet-5-5` and `claude-haiku-5-5` reject any temperature ("deprecated for this model") |
 | `ANTHROPIC_TIMEOUT_MS` | 60000 | Per-request timeout, maximum 300000 |
 | `ANTHROPIC_MAX_RETRIES` | 2 | Retries for transient failures only, maximum 5 |
 | `OPERATOR_PASSWORD_HASH` | empty | Required for anyone to sign in |
@@ -336,6 +338,8 @@ Copy `server/.env.example` to a file named `.env` in the same folder and set onl
 | `CORS_ALLOWED_ORIGINS` | empty | Empty is correct: the front end shares the API's origin |
 | `PORT` | 3200 | Server port |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+
+A variable already set in your shell or in Windows' user environment wins over the same name in the `.env` file (Node's `--env-file` never overrides). A stale `ANTHROPIC_API_KEY` in the environment will therefore be used instead of the one in the file; remove it, or run the command with it unset.
 
 ### Running the full application
 

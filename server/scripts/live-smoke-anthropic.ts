@@ -104,6 +104,8 @@ async function main(): Promise<number> {
     model: config.anthropicModel,
     timeoutMs: config.anthropicTimeoutMs,
     maxRetries: 0,
+    toolChoice: config.anthropicToolChoice,
+    ...(config.anthropicTemperature === null ? {} : { temperature: config.anthropicTemperature }),
     logger,
   });
   let requests = 0;
@@ -147,6 +149,8 @@ async function main(): Promise<number> {
 
   line('--- Anthropic live smoke test (synthetic CV) ---');
   line(`configured model : ${config.anthropicModel}`);
+  line(`tool choice      : ${config.anthropicToolChoice}`);
+  line(`temperature      : ${config.anthropicTemperature ?? 'not sent'}`);
   line(`requests made    : ${requests}`);
   line(`input type       : synthetic CV`);
 
@@ -184,7 +188,7 @@ async function main(): Promise<number> {
 
   const usage = meta.usage;
   const checks: Check[] = [
-    { name: 'request succeeded; forced record_evidence call accepted', pass: true },
+    { name: 'request succeeded; the record_evidence tool call was accepted', pass: true },
     { name: 'expected extraction structure; validateExtraction: zero malformed', pass: outcome.malformed === 0 },
     { name: 'at least one evidence quote returned', pass: outcome.verified + outcome.rejected > 0 },
     { name: 'at least one quote passed deterministic verification', pass: outcome.verified > 0 },

@@ -5,8 +5,8 @@ import type { AppConfig } from '../../config/env.ts';
 import type { Logger } from '../../lib/logger.ts';
 
 export { createMockLlmProvider, fixtureKey } from './mock.ts';
-export { createAnthropicProvider, ANTHROPIC_PROVIDER, MAX_RETRIES_CEILING } from './anthropic.ts';
-export type { AnthropicMessagesClient, AnthropicProviderOptions } from './anthropic.ts';
+export { createAnthropicProvider, ANTHROPIC_PROVIDER, MAX_RETRIES_CEILING, TOOL_CHOICE_MODES } from './anthropic.ts';
+export type { AnthropicMessagesClient, AnthropicProviderOptions, ToolChoiceMode } from './anthropic.ts';
 export { LlmError } from './types.ts';
 export type { LlmProvider, LlmRequest, LlmResponse, LlmTool } from './types.ts';
 
@@ -36,6 +36,8 @@ export function createLlmProvider(config: AppConfig, options: { logger?: Logger 
         model: config.anthropicModel,
         timeoutMs: config.anthropicTimeoutMs,
         maxRetries: config.anthropicMaxRetries,
+        toolChoice: config.anthropicToolChoice,
+        ...(config.anthropicTemperature === null ? {} : { temperature: config.anthropicTemperature }),
         ...(options.logger ? { logger: options.logger } : {}),
       });
     }
