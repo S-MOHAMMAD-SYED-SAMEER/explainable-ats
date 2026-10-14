@@ -14,7 +14,7 @@ import type {
 //
 // The split between `reference` and `displayName` is the fairness boundary made
 // structural: the reference is what the system passes around, and the name is a
-// column the scorer has no reason to read. P3-D asserts that by changing the
+// column the scorer has no reason to read. A test asserts that by changing the
 // name and requiring the score not to move.
 
 function mapCandidate(row: Record<string, unknown>): Candidate {
@@ -64,7 +64,7 @@ export type CreateCandidateInput = {
 export type CreateResumeInput = {
   candidateId: string;
   contentText: string;
-  /** What the model will be shown. P3-C computes it; P3-B just stores it. */
+  /** What the model will be shown. Redaction computes it; this repository just stores it. */
   redactedText: string;
 };
 

@@ -18,7 +18,7 @@ import { CSRF_HEADER } from '../src/auth/csrf.ts';
 import { createTestContext } from './helpers.ts';
 import { PASSWORD, SECRET_API_KEY, withHarness } from './demoHarness.ts';
 
-// The deployment-mode boundary (Phase 3C.8).
+// The deployment-mode boundary.
 //
 // WHAT THIS FILE IS DEFENDING
 //

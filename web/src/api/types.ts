@@ -19,7 +19,7 @@ export type Health = {
   version: string;
 };
 
-// --- the recruiter API (P3-F) ------------------------------------------------
+// --- the recruiter API ------------------------------------------------
 //
 // Every number below is computed on the server. Nothing here is a hint the
 // browser is expected to finish: `scorePercent` arrives already rounded and

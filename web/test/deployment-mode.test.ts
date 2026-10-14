@@ -8,7 +8,7 @@ import { DEFAULT_ROUTE, DEMO_DEFAULT_ROUTE, DEMO_ROUTES, RECRUITER_ROUTES, parse
 import { resolveApiPath } from '../src/demo/session.ts';
 import { openingTags, stripComments } from './jsxScan.ts';
 
-// Deployment mode (Phase 3C.8), from the browser's side.
+// Deployment mode, from the browser's side.
 //
 // ONE BUNDLE, TWO DEPLOYMENTS. The real application and the portfolio demo serve
 // the same built client, so which one a page is talking to is not something the
@@ -17,7 +17,7 @@ import { openingTags, stripComments } from './jsxScan.ts';
 // and never guessed, each half draws only its own screens, and nothing of the
 // retired read-only demo is left to be reached.
 //
-// NFR-9 rules out rendering components, so what is checked is pure functions and
+// The project avoids rendering components, so what is checked is pure functions and
 // source — the same convention as the rest of this folder.
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

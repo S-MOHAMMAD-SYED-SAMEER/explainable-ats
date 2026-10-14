@@ -29,7 +29,7 @@ import { loadConfig } from '../src/config/env.ts';
 test('every JSON shape survives the round trip a column takes', () => {
   // Both drivers hand `toJson` text; it parses exactly once. These are the
   // shapes that will hold requirement criteria, evidence spans and audit
-  // payloads from P3-B onwards.
+  // payloads in the domain tables.
   assert.deepEqual(toJson(fromJson({ weight: 3 }), null), { weight: 3 });
   assert.deepEqual(toJson(fromJson([1, 2, 3]), null), [1, 2, 3]);
   assert.deepEqual(toJson(fromJson([]), null), []);
@@ -216,8 +216,8 @@ test('health reports the configuration of the app it was given', async () => {
   assert.equal(body.database?.migrationsApplied, MIGRATION_COUNT);
   assert.equal(body.adapters.llmProvider, 'mock');
 
-  // The version is a product version, never a milestone label: it is rendered
-  // on an operator surface, where "P3-A" would read as a pre-release marker.
+  // The version is a product version, never a development-stage label: it is rendered
+  // on an operator surface, where a stage name would read as a pre-release marker.
   assert.doesNotMatch(body.version, /^P\d/);
   await close();
 });

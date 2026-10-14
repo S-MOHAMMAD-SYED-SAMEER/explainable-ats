@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { openingTags, stripComments } from './jsxScan.ts';
 import { resolveApiPath } from '../src/demo/session.ts';
 
-// The structure of the new demo sections (Phase 3C.4): the redacted resume, the
+// The structure of the new demo sections: the redacted resume, the
 // pipeline and the timeline.
 //
-// NFR-9 rules out rendering components in tests, so this reads source for the
+// The project avoids rendering components in tests, so this reads source for the
 // conventions that make a screen usable — and checks that the recruiter's screens
 // are the ones they were. (The logic is tested in demo-evidence.test.ts and
 // demo-pipeline.test.ts; the rendered layout was checked in a real browser at 375,

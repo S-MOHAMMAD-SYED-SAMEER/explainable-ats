@@ -1,4 +1,4 @@
-// The frontend's half of the M5 authentication contract.
+// The frontend's half of the authentication contract.
 //
 // WHAT THE BROWSER HOLDS, AND WHAT IT DELIBERATELY DOES NOT
 //
@@ -8,7 +8,7 @@
 // directory tries to read it, and nothing stores a password anywhere.
 //
 // What the browser does hold is the CSRF token, in a *readable* cookie, because
-// M5-B's double-submit scheme requires the front end to echo it back in a
+// The server's double-submit scheme requires the front end to echo it back in a
 // header. That is safe on its own: a cross-site page can cause the session
 // cookie to be sent but cannot read this one to copy the value.
 //
@@ -19,7 +19,7 @@
 // local flag that can drift out of step with the cookie, and no way to
 // construct an authenticated-looking state without the server having said so.
 
-/** The CSRF cookie M5-B sets alongside the session. Readable on purpose. */
+/** The CSRF cookie the server sets alongside the session. Readable on purpose. */
 export const CSRF_COOKIE = 'ats_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
@@ -54,7 +54,7 @@ export function currentCsrfToken(): string | null {
 /**
  * Whether a request changes state and therefore needs a CSRF token.
  *
- * Mirrors M5-B's server rule. It is not a second mechanism — the server decides
+ * Mirrors the server's rule. It is not a second mechanism — the server decides
  * and refuses; this only avoids sending a header where the server would ignore
  * it, and avoids omitting one where the server would refuse.
  */

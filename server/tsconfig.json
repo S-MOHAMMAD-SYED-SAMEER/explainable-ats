@@ -1,7 +1,7 @@
 {
   // Typecheck only. Nothing here emits JavaScript: the runtime is Node 24's
   // native type stripping (`node src/index.ts`), so there is no build step,
-  // no bundler, and no ts-node in the dependency tree (D2, NFR-9).
+  // no bundler, and no ts-node in the dependency tree.
   //
   // Two settings do the real work:
   //   allowImportingTsExtensions  — imports must carry an explicit `.ts`

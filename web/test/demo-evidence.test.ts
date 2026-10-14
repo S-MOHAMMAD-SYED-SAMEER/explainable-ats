@@ -16,7 +16,7 @@ import {
 } from '../src/demo/evidence.ts';
 import { HighlightedText } from '../src/components/EvidenceText.ts';
 
-// Evidence in context (Phase 3C.4): which words in the redacted resume are
+// Evidence in context: which words in the redacted resume are
 // verified evidence, and — as important — which are not.
 //
 // Everything here runs the real functions, and the rendering tests run the real

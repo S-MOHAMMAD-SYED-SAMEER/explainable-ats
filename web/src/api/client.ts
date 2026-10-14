@@ -25,12 +25,12 @@ import type {
 //     then has exactly one error shape to render.
 //   * No secret ever reaches this layer, because there is nothing to send. The
 //     browser holds no key and no token: every provider call happens on the
-//     server (§19). If this file ever grows an API key, something has gone
+//     server. If this file ever grows an API key, something has gone
 //     badly wrong upstream of it.
 
 const BASE_URL = '/api';
 
-// --- authentication events (M6-A) -------------------------------------------
+// --- authentication events -------------------------------------------
 //
 // The client cannot navigate, and the app cannot see inside a fetch. These two
 // hooks are the seam: the client reports what the server said, and the app
@@ -91,7 +91,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  // The CSRF token rides along on every state-changing request (M5-B). It is
+  // The CSRF token rides along on every state-changing request. It is
   // read from the readable cookie at call time rather than cached, so a fresh
   // sign-in cannot leave a stale token behind. The session cookie itself is
   // HttpOnly and is never touched here — the browser attaches it.
@@ -191,7 +191,7 @@ export const api = {
   logout: (): Promise<{ signedOut: boolean }> =>
     request<{ signedOut: boolean }>('/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
 
-  // --- the recruiter API (P3-F) ---------------------------------------------
+  // --- the recruiter API ---------------------------------------------
 
   jobs: (): Promise<{ jobs: JobSummary[] }> => request<{ jobs: JobSummary[] }>('/jobs'),
 

@@ -1,6 +1,6 @@
 // A small reader for JSX source, for the tests that scan components.
 //
-// NFR-9 rules out rendering components in tests, so structural conventions —
+// The project avoids rendering components in tests, so structural conventions —
 // every button typed, every control focusable with a visible ring — are checked
 // by reading the source. These helpers are what make that reading reliable.
 

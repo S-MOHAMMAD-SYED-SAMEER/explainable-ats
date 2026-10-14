@@ -32,7 +32,7 @@ import {
 } from './demoHarness.ts';
 import { createTestContext } from './helpers.ts';
 
-// Evidence in context, the pipeline and the audit timeline (Phase 3C.4) — checked
+// Evidence in context, the pipeline and the audit timeline — checked
 // against the REAL pipeline.
 //
 // Two jobs. The first is security: the one new endpoint returns a resume's

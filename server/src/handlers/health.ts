@@ -30,8 +30,8 @@ export type HealthBody = {
   version: string;
 };
 
-// A product version, never a milestone label: this is rendered on an operator
-// surface, where "P3-A" would read as a pre-release marker.
+// A product version, never a development-stage label: this is rendered on an operator
+// surface, where a stage name would read as a pre-release marker.
 const VERSION = '0.1.0';
 
 export async function handleHealth(deps: HealthDeps = {}): Promise<{ status: number; body: HealthBody }> {

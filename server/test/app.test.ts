@@ -19,7 +19,7 @@ import { createTestContext, MIGRATION_COUNT } from './helpers.ts';
 // the fact that serving the front end from the same origin cannot shadow it.
 //
 // Node's built-in fetch and an ephemeral port cover it with no HTTP-testing
-// dependency (NFR-9).
+// dependency.
 
 const PASSWORD = 'p3a-operator-password-2026';
 

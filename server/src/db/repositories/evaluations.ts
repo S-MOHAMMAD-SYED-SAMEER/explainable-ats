@@ -20,7 +20,7 @@ import type {
 //
 // A ranking is a pure function of the evaluations that exist. Storing it would
 // create a second source of truth that drifts the moment one evaluation is
-// superseded and the other is not. P3-E computes it on read.
+// superseded and the other is not. Ranking computes it on read.
 
 function mapEvaluation(row: Record<string, unknown>): Evaluation {
   return {
@@ -142,7 +142,7 @@ export function createEvaluationRepository({ db, clock, newId }: RepoDeps) {
       return rows[0] ? mapEvaluation(rows[0] as Record<string, unknown>) : null;
     },
 
-    /** Every current evaluation for a job — what P3-E ranks. One query. */
+    /** Every current evaluation for a job — what ranking reads. One query. */
     async listCurrentForJob(jobId: string): Promise<Evaluation[]> {
       const rows = await db.query(
         'SELECT * FROM evaluations WHERE job_id = ? AND superseded_by IS NULL ORDER BY created_at DESC',
@@ -235,7 +235,7 @@ export function createEvidenceRepository({ db, clock, newId }: RepoDeps) {
     /**
      * Records a quote the model produced.
      *
-     * `verified` defaults to false and is set only by P3-C, once the quote has
+     * `verified` defaults to false and is set only by evidence verification, once the quote has
      * been found verbatim at those offsets in the resume. Unverified evidence
      * is stored rather than discarded so a fabrication is visible in the audit
      * trail — but nothing downstream may score or display it.

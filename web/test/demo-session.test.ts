@@ -7,7 +7,7 @@ import { sessionFromResponse, isAuthenticated, CSRF_COOKIE } from '../src/auth/s
 
 // The browser's half of the read-only demo.
 //
-// NFR-9 rules out jsdom and a browser driver, so nothing here renders. What can
+// The project avoids jsdom and a browser driver, so nothing here renders. What can
 // still be proved without one is the part that would actually go wrong: that
 // "the demo window is open" can never be mistaken for "this person is signed
 // in", and that no credential exists anywhere in this bundle to be mistaken for

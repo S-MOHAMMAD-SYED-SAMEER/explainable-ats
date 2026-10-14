@@ -2,7 +2,7 @@ import pg from 'pg';
 import { convertPlaceholders } from './dialect.ts';
 import type { Database, QueryResult, SqlParam } from './types.ts';
 
-// PostgreSQL driver (D1) — the hosted path, Neon or otherwise.
+// PostgreSQL driver — the hosted path, Neon or otherwise.
 //
 // STATUS: NOT verified against a live PostgreSQL server for THIS project's
 // schema. This driver was inherited from the inbox-crm-agent project, where it

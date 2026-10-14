@@ -114,7 +114,7 @@ test('the README does not repeat claims that were once true or never were', () =
     [/production[- ]ready (AI|extraction)/i, 'overclaims what the Anthropic provider is'],
     [/\b(has|have) been (verified|tested|confirmed)[^.]{0,40}(real|live)[^.]{0,20}API/i, 'claims live-API verification'],
     [/read-only exploration experience/i, 'calls the demo purely read-only'],
-    // Phase 3C.8 removed these. The README may say they are gone; it may not describe them as current.
+    // These were removed. The README may say they are gone; it may not describe them as current.
     [/DEMO_PUBLIC_READONLY=true/, 'tells a reader to turn on the retired read-only window'],
     [/POST \/api\/demo\/scenarios/, 'documents the retired demo-run endpoint'],
     [/PUBLIC_DEMO_READS[^\n]{0,40}allow-list/i, 'documents the retired public read allow-list as current'],
@@ -358,6 +358,31 @@ function sourceFiles(dir: string): string[] {
     return /\.(ts|tsx|css|html)$/.test(entry.name) ? [rel] : [];
   });
 }
+
+test('no source or test file carries a milestone label', () => {
+  // Labels like "M5-B", "P3-D", "Phase 3C.4" and "NFR-9" were the project's own bookkeeping while it was being
+  // built. They mean nothing to a reader, so comments say what the code does and why, not which stage added it.
+  // The migrations are left out on purpose: their checksum covers their comments, so rewording a comment in a
+  // migration that has been applied would make every existing database refuse to migrate.
+  // This file is left out because it has to name the patterns.
+  const labels = /\b(?:M\d-[A-E]|P3-[A-F]|Phase 3C(?:\.\d)?|NFR-\d+)\b/;
+  const files = [
+    ...sourceFiles('server/src'),
+    ...sourceFiles('server/scripts'),
+    ...sourceFiles('server/test'),
+    ...sourceFiles('web/src'),
+    ...sourceFiles('web/test'),
+  ].filter((file) => file !== 'server/test/repo-hygiene.test.ts');
+  assert.ok(files.length > 100, 'the scan found suspiciously few files');
+
+  for (const file of files) {
+    read(file)
+      .split(/\r?\n/)
+      .forEach((line, index) => {
+        assert.equal(labels.test(line), false, `${file}:${index + 1} carries a milestone label: ${line.trim()}`);
+      });
+  }
+});
 
 test('no source file names another project\'s cookies, routes or documents', () => {
   const residue: Array<[RegExp, string]> = [

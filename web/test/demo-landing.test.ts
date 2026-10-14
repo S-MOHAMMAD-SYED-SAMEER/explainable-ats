@@ -22,9 +22,9 @@ import {
 import { TIERS, TIER_WORDING } from '../src/copy.ts';
 import { openingTags } from './jsxScan.ts';
 
-// The public demo's landing and guided experience (Phase 3C.3).
+// The public demo's landing and guided experience.
 //
-// NFR-9 rules out jsdom and Playwright, so nothing here renders a component. What
+// The project avoids jsdom and Playwright, so nothing here renders a component. What
 // can be proved without a browser is what a visitor is TOLD and what they are
 // OFFERED: every sentence of demo copy is data a test can read, the landing's
 // behaviour is a pure function, and the structural conventions that make a screen

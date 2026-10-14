@@ -5,7 +5,7 @@ import { systemClock, type Clock } from '../lib/clock.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { SessionRecord } from '../domain/session.ts';
 
-// The authentication boundary (M5-A).
+// The authentication boundary.
 //
 // WHAT CHANGED, AND WHY IT MATTERS MORE THAN IT LOOKS
 //
@@ -23,7 +23,7 @@ import type { SessionRecord } from '../domain/session.ts';
 //
 // `attachSession` resolves a session if one is presented and never rejects —
 // so `/api/auth/session` can answer "not signed in" rather than 401, and so the
-// CSRF layer (M5-B) has the session available to compare against.
+// CSRF layer has the session available to compare against.
 // `requireSession` is the gate. Splitting them keeps "who is this?" separate
 // from "may they?", which is the same separation the executor draws between
 // verification and authorisation.
@@ -100,7 +100,7 @@ export function operatorOf(req: Request): string {
   if (!operator) {
     // Unreachable behind `requireSession`, and an assertion rather than a
     // default because a silent 'operator' fallback here would quietly restore
-    // the anonymous-actor problem this milestone exists to remove.
+    // the anonymous-actor problem this boundary exists to remove.
     throw new AppError('UNAUTHORIZED', 'Sign in to continue.');
   }
   return operator;

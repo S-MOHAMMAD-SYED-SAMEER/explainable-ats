@@ -25,7 +25,7 @@ import type { Database } from '../types.ts';
 // excluded — the quarantine is a feature, not a side effect.
 //
 // There is no ranking repository: a ranking is a pure function of the current
-// evaluations, computed on read in P3-E. A stored one would be a second source
+// evaluations, computed on read, by ranking. A stored one would be a second source
 // of truth able to disagree with the first.
 //
 // `transaction` rebinds every repository onto the transaction's connection.

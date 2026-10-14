@@ -1,4 +1,4 @@
-// PII redaction for logs (NFR-12).
+// PII redaction for logs.
 //
 // This system's inputs are other people's CVs. That makes the log a likely
 // place for personal data to end up somewhere nobody intended — and a log
