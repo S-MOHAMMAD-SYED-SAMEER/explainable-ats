@@ -13,6 +13,7 @@ import {
   PORTFOLIO_FIXTURE_ENV,
   resolvePortfolio2dFixture,
   resolvePortfolioFixture,
+  siblingsRequired,
   skipReason,
   type PortfolioDemoModule,
 } from './portfolioFixture.ts';
@@ -60,6 +61,16 @@ const targets: Target[] = [
   ...(lookup2d.runner !== null ? [{ label: '2D portfolio', runner: lookup2d.runner }] : []),
 ];
 const skip = targets.length > 0 ? false : skipReason(lookup) + ' ' + `The 2D portfolio's runner was not found at ${lookup2d.tried.join(', ')} either (override: ${PORTFOLIO_2D_FIXTURE_ENV}).`;
+
+if (siblingsRequired() && (lookup.runner === null || lookup2d.runner === null)) {
+  test('both portfolio sites are checked out, as this environment requires', () => {
+    assert.fail(
+      `This environment requires both portfolio sites (CI=true or REQUIRE_PORTFOLIO_SIBLINGS=1), but the ` +
+        `3D runner ${lookup.runner === null ? 'was not found' : 'was found'} (looked in ${lookup.tried.join(', ')}) and the ` +
+        `2D runner ${lookup2d.runner === null ? 'was not found' : 'was found'} (looked in ${lookup2d.tried.join(', ')}).`,
+    );
+  });
+}
 
 if (lookup.explicitButMissing) {
   test(`${PORTFOLIO_FIXTURE_ENV} points at a directory that holds the demo runner`, () => {

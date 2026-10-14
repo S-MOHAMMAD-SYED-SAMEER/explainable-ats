@@ -219,7 +219,14 @@ test('the session-based interactive demo is still all there', () => {
 
 const PORTFOLIO_DATA = path.resolve(HERE, '../../../portfolio/src/data/projects.ts');
 
-// Skipped, like the parity suite, wherever the sibling portfolio checkout is absent (CI).
+// Skipped, like the parity suite, wherever the sibling portfolio checkout is absent: a standalone clone. CI checks the
+// portfolio out, so there (CI=true) its absence is a failure, below, not a skip.
+test('the sibling portfolio is checked out where CI requires it', () => {
+  if (process.env.CI === 'true' || process.env.REQUIRE_PORTFOLIO_SIBLINGS === '1') {
+    assert.ok(fs.existsSync(PORTFOLIO_DATA), `CI requires the sibling portfolio repository, and ${PORTFOLIO_DATA} does not exist`);
+  }
+});
+
 test(
   'the portfolio\'s Explainable ATS entry links to its interactive demo and its repository, and to no hosted instance',
   { skip: fs.existsSync(PORTFOLIO_DATA) ? false : 'the sibling portfolio repository is not checked out here' },

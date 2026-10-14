@@ -7,6 +7,7 @@ import {
   PORTFOLIO_FIXTURE_ENV,
   resolvePortfolio2dFixture,
   resolvePortfolioFixture,
+  siblingsRequired,
   skipReason,
 } from './portfolioFixture.ts';
 
@@ -130,4 +131,14 @@ test('every default candidate is derived from the repository root', () => {
     path.resolve(REPO_ROOT, '..', '..', 'sameer-3d-portfolio', 'sameer-3d-portfolio', 'src', 'demo', 'p3'),
   ]);
   assert.ok(lookup.tried.every((dir) => path.isAbsolute(dir)));
+});
+
+// --- when a missing sibling is a failure, not a skip -----------------------------------
+
+test('a missing sibling is only a failure where the environment says so', () => {
+  assert.equal(siblingsRequired({}), false, 'a standalone clone may skip');
+  assert.equal(siblingsRequired({ CI: 'true' }), true, 'GitHub Actions sets CI=true');
+  assert.equal(siblingsRequired({ REQUIRE_PORTFOLIO_SIBLINGS: '1' }), true);
+  assert.equal(siblingsRequired({ CI: 'false' }), false);
+  assert.equal(siblingsRequired({ CI: '' }), false);
 });

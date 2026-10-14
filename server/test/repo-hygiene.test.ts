@@ -221,6 +221,8 @@ test('the parity lookup order the README documents is the lookup order in the co
 // --- CI: valid in shape, and it runs real commands -----------------------------
 
 const CI_PATH = '.github/workflows/ci.yml';
+const CI_AUDIT = 'npm audit --audit-level=high';
+const CI_CHECKOUT = 'bash ../.github/scripts/checkout-portfolio-repos.sh';
 
 type CiStep = { run?: string; uses?: string };
 type CiJob = { workingDirectory: string; steps: CiStep[]; nodeVersion: string | null; cachePaths: string[] };
@@ -298,8 +300,17 @@ test('the CI workflow runs every check, from the right directory, using real scr
     assert.ok(exists(`${pkg}/package-lock.json`), `${name}: npm ci needs a lockfile`);
 
     const invoked = new Set<string>();
+    // The audit fails the build on a high or critical advisory; the checkout puts the two portfolio repositories
+    // beside this one, so the parity tests run instead of skipping.
+    assert.ok(runs.includes(CI_AUDIT), `${name}: does not run \`${CI_AUDIT}\``);
+    assert.ok(runs.includes(CI_CHECKOUT), `${name}: does not check the portfolio repositories out`);
+    assert.ok(
+      runs.indexOf(CI_CHECKOUT) < runs.indexOf('npm test'),
+      `${name}: tests run before the portfolio repositories are checked out`,
+    );
+
     for (const command of runs) {
-      if (command === 'npm ci') continue;
+      if (command === 'npm ci' || command === CI_AUDIT || command === CI_CHECKOUT) continue;
       const script = command === 'npm test' ? 'test' : /^npm run ([\w:-]+)$/.exec(command)?.[1];
       assert.ok(script, `${name}: "${command}" is not an npm script invocation`);
       assert.ok(script in available, `${name}: "${command}" is not a script in ${pkg}/package.json`);
@@ -309,6 +320,18 @@ test('the CI workflow runs every check, from the right directory, using real scr
 
     for (const cachePath of job.cachePaths) assert.ok(exists(cachePath), `${name}: cache path ${cachePath} does not exist`);
   }
+});
+
+test('the CI workflow runs on every push and every pull request, and its checkout script exists', () => {
+  const source = read(CI_PATH);
+  // Everything between `on:` and the next top-level key.
+  const triggers = source.slice(source.search(/^on:\s*$/m), source.search(/^permissions:/m));
+
+  assert.ok(/^\s+push:\s*$/m.test(triggers), 'CI does not run on push');
+  assert.ok(/^\s+pull_request:\s*$/m.test(triggers), 'CI does not run on pull requests');
+  assert.equal(/branches/.test(triggers), false, 'CI is limited to some branches');
+  assert.ok(exists('.github/scripts/checkout-portfolio-repos.sh'), 'the portfolio checkout script is missing');
+  assert.ok(read('.github/scripts/checkout-portfolio-repos.sh').startsWith('#!/usr/bin/env bash'), 'the checkout script is not a bash script');
 });
 
 test('the CI workflow uses only first-party actions and a Node version the server supports', () => {

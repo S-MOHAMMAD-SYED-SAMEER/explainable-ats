@@ -37,6 +37,20 @@ import type {
 
 export const PORTFOLIO_FIXTURE_ENV = 'PORTFOLIO_DEMO_DIR';
 
+/**
+ * Whether a missing portfolio checkout is a failure rather than a skip.
+ *
+ * On a developer's machine, or in a standalone clone, the sibling repositories may simply
+ * not be there, and the parity tests say so and skip. CI checks them out before it tests,
+ * so there a missing one means the checkout step broke, and a green run with the parity
+ * suite silently skipped would be exactly the false comfort the suite exists to prevent.
+ * GitHub Actions sets CI=true; REQUIRE_PORTFOLIO_SIBLINGS=1 asks for the same strictness
+ * anywhere else.
+ */
+export function siblingsRequired(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  return env.CI === 'true' || env.REQUIRE_PORTFOLIO_SIBLINGS === '1';
+}
+
 const RUNNER_FILE = 'run.ts';
 
 export type FixtureLookup = {

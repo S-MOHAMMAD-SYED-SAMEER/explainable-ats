@@ -223,7 +223,7 @@ cd server && npm test        # 500 reported: 496 test cases and 4 helper modules
 cd web && npm test           # 193 reported: 192 test cases and 1 helper module
 ```
 
-`server/test/demo-parity.test.ts` compares this pipeline with the browser-demo runner in the separate `sameer-3d-portfolio` repository, and with the copy of that runner in the `portfolio` repository (the 2D site). Each comparison runs against every copy it can find. It finds the 3D runner through `PORTFOLIO_DEMO_DIR`, then `../sameer-3d-portfolio/src/demo/p3`, then `../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3`. The 2D copy is looked for at `../portfolio/src/demo/p3`, or at `PORTFOLIO_2D_DEMO_DIR` if that is set. If no copy holds `run.ts` the 11 parity tests are reported as skipped, as they are in CI (`.github/workflows/ci.yml`, two jobs on Node 24, no secrets).
+`server/test/demo-parity.test.ts` compares this pipeline with the browser-demo runner in the separate `sameer-3d-portfolio` repository, and with the copy of that runner in the `portfolio` repository (the 2D site). Each comparison runs against every copy it can find. It finds the 3D runner through `PORTFOLIO_DEMO_DIR`, then `../sameer-3d-portfolio/src/demo/p3`, then `../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3`. The 2D copy is looked for at `../portfolio/src/demo/p3`, or at `PORTFOLIO_2D_DEMO_DIR` if that is set. If no copy holds `run.ts` the 11 parity tests are reported as skipped, as they are in a standalone clone. CI (`.github/workflows/ci.yml`, two jobs on Node 24, no secrets) checks both portfolio repositories out first (the branch of the same name if there is one, otherwise `main`), runs `npm audit --audit-level=high`, and treats a missing sibling as a failure, not a skip, so nothing is skipped there.
 
 There are no browser or end-to-end tests, and no evaluation set that measures extraction quality.
 
@@ -269,7 +269,9 @@ There are no browser or end-to-end tests, and no evaluation set that measures ex
 ├── web/
 │   ├── src/                     React app: screens, components, demo views, API client
 │   └── test/                    11 test files and 1 helper module
-└── .github/workflows/ci.yml     server and web jobs
+└── .github/
+    ├── workflows/ci.yml         server and web jobs: install, audit, test, typecheck, lint (and build)
+    └── scripts/                 checks the two portfolio repositories out beside this one for CI
 ```
 
 Key files:
