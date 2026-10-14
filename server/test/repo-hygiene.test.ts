@@ -107,7 +107,7 @@ test('the README does not repeat claims that were once true or never were', () =
     [/\b(389|346|337) tests\b/i, 'quotes an old test count'],
     [/No Docker, Compose, or CI/i, 'denies the CI workflow'],
     [/reachability has not been verified/i, 'makes an obsolete deployment-reachability claim'],
-    [/pinned to `?claude-sonnet-5`? by default/i, 'implies the Anthropic provider works'],
+    [/pinned to `?claude-sonnet-5(-5)?`? by default/i, 'implies the Anthropic provider works'],
     [/anthropic[^\n]{0,60}not implemented/i, 'says the Anthropic provider is not implemented'],
     [/not implemented[^\n]{0,60}anthropic/i, 'says the Anthropic provider is not implemented'],
     [/not imported anywhere/i, 'says the Anthropic SDK is unused'],

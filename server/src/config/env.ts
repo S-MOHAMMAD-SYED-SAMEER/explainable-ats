@@ -273,7 +273,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         // to drift from: API spend is real money, so the tier is stated here and
         // changed deliberately or not at all. The Anthropic provider passes this
         // string through verbatim and never names a model of its own.
-        anthropicModel: readString('ANTHROPIC_MODEL', 'claude-sonnet-5'),
+        anthropicModel: readString('ANTHROPIC_MODEL', 'claude-sonnet-5-5'),
         anthropicTimeoutMs: readBoundedInt(
           'ANTHROPIC_TIMEOUT_MS',
           ANTHROPIC_DEFAULT_TIMEOUT_MS,

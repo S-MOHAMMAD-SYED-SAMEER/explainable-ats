@@ -94,7 +94,7 @@ export const PROJECT_SECTIONS: readonly ProjectSection[] = [
     id: 'privacy',
     heading: 'Redaction and privacy',
     body: [
-      'Before anything reads a CV, personal details — name, contact details, date of birth, gender, nationality, address and similar — are masked in place with blocks of the same length. The system records which category was found and where, never the value, and the extraction step is shown only the masked copy.',
+      'Before anything reads a CV, personal details — name, contact details, date of birth, gender, nationality, address and similar — are masked in place with blocks of the same length. The findings record which category was found and where, never the value; the extraction step is shown only the masked copy, and the original text is kept so that quotes can be checked against it.',
       'Redaction here is pattern-based and tuned for the synthetic CVs; it is not a general-purpose scrubber for real-world documents.',
     ],
   },
@@ -180,7 +180,7 @@ export const WORKFLOW_STAGES: ReadonlyArray<{ id: string; label: string; summary
     id: 'redact',
     label: 'Redaction',
     summary:
-      'Personal details — name, contact details, date of birth, nationality, gender, address — are masked before anything reads the CV. Only the category is recorded, never the value.',
+      'Personal details — name, contact details, date of birth, nationality, gender, address — are masked before anything reads the CV. The findings record only the category, never the value; the original text is kept for checking quotes.',
   },
   {
     id: 'verify',

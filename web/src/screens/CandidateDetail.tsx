@@ -126,8 +126,8 @@ function Fairness({ detail }: { detail: EvaluationDetail }): ReactNode {
         {detail.protectedAttributes.categories.join(', ').replace(/_/g, ' ')}.
       </p>
       <p className="mt-1 text-meta text-ink-muted">
-        Only the category and the position were recorded. The values themselves were never stored, so there is nothing
-        to show here and nothing to leak.
+        Only the category and the position were recorded in the findings, so there is nothing to show here. The original
+        text is stored, because every quote is checked against it; the model only ever saw the masked copy.
       </p>
     </section>
   );

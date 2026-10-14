@@ -7,9 +7,11 @@ import { BASIS_POINTS_MAX, VERDICT_BASIS_POINTS, type JobRequirement } from '../
 //
 //     score = floor( Σ (weight_i × verdictBasisPoints_i) / Σ weight_i )
 //
-// Every term is an integer and the division happens exactly once, at the end.
-// There is no floating point anywhere in this file, which is why the same
-// evidence gives the same number on every machine, forever.
+// Every term is an integer and the division happens exactly once, at the end,
+// as a floor-division. That one division is IEEE-754, which is deterministic, and
+// at these magnitudes (a score never exceeds 10,000 and the total weight is
+// small) it agrees with exact integer division, so the same evidence gives the
+// same number on every machine, forever.
 //
 // CONTRIBUTIONS ADD UP TO THE SCORE, EXACTLY
 //
