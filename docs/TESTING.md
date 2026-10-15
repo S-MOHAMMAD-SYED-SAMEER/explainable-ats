@@ -248,4 +248,4 @@ These protect the two guarantees the product is built on: nothing protected reac
 - **Prompt injection.** No test feeds a CV containing instructions to a model. The verifier limits the damage (a model can only cite text that really is in the CV, and it cannot score), but the prompt layer has no defence and no tests.
 - **Rendered components.** The web tests don't render components, with one exception: the evidence highlighter, which is written without JSX so React's string renderer can run it. There are no browser tests.
 
-What I'd add first is an evaluation set: a few dozen redacted CVs with hand-marked passages per requirement, scored on how many true passages the extractor finds. A missed passage becomes `unclear`, not `not_met`, so recall is the number that matters most.
+What I'd add first is an evaluation: `eval/` holds the set (twenty invented CVs over two roles) and a labelling file waiting for hand-marked passages and verdicts, but no labels exist yet and nothing has been scored. Once they do, the first number to read is how many true passages the extractor finds: a missed passage becomes `unclear`, not `not_met`, so recall matters most.

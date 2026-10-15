@@ -1,0 +1,66 @@
+Name: Leopold Abernethy-Sithole
+Email: leopold.abernethy-sithole@example.invalid
+Phone: +44 20 7946 0719
+Date of birth: 21 January 1981
+Nationality: British
+Gender: Male
+Address: 72 Cathedral View, Durham DH1 3RW
+
+CURRICULUM VITAE
+
+PERSONAL STATEMENT
+Nineteen years in data: first as an analyst, then a developer, then an architect, and for the last six years back to hands-on engineering because that is the part I enjoy. This document is long because I would rather you could see how I work than have to guess.
+
+EMPLOYMENT
+
+Principal Data Engineer, Vantage Mobility (2021 - present)
+Vantage runs a fleet of shared electric vehicles; the data group has twelve people.
+- Own the design of the telemetry platform: vehicle events arrive by the million and have to be usable for billing within minutes.
+- Built and operate production data pipelines in Python that take telemetry and booking data through cleansing, enrichment and aggregation into the lakehouse. There are about 90 pipelines.
+- Set the standard for how pipelines are tested: every pipeline has a data quality suite, and a failing check stops publication.
+- Introduced dbt for the analytics layer and trained the analysts to write their own models.
+- Review the schema changes proposed by the application teams before they reach the lake.
+- Represent the data group in the quarterly planning meeting.
+
+Senior Data Engineer, Vantage Mobility (2018 - 2021)
+- Migrated the batch estate from cron and shell scripts to Dagster, including the backfill tooling. About 150 jobs moved over a year.
+- Wrote complex SQL against the Snowflake warehouse: sessionisation, billing reconciliation, and a fraud feature set built from trip history with window functions over very large partitions.
+- Sat with the finance and operations analysts every week for a year to agree the definitions of utilisation, revenue per vehicle and downtime; the definitions we agreed are still the company's metrics.
+- Interviewed and hired four engineers.
+
+Data Architect, Greenacre Energy (2014 - 2018)
+Greenacre is an energy retailer with six million customers.
+- Designed the move from an on-premises data warehouse to a cloud platform, and ran the migration in phases over two years.
+- Wrote the data modelling standards for the new warehouse.
+- Worked with the regulatory team on the data returns the regulator requires.
+- Wrote SQL for the most difficult reconciliations myself, including the half-hourly settlement queries.
+- Introduced Airflow in 2016 for the new platform; I wrote the first twenty DAGs and the operating guide the team still uses.
+- Gave a talk at an industry event about the migration.
+
+Data Developer, Teesdale Water (2009 - 2014)
+- Built reporting for the operations centre using Oracle and a reporting tool.
+- Wrote stored procedures and the nightly loads that fed them, in PL/SQL.
+- Spent a winter writing the reports used during flood response, with the operations team beside me.
+- Moved the nightly loads to Python scripts in 2012, which was my first production Python.
+
+Analyst, Teesdale Water (2005 - 2009)
+- Wrote queries and reports for the finance team.
+- Learned SQL from a very patient colleague and a very large book.
+
+EDUCATION
+BSc Mathematics, University of Durham, 2004
+Postgraduate Diploma in Data Management, Open University, 2010
+
+SKILLS
+Python, SQL, Snowflake, Dagster, Airflow, dbt, PL/SQL, data modelling, data quality, mentoring
+
+PUBLICATIONS AND TALKS
+"Moving a warehouse without stopping the reports", industry conference, 2017.
+"Data contracts in practice", blog post, 2022.
+"Testing data pipelines", internal workshop series, 2023.
+
+INTERESTS
+Hill walking, brass bands, a long-running attempt to grow tomatoes.
+
+REFERENCES
+Available on request.

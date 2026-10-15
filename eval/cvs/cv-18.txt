@@ -1,0 +1,10 @@
+NAME: Marisol Eberhardt-Quaye
+EMAIL: marisol.eberhardt-quaye@example.invalid
+PHONE: +44 20 7946 0718
+DOB: 4/8/1995
+NATIONALITY: German
+GENDER: F
+ADDRESS: 3 Dock Lane, Southampton SO14 3HJ
+
+data eng, 3y. py pipelines (airflow) in prod, ~50 jobs. sql on warehouse, lots. talk to analysts weekly to scope stuff.
+tools: python sql airflow bigquery git

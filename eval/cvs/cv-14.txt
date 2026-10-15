@@ -1,0 +1,27 @@
+Name: Lucian Haverford-Mbeki
+Email: lucian.haverford-mbeki@example.invalid
+Phone: +44 20 7946 0714
+Date of birth: 1 July 1997
+Nationality: British
+Gender: Male
+Address: 14 Orchard Way, Reading RG1 7HN
+
+SUMMARY
+Business analyst who wants to move into data engineering. Strong with numbers, quick to learn tools.
+
+EXPERIENCE
+Business Analyst, Calderbank Insurance (2021 - present)
+Produce the weekly claims report for the operations director, built in Excel with a set of macros I wrote myself.
+Write SQL queries against the claims database in Access and, more recently, against a reporting copy in SQL Server, mostly joins and aggregates.
+Work with claims handlers and underwriters to turn their questions into reports, and present the results in a monthly meeting.
+Attended an Airflow introduction webinar and a Python for analysts workshop.
+
+Junior Analyst, Pennant Marketing (2019 - 2021)
+Cleaned survey data in Excel and built dashboards for account managers.
+
+EDUCATION
+BSc Economics, University of Reading, 2019
+Python for Data Analysis (online certificate), 2022
+
+SKILLS
+Excel, SQL, Power BI, Python (beginner)

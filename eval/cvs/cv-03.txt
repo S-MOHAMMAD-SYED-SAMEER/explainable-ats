@@ -1,0 +1,31 @@
+Name: Keiran Dobbs
+Email: keiran.dobbs@example.invalid
+Phone: +44 20 7946 0703
+Date of birth: 19 July 2002
+Nationality: British
+Gender: Male
+Address: 5 Station Road, Leicester LE1 2AA
+
+SUMMARY
+Recent graduate looking for a first job in software. Quick learner, keen to get stuck in.
+
+EDUCATION
+BSc Computer Science (2:1), De Montfort University, 2024
+Final year project: a recipe-sharing website.
+
+PROJECTS
+Recipe site (final year project)
+Built the website with a Node.js tutorial series and a PostgreSQL database that I accessed through an ORM, so I never wrote much SQL directly. It ran on my laptop and on a free hosting plan for the demo.
+
+Weather app
+Small app that shows a forecast for a postcode. Followed an online course for the backend.
+
+EXPERIENCE
+Sales Assistant, Greenfield Garden Centre, 2021 to 2023 (part time)
+Served customers, handled the till and helped stock the shelves.
+
+Volunteer, Saturday Coding Club for Children, 2022 to 2023
+Helped children aged 8 to 12 make games in Scratch.
+
+SKILLS
+JavaScript, Node.js (learning), SQL (basic), Git, HTML and CSS

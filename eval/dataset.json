@@ -1,0 +1,49 @@
+{
+  "version": "eval-set-v1",
+  "note": "Twenty invented CVs against two roles. Every person, employer, address, email and phone number is invented; emails use the reserved .invalid top level and phone numbers come from the range set aside for fiction. The CVs were written by an AI. The labels are written by the project's owner.",
+  "roles": {
+    "demo": {
+      "title": "Senior Backend Engineer",
+      "seniority": "senior",
+      "description": "Owns a payments service end to end: the API, the database behind it, and the people who work on it.",
+      "requirements": [
+        { "id": "demo-node", "label": "Node.js", "criterion": "Has shipped production services in Node.js", "kind": "must_have", "weight": 3 },
+        { "id": "demo-postgres", "label": "PostgreSQL", "criterion": "Has run PostgreSQL at scale", "kind": "must_have", "weight": 2 },
+        { "id": "demo-mentoring", "label": "Mentoring", "criterion": "Has mentored junior engineers", "kind": "nice_to_have", "weight": 2 }
+      ]
+    },
+    "data": {
+      "title": "Data Platform Engineer",
+      "seniority": "senior",
+      "description": "Builds and runs the pipelines and warehouse that analysts and models depend on.",
+      "requirements": [
+        { "id": "data-python", "label": "Python pipelines", "criterion": "Has built and operated production data pipelines in Python", "kind": "must_have", "weight": 3 },
+        { "id": "data-sql", "label": "SQL and warehouses", "criterion": "Has written complex SQL against a data warehouse", "kind": "must_have", "weight": 2 },
+        { "id": "data-orchestration", "label": "Orchestration", "criterion": "Has used a workflow orchestrator such as Airflow or Dagster", "kind": "nice_to_have", "weight": 2 },
+        { "id": "data-stakeholders", "label": "Stakeholders", "criterion": "Has worked with analysts or business stakeholders to define data requirements", "kind": "nice_to_have", "weight": 1 }
+      ]
+    }
+  },
+  "cvs": [
+    { "id": "cv-01", "role": "demo", "displayName": "Amara Okonkwo-Reyes", "file": "cvs/cv-01.txt" },
+    { "id": "cv-02", "role": "demo", "displayName": "Tomasz Wieczorek-Hale", "file": "cvs/cv-02.txt" },
+    { "id": "cv-03", "role": "demo", "displayName": "Keiran Dobbs", "file": "cvs/cv-03.txt" },
+    { "id": "cv-04", "role": "demo", "displayName": "Rosalind Achterberg", "file": "cvs/cv-04.txt" },
+    { "id": "cv-05", "role": "demo", "displayName": "Desmond Fairweather", "file": "cvs/cv-05.txt" },
+    { "id": "cv-06", "role": "demo", "displayName": "Oluwaseun Brandt", "file": "cvs/cv-06.txt" },
+    { "id": "cv-07", "role": "demo", "displayName": "Henrietta Valdivia-Cross", "file": "cvs/cv-07.txt" },
+    { "id": "cv-08", "role": "demo", "displayName": "Ignatius Pemberton-Shah", "file": "cvs/cv-08.txt" },
+    { "id": "cv-09", "role": "demo", "displayName": "Philomena Grosvenor-Adeyemi", "file": "cvs/cv-09.txt" },
+    { "id": "cv-10", "role": "demo", "displayName": "Valentina Moretti-Osei", "file": "cvs/cv-10.txt" },
+    { "id": "cv-11", "role": "demo", "displayName": "Bartholomew Nakamura-Quinn", "file": "cvs/cv-11.txt" },
+    { "id": "cv-12", "role": "demo", "displayName": "Cordelia Fitzgerald-Banda", "file": "cvs/cv-12.txt" },
+    { "id": "cv-13", "role": "data", "displayName": "Imogen Castellanos-Reid", "file": "cvs/cv-13.txt" },
+    { "id": "cv-14", "role": "data", "displayName": "Lucian Haverford-Mbeki", "file": "cvs/cv-14.txt" },
+    { "id": "cv-15", "role": "data", "displayName": "Saoirse Delacroix-Mutasa", "file": "cvs/cv-15.txt" },
+    { "id": "cv-16", "role": "data", "displayName": "Anselm Rutherford-Nkemelu", "file": "cvs/cv-16.txt" },
+    { "id": "cv-17", "role": "data", "displayName": "Thaddeus Okafor-Lindqvist", "file": "cvs/cv-17.txt" },
+    { "id": "cv-18", "role": "data", "displayName": "Marisol Eberhardt-Quaye", "file": "cvs/cv-18.txt" },
+    { "id": "cv-19", "role": "data", "displayName": "Leopold Abernethy-Sithole", "file": "cvs/cv-19.txt" },
+    { "id": "cv-20", "role": "data", "displayName": "Perpetua Lindgren-Adebayo", "file": "cvs/cv-20.txt" }
+  ]
+}

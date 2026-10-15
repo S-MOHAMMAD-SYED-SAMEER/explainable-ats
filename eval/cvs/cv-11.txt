@@ -1,0 +1,27 @@
+Name: Bartholomew Nakamura-Quinn
+Email: bartholomew.nakamura-quinn@example.invalid
+Phone: +44 20 7946 0711
+Date of birth: 2 November 1987
+Nationality: British
+Gender: Male
+Address: 55 Ropewalk, Liverpool L1 4DN
+
+SUMMARY
+Backend engineer, mostly Go and Python, with a long record of running databases for products that cannot go down.
+
+EXPERIENCE
+Staff Engineer, Tidewater Exchange (2018 - present)
+Operated a fleet of PostgreSQL replicas behind a trading platform: three regions, 20 TB in total, with automated failover that has been exercised in production twice.
+Wrote the capacity model that told us when to add replicas and when to shard, and the tooling that made resharding a routine task.
+Mentored four junior engineers and one intern; I set learning goals with each of them every quarter and reviewed their design documents.
+Evaluated Node.js for the new gateway, but chose Go because the workload was CPU bound and latency sensitive. The gateway has been in production since 2020.
+
+Senior Engineer, Copperfield Data (2014 - 2018)
+Built ingestion services in Python that processed 50 million events a day.
+Ran the PostgreSQL warehouse that powered customer reporting and tuned the slowest forty queries.
+
+EDUCATION
+MEng Computer Science, University of Liverpool, 2010
+
+SKILLS
+Go, Python, PostgreSQL, Linux, Prometheus, Terraform

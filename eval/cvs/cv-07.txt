@@ -1,0 +1,87 @@
+Name: Henrietta Valdivia-Cross
+Email: henrietta.valdivia-cross@example.invalid
+Phone: +44 20 7946 0707
+Date of birth: 30 October 1979
+Nationality: British
+Gender: Female
+Address: 66 Vicarage Gardens, Oxford OX2 6PT
+
+CURRICULUM VITAE
+
+PERSONAL STATEMENT
+I have worked in software for twenty-one years, in start-ups, a large public-sector programme and a scale-up, and in roles that moved between hands-on engineering, architecture and managing people. I am looking for a senior hands-on role where I can still write code most days. What follows is a full history because short CVs hide the interesting parts.
+
+EMPLOYMENT HISTORY
+
+Head of Platform Engineering, Quillon Health (2022 - present)
+Quillon is a digital health provider with about 400 staff. I run a platform group of nine engineers.
+- Set the technical direction for the patient records platform, a set of around thirty services.
+- Introduced architecture decision records and a lightweight design review that takes less than an hour a week.
+- Negotiated the move from one cloud provider to another, saving roughly a third of the hosting bill without a single minute of planned downtime.
+- Hired seven of the nine people in the group. I run weekly one-to-ones with all of them and a monthly session on career growth.
+- Still write code: last quarter I built the audit export service myself.
+- Represented the engineering group in the data protection reviews that followed the regulator's guidance on health records.
+- Reduced the number of production incidents per month from eleven to three by fixing the on-call rota, the alert thresholds and the runbooks, in that order.
+
+Principal Engineer, Quillon Health (2019 - 2022)
+- Led the design of the appointment booking service. It is written in Go and it is very fast.
+- Introduced contract testing between teams after a bad week in which three teams broke each other's builds.
+- Gave internal talks on reliability and wrote the postmortem template the company still uses.
+- Worked with clinicians to understand how appointments are really made, which changed the design more than any technical consideration did.
+- Chaired the interview panel for senior engineers.
+
+Senior Engineer, Fernbank Digital (2015 - 2019)
+Fernbank built digital products for retail clients. I was one of four senior engineers.
+- Designed and shipped production Node.js services for three retail clients, including a loyalty points platform that handled a quarter of a million transactions on its busiest day.
+- Wrote the shared Node.js starter template that every new service at Fernbank began from, with logging, health checks and graceful shutdown built in.
+- Introduced a staging environment that matched production, which ended the habit of finding configuration bugs on release day.
+- Estimated and planned projects with account managers and presented the plans to clients.
+- Moved two clients from hand-deployed servers to a container platform.
+- Took part in a three-month reliability project that halved the number of out-of-hours calls.
+- Supported the sales team with technical answers to tenders.
+
+Software Engineer, Brightmoor Council (2010 - 2015)
+Brightmoor Council ran a large programme to move services online, in a team of around forty developers.
+- Built web forms and the workflow behind them, in Java.
+- Designed a document store on top of PostgreSQL that held about two million case files, and wrote the backup and restore procedures for it.
+- Tuned the database as the volume grew, adding indexes, partitioning the largest tables by year and moving the reporting queries to a replica.
+- Took part in a procurement exercise to choose a case management product, and wrote the technical evaluation.
+- Trained new starters on the council's coding standards.
+
+Developer, Greyfriars Systems (2005 - 2010)
+- Wrote and maintained a stock control application in C# for a chain of builders' merchants.
+- Fixed bugs in the invoicing module, which was written by someone who had since left and had left very few comments.
+- Spent a year on the support desk, which taught me more about how software fails than anything else has.
+
+Junior Developer, Penhallow Print (2003 - 2005)
+- Built the company's order tracking website in PHP.
+- Learned version control the hard way, after overwriting a colleague's work.
+
+VOLUNTARY WORK
+
+Mentor, Code First Women (2017 - present)
+I have mentored eleven women who are changing career into software, meeting each of them monthly for a year. Seven are now working as developers.
+
+School governor, Elmcroft Primary School (2018 - 2022)
+Chaired the digital strategy committee.
+
+Organiser, Oxford Software Meetup (2016 - 2019)
+Ran a monthly evening talk with about sixty attendees.
+
+PUBLICATIONS AND TALKS
+"What on-call taught me about writing software", talk at a regional engineering conference, 2018.
+"Contract tests, or how to stop breaking each other", blog post, 2019.
+"Hiring for curiosity", internal talk at Quillon Health, 2023.
+
+EDUCATION
+MSc Software Engineering, University of Oxford (part time), 2009
+BSc Mathematics and Computer Science, University of Warwick, 2003
+
+SKILLS
+Go, Node.js, Java, C#, PostgreSQL, Kubernetes, Terraform, system design, hiring, coaching
+
+INTERESTS
+Fell running, restoring old radios, and trying to learn the cello.
+
+REFERENCES
+Available on request.

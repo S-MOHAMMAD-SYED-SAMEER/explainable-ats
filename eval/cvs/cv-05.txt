@@ -1,0 +1,26 @@
+Name: Desmond Fairweather
+Email: desmond.fairweather@example.invalid
+Phone: +44 20 7946 0705
+Date of birth: 8 December 1992
+Nationality: British
+Gender: Male
+Address: 17 Mill Lane, Cambridge CB2 3QR
+
+SUMMARY
+Backend engineer, five years, mostly APIs for e-commerce.
+
+EXPERIENCE
+Backend Engineer, Thistledown Retail (2020 - present)
+Designed and shipped production Node.js services for an online storefront, including the basket, pricing and order APIs. They handled Black Friday 2022 without incident.
+I have not run PostgreSQL in production and have no experience of it at scale. Our data lived in a managed MySQL service that another team looked after.
+I have not had the opportunity to mentor anyone; I have always been the most junior person on the team.
+Wrote the contract tests that stopped two teams breaking each other's APIs.
+
+Junior Developer, Marlow and Finch (2018 - 2020)
+Built internal tools in JavaScript and fixed bugs in a legacy PHP application.
+
+EDUCATION
+BSc Software Engineering, Anglia Ruskin University
+
+SKILLS
+Node.js, TypeScript, MySQL, Docker, Jest

@@ -1,0 +1,26 @@
+Name: Philomena Grosvenor-Adeyemi
+Email: philomena.grosvenor-adeyemi@example.invalid
+Phone: +44 20 7946 0709
+Date of birth: 5 June 1994
+Nationality: British
+Gender: Female
+Address: 12 Parkside Avenue, Nottingham NG7 1BQ
+
+SUMMARY
+Developer with six years of experience, the last three on a small product team.
+
+EXPERIENCE
+Developer, Wrenfield Software (2021 - present)
+Shipped Node.js microservices to production for a scheduling product; there are eleven of them and they handle bookings for about 600 clinics.
+Administered the PostgreSQL instance behind the team's internal tools. It holds about 20 GB and has one backup a night.
+Helped new joiners get set up in their first week and answered their questions in the team channel.
+Wrote the deployment scripts used by the whole team.
+
+Developer, Stonebridge Media (2018 - 2021)
+Maintained a content management system written in Python and migrated its database from SQLite to PostgreSQL.
+
+EDUCATION
+BSc Computer Science, University of Nottingham, 2018
+
+SKILLS
+Node.js, JavaScript, Python, PostgreSQL, Docker
