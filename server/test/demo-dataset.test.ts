@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEMO_CANDIDATES, demoPersonalDetails, demoCandidateNames } from '../src/demo/dataset.ts';
+import { MATCH_MODES, type MatchMode } from '../src/agent/matchRules.ts';
 import { seedDemoData, clearDemoData, containsOnlyDemoData, isEmpty } from '../src/demo/seed.ts';
 import { rankJob } from '../src/agent/rank.ts';
 import { handleEvaluationDetail } from '../src/handlers/evaluations.ts';
@@ -18,76 +19,105 @@ import { createTestContext, type TestContext } from './helpers.ts';
 // Nothing here reads `expected` to decide an outcome. It reads it to compare
 // against one.
 
-async function seeded(t: { after: (fn: () => unknown) => void }): Promise<TestContext & { jobId: string }> {
+async function seeded(
+  t: { after: (fn: () => unknown) => void },
+  mode?: MatchMode,
+): Promise<TestContext & { jobId: string }> {
   const ctx = await createTestContext();
   t.after(() => ctx.close());
-  const result = await seedDemoData({ repos: ctx.repos });
+  const result = await seedDemoData({ repos: ctx.repos, ...(mode ? { matchMode: mode } : {}) });
   return Object.assign(ctx, { jobId: result.jobId });
+}
+
+/** What a candidate is declared to produce under one mode. */
+function declared(candidate: (typeof DEMO_CANDIDATES)[number], mode: MatchMode) {
+  return mode === 'folded' ? candidate.expectedFolded : candidate.expected;
 }
 
 // --- the four cases are all present and all distinct -------------------------
 
-test('the dataset declares all four outcomes the product distinguishes', () => {
+test('the dataset declares all four outcomes the product distinguishes, in the mode that was written for them', () => {
   // A precondition on the dataset itself, before anything runs. If someone
   // removes a candidate, this says so rather than the demo quietly losing a
   // case nobody notices until a client is watching.
-  const tiers = new Set(DEMO_CANDIDATES.map((candidate) => candidate.expected.tier));
+  const tiers = new Set(DEMO_CANDIDATES.map((candidate) => candidate.expectedFolded.tier));
 
-  assert.ok(tiers.has('qualified'), 'no qualified candidate');
+  assert.ok(tiers.has('qualified'), 'no qualified candidate when matching is folded');
   assert.ok(tiers.has('needs_review'), 'no needs-review candidate');
   assert.ok(tiers.has('gated'), 'no gated candidate');
   assert.ok(tiers.has('not_evaluated'), 'no unevaluated candidate');
 });
 
-test('every candidate lands in the tier the dataset says they will', async (t) => {
-  const ctx = await seeded(t);
-  const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
-
-  assert.equal(ranking.entries.length, DEMO_CANDIDATES.length, 'every candidate is listed');
-
-  const byReference = new Map(ranking.entries.map((entry) => [entry.reference, entry]));
-  for (const candidate of DEMO_CANDIDATES) {
-    const entry = byReference.get(candidate.reference);
-    assert.ok(entry, `${candidate.displayName} is missing from the ranking`);
-    assert.equal(
-      entry.tier,
-      candidate.expected.tier,
-      `${candidate.displayName} landed in "${entry.tier}", not "${candidate.expected.tier}"`,
-    );
-    assert.equal(
-      entry.scoreBasisPoints,
-      candidate.expected.scoreBasisPoints,
-      `${candidate.displayName} scored ${entry.scoreBasisPoints}`,
-    );
-  }
+test('under the default strict matching nobody is qualified, and the data is not reworded to hide it', () => {
+  // The CVs say "Running PostgreSQL at scale" and the criterion says "run". Whole-word
+  // matching does not equate them, so the two candidates who would be qualified are gated.
+  // This is pinned so that rewording the CVs to make the demo prettier shows up as a change
+  // somebody has to mean.
+  const tiers = new Set(DEMO_CANDIDATES.map((candidate) => candidate.expected.tier));
+  assert.ok(!tiers.has('qualified'));
+  assert.ok(DEMO_CANDIDATES.every((candidate) => candidate.resume.includes('Running PostgreSQL') || !['demo-001', 'demo-002'].includes(candidate.reference)));
+  assert.ok(MATCH_MODES.includes('strict') && MATCH_MODES.includes('folded'));
 });
 
-test('every requirement gets the verdict the dataset says it will', async (t) => {
-  const ctx = await seeded(t);
-  const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
+for (const mode of MATCH_MODES) {
+  test(`${mode}: every candidate lands in the tier the dataset says they will`, async (t) => {
+    const ctx = await seeded(t, mode);
+    const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
 
-  for (const candidate of DEMO_CANDIDATES) {
-    if (candidate.expected.verdicts.length === 0) continue;
+    assert.equal(ranking.entries.length, DEMO_CANDIDATES.length, 'every candidate is listed');
 
-    const entry = ranking.entries.find((e) => e.reference === candidate.reference);
-    const detail = await handleEvaluationDetail({ repos: ctx.repos }, entry?.evaluationId as string);
+    const byReference = new Map(ranking.entries.map((entry) => [entry.reference, entry]));
+    for (const candidate of DEMO_CANDIDATES) {
+      const want = declared(candidate, mode);
+      const entry = byReference.get(candidate.reference);
+      assert.ok(entry, `${candidate.displayName} is missing from the ranking`);
+      assert.equal(entry.tier, want.tier, `${mode}: ${candidate.displayName} landed in "${entry.tier}", not "${want.tier}"`);
+      assert.equal(entry.scoreBasisPoints, want.scoreBasisPoints, `${mode}: ${candidate.displayName} scored ${entry.scoreBasisPoints}`);
+    }
+  });
 
-    assert.deepEqual(
-      detail.body.requirements.map((requirement) => requirement.verdict),
-      candidate.expected.verdicts,
-      `${candidate.displayName}'s verdicts`,
-    );
+  test(`${mode}: every requirement gets the verdict the dataset says it will`, async (t) => {
+    const ctx = await seeded(t, mode);
+    const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
+
+    for (const candidate of DEMO_CANDIDATES) {
+      const want = declared(candidate, mode);
+      if (want.verdicts.length === 0) continue;
+
+      const entry = ranking.entries.find((e) => e.reference === candidate.reference);
+      const detail = await handleEvaluationDetail({ repos: ctx.repos }, entry?.evaluationId as string);
+
+      assert.deepEqual(
+        detail.body.requirements.map((requirement) => requirement.verdict),
+        want.verdicts,
+        `${mode}: ${candidate.displayName}'s verdicts`,
+      );
+    }
+  });
+}
+
+test('the mode is recorded in the audit trail of every score', async (t) => {
+  for (const mode of MATCH_MODES) {
+    const ctx = await seeded(t, mode);
+    const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
+    for (const entry of ranking.entries) {
+      if (!entry.evaluationId || entry.tier === 'not_evaluated') continue;
+      const events = await ctx.repos.audit.listForCorrelation(entry.evaluationId);
+      assert.equal(events.find((event) => event.eventType === 'requirements_matched')?.payload.matchMode, mode);
+    }
   }
 });
 
 // --- the centrepiece ---------------------------------------------------------
 
-test('the gate is visible: the same score, one tier apart', async (t) => {
-  // The single thing this dataset exists to show. Devi and Marcus score
+test('folded: the gate is visible: the same score, one tier apart', async (t) => {
+  // The single thing this dataset was written to show. Devi and Marcus score
   // identically; Devi is placed above Marcus because Marcus's CV does not
   // demonstrate an essential requirement. If a change ever separates their
   // scores, the demo silently degrades into ordinary sorting and this fails.
-  const ctx = await seeded(t);
+  // It holds when matching is folded; under the default strict matching Devi's
+  // score is lower, which is pinned in the next test rather than hidden.
+  const ctx = await seeded(t, 'folded');
   const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
 
   const devi = ranking.entries.find((entry) => entry.reference === 'demo-002');
@@ -105,6 +135,24 @@ test('the gate is visible: the same score, one tier apart', async (t) => {
   assert.deepEqual(marcus.failedMustHaves, ['PostgreSQL']);
   assert.match(marcus.rationale, /does not demonstrate "PostgreSQL"/);
   assert.match(marcus.rationale, /the score itself is unchanged/);
+});
+
+test('strict: the pair no longer ties, and the reason is the word form', async (t) => {
+  const ctx = await seeded(t, 'strict');
+  const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
+
+  const devi = ranking.entries.find((entry) => entry.reference === 'demo-002');
+  const rowan = ranking.entries.find((entry) => entry.reference === 'demo-001');
+  assert.ok(devi && rowan);
+
+  assert.equal(devi.tier, 'gated');
+  assert.equal(rowan.tier, 'gated');
+  assert.equal(rowan.scoreBasisPoints, 8571, 'the highest score on the list, and gated');
+  assert.deepEqual(rowan.failedMustHaves, ['PostgreSQL']);
+  const detail = await handleEvaluationDetail({ repos: ctx.repos }, rowan.evaluationId as string);
+  const postgres = detail.body.requirements.find((requirement) => requirement.label === 'PostgreSQL');
+  assert.equal(postgres?.verdict, 'partial');
+  assert.match(postgres?.rationale ?? '', /nothing was found for "run"/);
 });
 
 test('needs-review and gated are told apart, and worded differently', async (t) => {
@@ -143,14 +191,22 @@ test('the unassessed candidate is listed, unranked, and given no number', async 
   assert.equal(ranking.notEvaluatedCount, 1);
 });
 
-test('the list opens on a candidate who meets everything', async (t) => {
+test('folded: the list opens on a candidate who meets everything', async (t) => {
   // A demo that opened on a rejection would be a strange thing to show anyone.
-  const ctx = await seeded(t);
+  const ctx = await seeded(t, 'folded');
   const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
 
   assert.equal(ranking.entries[0]?.reference, 'demo-001');
   assert.equal(ranking.entries[0]?.tier, 'qualified');
   assert.equal(ranking.entries[0]?.scorePercent, '100%');
+});
+
+test('strict: the list opens on the candidate nobody could rule out, not on a qualified one', async (t) => {
+  const ctx = await seeded(t, 'strict');
+  const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
+
+  assert.equal(ranking.entries[0]?.reference, 'demo-004');
+  assert.equal(ranking.entries[0]?.tier, 'needs_review');
 });
 
 // --- the guarantees still hold on this data ----------------------------------

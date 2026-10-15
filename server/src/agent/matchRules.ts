@@ -22,9 +22,11 @@ import type { ConfidenceLevel, JobRequirement, MatchVerdict } from '../domain/at
 // is a decision rather than an accident)
 //
 //   * A term counts only as a WHOLE WORD. "Java" is not found in "JavaScript" and
-//     "run" is not found in "running". The price is the other direction: "service"
-//     does not satisfy "services", and "Postgres" does not satisfy "PostgreSQL".
-//     No stemming and no synonyms are applied.
+//     "run" is not found in "running". The price is the other direction: in the
+//     default `strict` mode "service" does not satisfy "services", and "Postgres"
+//     does not satisfy "PostgreSQL". The optional `folded` mode folds plural -s/-es,
+//     -ing and -ed endings first (see `foldWord`), which closes the first gap and
+//     leaves the second. No synonyms are applied in either mode.
 //   * NEGATION IS NOT UNDERSTOOD. "Never shipped a Node.js service" covers exactly
 //     the terms "Shipped a Node.js service" covers, and gets the same verdict. The
 //     rules count which words appear, not what the sentence claims.
@@ -79,6 +81,61 @@ function tokenize(text: string): string[] {
     .filter((word) => word.length > 0);
 }
 
+// HOW WORDS ARE COMPARED
+//
+//   strict   a term is in a passage only if it is one of the passage's whole words.
+//            The default.
+//   folded   both sides are first reduced by `foldWord`, so "running", "runs" and
+//            "run" are one word, and so are "service" and "services", "mentored" and
+//            "mentoring". Still whole words: "java" is not "javascript".
+//
+// Which one is right is an empirical question, answered by the evaluation set rather
+// than by taste, so it is a setting (`MATCH_MODE`) and not a decision made here.
+
+export const MATCH_MODES = ['strict', 'folded'] as const;
+export type MatchMode = (typeof MATCH_MODES)[number];
+export const DEFAULT_MATCH_MODE: MatchMode = 'strict';
+
+/**
+ * A light, rule-based fold of one lower-case word, for `folded` matching.
+ *
+ * In order: plural endings (-ies to -y, -sses to -ss, -ches/-shes/-xes/-zes drop -es,
+ * otherwise drop a final -s unless the word ends -ss, -us or -is), then -ing and -ed
+ * where at least three letters remain, then an undoubled final consonant after those
+ * two (shipped, ship), then a final -e (scale, scaled, scaling all become "scal").
+ *
+ * It is a fold, not a stemmer: the result need not be a word, it only has to be the
+ * same for words that should match. It does NOT touch anything shorter than four
+ * letters, or anything with a digit, dot, plus or hash in it, so "node.js", "c++" and
+ * "c#" are never altered. It has known edge cases ("use" and "using" do not meet,
+ * "speed" and "speeding" do not meet) and is not meant to be clever.
+ */
+export function foldWord(word: string): string {
+  if (word.length < 4 || !/^[a-z]+$/.test(word)) return word;
+  let w = word;
+
+  if (w.endsWith('ies') && w.length > 4) w = `${w.slice(0, -3)}y`;
+  else if (w.endsWith('sses')) w = w.slice(0, -2);
+  else if (/(ches|shes|xes|zes)$/.test(w)) w = w.slice(0, -2);
+  else if (w.endsWith('s') && !/(ss|us|is)$/.test(w)) w = w.slice(0, -1);
+
+  let stripped = false;
+  if (w.endsWith('ing') && w.length - 3 >= 3) {
+    w = w.slice(0, -3);
+    stripped = true;
+  } else if (w.endsWith('ed') && w.length - 2 >= 3) {
+    w = w.slice(0, -2);
+    stripped = true;
+  }
+
+  if (stripped && w.length >= 3) {
+    const last = w[w.length - 1] as string;
+    if (last === w[w.length - 2] && !'lsz'.includes(last)) w = w.slice(0, -1);
+  }
+  if (w.length >= 4 && w.endsWith('e')) w = w.slice(0, -1);
+  return w;
+}
+
 /**
  * The set of whole words in a text.
  *
@@ -86,9 +143,18 @@ function tokenize(text: string): string[] {
  * would find "java" in "javascript" and "run" in "running", which is a different
  * claim from the one the criterion makes; the stand-in extractor shares this so
  * the lines it picks are the lines the matcher will count.
+ *
+ * In `folded` mode every word is folded first, so test for a term with
+ * `containsTerm`, which folds the term the same way.
  */
-export function wordsOf(text: string): Set<string> {
-  return new Set(tokenize(text));
+export function wordsOf(text: string, mode: MatchMode = DEFAULT_MATCH_MODE): Set<string> {
+  const words = tokenize(text);
+  return new Set(mode === 'folded' ? words.map(foldWord) : words);
+}
+
+/** Whether `term` is one of `words`, which must have come from `wordsOf` in the same mode. */
+export function containsTerm(words: ReadonlySet<string>, term: string, mode: MatchMode = DEFAULT_MATCH_MODE): boolean {
+  return words.has(mode === 'folded' ? foldWord(term) : term);
 }
 
 /** What a requirement asks for: its criterion, plus its label. */
@@ -157,6 +223,7 @@ function buildRationale(
 export function decideMatch(
   requirement: Pick<JobRequirement, 'id' | 'label' | 'criterion'>,
   evidence: readonly EvidenceLike[],
+  mode: MatchMode = DEFAULT_MATCH_MODE,
 ): MatchDecision {
   const usable = evidence.filter(
     (item) => item.verified && item.requirementId === requirement.id,
@@ -190,9 +257,9 @@ export function decideMatch(
     };
   }
 
-  const words = wordsOf(usable.map((item) => item.quote).join('\n'));
-  const matched = terms.filter((term) => words.has(term));
-  const missing = terms.filter((term) => !words.has(term));
+  const words = wordsOf(usable.map((item) => item.quote).join('\n'), mode);
+  const matched = terms.filter((term) => containsTerm(words, term, mode));
+  const missing = terms.filter((term) => !containsTerm(words, term, mode));
 
   // Integer comparison: matched/total >= threshold/100, without the division.
   const covered = matched.length * 100;

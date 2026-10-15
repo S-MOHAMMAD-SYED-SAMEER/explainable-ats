@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { seedDemoData } from '../src/demo/seed.ts';
+import { MATCH_MODES, type MatchMode } from '../src/agent/matchRules.ts';
 import { DEMO_CANDIDATES } from '../src/demo/dataset.ts';
 import type { AuditEvent } from '../src/domain/ats.ts';
 import { rankJob } from '../src/agent/rank.ts';
@@ -100,16 +101,27 @@ function parityTest(
   body: (t: NodeTestContext, loadRunner: () => Promise<PortfolioDemoModule>) => Promise<void>,
 ): void {
   test(name, { skip }, async (t) => {
-    for (const target of targets) {
-      try {
-        await body(t, () => importRunner(target.runner));
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        throw new Error(`[${target.label}] ${reason}`, { cause: error });
+    // Every comparison is made twice, once per matching mode, so the demo runner and the
+    // pipeline are shown to agree whichever way words are compared.
+    for (const mode of MATCH_MODES) {
+      parityMode = mode;
+      for (const target of targets) {
+        try {
+          await body(t, async () => {
+            const loaded = await importRunner(target.runner);
+            return { ...loaded, runDemo: (options?: object) => loaded.runDemo({ ...options, matchMode: mode }) } as PortfolioDemoModule;
+          });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(`[${target.label}, ${mode}] ${reason}`, { cause: error });
+        }
       }
     }
   });
 }
+
+/** The matching mode the comparison in progress is being made in. */
+let parityMode: MatchMode = 'strict';
 
 /** The real thing: a seeded database driven through the real stages. */
 async function real(t: { after: (fn: () => unknown) => void }): Promise<{
@@ -118,7 +130,7 @@ async function real(t: { after: (fn: () => unknown) => void }): Promise<{
 }> {
   const ctx = await createTestContext();
   t.after(() => ctx.close());
-  const result = await seedDemoData({ repos: ctx.repos });
+  const result = await seedDemoData({ repos: ctx.repos, matchMode: parityMode });
   return { ctx, jobId: result.jobId };
 }
 
@@ -550,23 +562,20 @@ parityTest('the demo reproduces every outcome the dataset says it will', async (
   const demo = await runDemo();
 
   for (const candidate of DEMO_CANDIDATES) {
+    const want = parityMode === 'folded' ? candidate.expectedFolded : candidate.expected;
     const entry = demo.ranking.entries.find((item) => item.reference === candidate.reference);
     assert.ok(entry, `${candidate.displayName} is missing from the demo ranking`);
 
-    assert.equal(entry.tier, candidate.expected.tier, `${candidate.displayName}: tier`);
-    assert.equal(
-      entry.scoreBasisPoints,
-      candidate.expected.scoreBasisPoints,
-      `${candidate.displayName}: score`,
-    );
+    assert.equal(entry.tier, want.tier, `${parityMode}: ${candidate.displayName}: tier`);
+    assert.equal(entry.scoreBasisPoints, want.scoreBasisPoints, `${parityMode}: ${candidate.displayName}: score`);
 
-    if (candidate.expected.verdicts.length > 0) {
+    if (want.verdicts.length > 0) {
       const run = demo.candidates.find((item) => item.candidate.reference === candidate.reference);
       assert.ok(run);
       assert.deepEqual(
         run.matches.map((match) => match.verdict),
-        candidate.expected.verdicts,
-        `${candidate.displayName}: verdicts`,
+        want.verdicts,
+        `${parityMode}: ${candidate.displayName}: verdicts`,
       );
     }
   }
@@ -581,6 +590,15 @@ parityTest('the gate is visible in the demo too: same score, one tier apart', as
   const devi = demo.ranking.entries.find((entry) => entry.reference === 'demo-002');
   const marcus = demo.ranking.entries.find((entry) => entry.reference === 'demo-003');
   assert.ok(devi && marcus);
+
+  if (parityMode === 'strict') {
+    // Under the default strict matching the pair does not tie: "Running PostgreSQL" is partial
+    // against "run", which gates Devi as well. Pinned, not hidden.
+    assert.equal(devi.tier, 'gated');
+    assert.notEqual(devi.scoreBasisPoints, marcus.scoreBasisPoints);
+    assert.ok(!demo.ranking.entries.some((entry) => entry.tier === 'qualified'));
+    return;
+  }
 
   assert.equal(devi.scoreBasisPoints, marcus.scoreBasisPoints, 'the two must score the same');
   assert.equal(devi.scorePercent, marcus.scorePercent, 'and must read the same on screen');

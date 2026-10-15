@@ -10,6 +10,8 @@ import { rateLimit } from './http/rateLimit.ts';
 import { createRepositories } from './db/repositories/index.ts';
 import { createLlmProvider } from './adapters/llm/index.ts';
 import { createEvaluationRunner } from './agent/runner.ts';
+import { installDeterministicExtractor } from './agent/mockExtractor.ts';
+import type { MockLlmProvider } from './adapters/llm/mock.ts';
 import { createDemoSessionStore, type DemoSessionStore } from './demo/sessions.ts';
 import { config as defaultConfig, type AppConfig } from './config/env.ts';
 import { capabilitiesOf } from './config/mode.ts';
@@ -181,7 +183,11 @@ function mountApplication(app: Express, { db, logger, config, provider, rateLimi
   // at startup rather than on the first request. Demo mode never reaches this
   // function, so a visitor's click can never call the configured provider.
   const llm = provider ?? createLlmProvider(config, { logger });
-  const runner = createEvaluationRunner({ repos, provider: llm, logger });
+  // The mock provider replays fixtures and has none here, so with LLM_PROVIDER=mock (the
+  // default) the recruiter's "run" would fail on an empty provider. Give it the deterministic
+  // stand-in, which quotes real lines and costs nothing. An injected provider is left alone.
+  if (!provider && llm.name === 'mock') installDeterministicExtractor(llm as MockLlmProvider, { matchMode: config.matchMode });
+  const runner = createEvaluationRunner({ repos, provider: llm, logger, matchMode: config.matchMode });
 
   app.use('/api', attachSession({ repos }));
   app.use('/api', rateLimiter);
@@ -213,7 +219,7 @@ type DemoDeps = {
  * repository, because a demo process has no canonical database to hand it.
  */
 function mountDemo(app: Express, { logger, config, rateLimiter, demoSessions }: DemoDeps): void {
-  const store = demoSessions ?? createDemoSessionStore({ migrationsDir: config.migrationsDir, logger });
+  const store = demoSessions ?? createDemoSessionStore({ migrationsDir: config.migrationsDir, logger, matchMode: config.matchMode });
 
   app.use('/api', rateLimiter);
   app.use('/api', createDemoSessionRouter({ store, config, logger }));

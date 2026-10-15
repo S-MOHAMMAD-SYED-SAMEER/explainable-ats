@@ -1,4 +1,4 @@
-import { decideMatch, type EvidenceLike, type MatchDecision } from './matchRules.ts';
+import { decideMatch, DEFAULT_MATCH_MODE, type EvidenceLike, type MatchDecision, type MatchMode } from './matchRules.ts';
 import { BASIS_POINTS_MAX, VERDICT_BASIS_POINTS, type JobRequirement } from '../domain/ats.ts';
 
 // SCORING — integer arithmetic a recruiter can redo on paper.
@@ -61,6 +61,7 @@ export type ScoreBreakdown = {
 export function scoreEvaluation(
   requirements: readonly JobRequirement[],
   evidence: readonly EvidenceLike[],
+  mode: MatchMode = DEFAULT_MATCH_MODE,
 ): ScoreBreakdown {
   if (requirements.length === 0) {
     // Zero out of zero renders as a rejection, and a candidate must never be
@@ -75,7 +76,7 @@ export function scoreEvaluation(
 
   const decisions = requirements.map((requirement) => ({
     requirement,
-    decision: decideMatch(requirement, evidence),
+    decision: decideMatch(requirement, evidence, mode),
   }));
 
   // The exact weighted numerator, before the single division.

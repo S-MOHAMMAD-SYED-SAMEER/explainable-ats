@@ -119,8 +119,8 @@ test('a session holds the fixed synthetic dataset, ranked exactly as the dataset
     const ranking = await rankingOf(h, token, jobId);
     assert.deepEqual(
       ranking.entries.map((e) => e.reference),
-      ['demo-001', 'demo-002', 'demo-004', 'demo-003', 'demo-005'],
-      'qualified, then needs review, then gated, then unranked',
+      ['demo-004', 'demo-001', 'demo-003', 'demo-002', 'demo-005'],
+      'needs review, then gated by score, then unranked (nobody is qualified under the default strict matching)',
     );
     for (const entry of ranking.entries) {
       const spec = DEMO_CANDIDATES.find((c) => c.reference === entry.reference);
@@ -191,8 +191,8 @@ test('the dataset the sessions run on is unchanged: one job, five candidates, th
   assert.deepEqual(
     DEMO_CANDIDATES.map((c) => [c.reference, c.displayName, c.expected.tier, c.expected.scoreBasisPoints]),
     [
-      ['demo-001', 'Rowan Ashfield', 'qualified', 10_000],
-      ['demo-002', 'Devi Narayanan', 'qualified', 7_142],
+      ['demo-001', 'Rowan Ashfield', 'gated', 8_571],
+      ['demo-002', 'Devi Narayanan', 'gated', 5_714],
       ['demo-003', 'Marcus Oyelaran', 'gated', 7_142],
       ['demo-004', 'Ines Fabre', 'needs_review', 5_714],
       ['demo-005', 'Toby Kestrel', 'not_evaluated', null],

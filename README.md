@@ -131,35 +131,47 @@ The demo role is *Senior Backend Engineer*, with three requirements:
 | PostgreSQL | must-have | 2 |
 | Mentoring | nice-to-have | 2 |
 
-The weights add up to 7. Here are three of the five candidates, as the running system scores them.
+The weights add up to 7. The numbers below are from the **default `strict` matching**, where a requirement's words count only as whole words. Here are three of the five candidates, as the running system scores them.
 
-**Devi** scores 71% and is qualified.
+**Rowan** scores 86% and is gated, with the highest score on the list.
 
 | Requirement | Quote found in the CV | Verdict | Points earned |
 |---|---|---|---|
-| Node.js | "Designed and shipped production Node.js services behind a payments API." | `met` (4 of 4 terms) | 3 × 10000 = 30000 |
-| PostgreSQL | "Run PostgreSQL at scale for a multi-tenant billing system." | `met` (3 of 3 terms) | 2 × 10000 = 20000 |
-| Mentoring | none | `unclear` | 2 × 0 = 0 |
+| Node.js | "Designed and shipped production Node.js services for a freight booking platform." | `met` (4 of 4 terms) | 3 × 10000 = 30000 |
+| PostgreSQL | "Running PostgreSQL at scale, moving a single instance to a replicated cluster." | `partial` (2 of 3 terms) | 2 × 5000 = 10000 |
+| Mentoring | "Mentoring: mentored four junior engineers through their first releases." | `met` (4 of 4 terms) | 2 × 10000 = 20000 |
 
-`(30000 + 20000 + 0) / 7 = 7142.857…`, and the floor is **7142** (71%). The per-requirement shares are 30000/7 = 4285, 20000/7 = 2857 and 0, which add up to 7142 with nothing left over.
+`(30000 + 10000 + 20000) / 7 = 8571.4…`, and the floor is **8571** (86%). The shares are 4285.7, 1428.6 and 2857.1; their floors add up to 8570, and the leftover point goes to the largest remainder, so the contributions are **4286, 1428 and 2857**. PostgreSQL is `partial` because the criterion's three words are `postgresql`, `run` and `scale`, and "Running" is not "run". PostgreSQL is essential, so Rowan is gated despite the score.
 
-**Marcus** also scores 7142. His Node.js and Mentoring are `met`, but his only PostgreSQL quote is "Used PostgreSQL for a final-year university project.". It contains one of the three terms (`postgresql`, `run`, `scale`), so the verdict is `not_met`. `(30000 + 0 + 20000) / 7` is again 7142. Because a must-have was addressed and fell short, he is **gated**: placed *below* Devi with exactly the same score.
+**Marcus** scores 7142. His Node.js and Mentoring are `met`, but his only PostgreSQL quote is "Used PostgreSQL for a final-year university project.". It contains one of the three terms (`postgresql`, `run`, `scale`), so the verdict is `not_met`. `(30000 + 0 + 20000) / 7` is 7142.8…, so **7142** (71%). Because a must-have was addressed and fell short, he is **gated**.
 
-**Ines** scores 5714. Node.js is `met` and her Mentoring quote ("Mentored a junior developer during onboarding.") covers two of four terms, so it is `partial`. Her CV says nothing about PostgreSQL, so that is `unclear`: `(30000 + 0 + 10000) / 7 = 5714.28…`, so **5714**. The raw shares are 4285 (remainder 5), 0 and 1428 (remainder 4), which add up to 5713, one short. The leftover point goes to the largest remainder, so the contributions are **4286, 0 and 1428**, which add up to 5714.
+**Ines** scores 5714. Node.js is `met` and her Mentoring quote ("Mentored a junior developer during onboarding.") covers two of four terms, so it is `partial`. Her CV says nothing about PostgreSQL, so that is `unclear`: `(30000 + 0 + 10000) / 7 = 5714.28…`, so **5714** (57%). The raw shares are 4285 (remainder 5), 0 and 1428 (remainder 4), which add up to 5713, one short. The leftover point goes to the largest remainder, so the contributions are **4286, 0 and 1428**, which add up to 5714.
 
-The resulting order:
+The resulting order with the default matching:
 
 | Rank | Candidate | Score | Tier | Why |
 |---|---|---|---|---|
-| 1 | Rowan | 100% | Meets every must-have | Every requirement `met` |
-| 2 | Devi | 71% | Meets every must-have | Both essentials `met` |
-| 3 | Ines | 57% | Worth a look | PostgreSQL is `unclear`, so it is unresolved, not failed |
-| 4 | Marcus | 71% | Missing an essential | The PostgreSQL evidence fell short |
+| 1 | Ines | 57% | Worth a look | PostgreSQL is `unclear`, so it is unresolved, not failed |
+| 2 | Rowan | 86% | Missing an essential | PostgreSQL is only `partial`: "Running" is not "run" |
+| 3 | Marcus | 71% | Missing an essential | The PostgreSQL evidence fell short |
+| 4 | Devi | 57% | Missing an essential | The same word form as Rowan, and nothing on mentoring |
 | — | Toby | — | Not assessed yet | Received but not yet assessed |
 
-Terms match as whole words, so the invented CVs say "Run PostgreSQL at scale" to cover the criterion's word "run". An earlier version said "Running", which only counted because matching was by substring; under whole-word matching that wording leaves PostgreSQL `partial` for Rowan and Devi, which moves both from qualified to gated. The CV text was changed, not the rule, and the case is a fair picture of what whole-word matching costs: a CV that says the same thing in another word form is read as saying less.
+Nobody is qualified, and that is the honest result of whole-word matching on these CVs. The CVs were written to say "Running PostgreSQL at scale" against the criterion "Has run PostgreSQL at scale", and they have not been reworded to suit the matcher.
 
-Ines ranks above Marcus although her score is lower, because `needs_review` sits above `gated`. The tiers and their order are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#how-ranking-works).
+**The same five CVs with word endings folded** (`MATCH_MODE=folded`: plural, -ing and -ed endings are reduced first, so "Running" counts as "run" and "mentored" as "mentoring"):
+
+| Rank | Candidate | Score | Tier | What changed |
+|---|---|---|---|---|
+| 1 | Rowan | 100% | Meets every must-have | PostgreSQL `met` |
+| 2 | Devi | 71% | Meets every must-have | PostgreSQL `met`; but mentoring reads `not_met`, not `unclear` (see below) |
+| 3 | Ines | 71% | Worth a look | Mentoring now `met` ("mentored" meets "mentoring") |
+| 4 | Marcus | 71% | Missing an essential | Unchanged |
+| — | Toby | — | Not assessed yet | Unchanged |
+
+With folding, Devi and Marcus tie at 7142 and are placed a tier apart, which is the must-have gate shown as clearly as it can be. Folding also has a cost the strict rule does not: Devi's CV is silent on mentoring, but her job title "Backend Engineer" folds to "engineer", which is one of the criterion's words, so the stand-in extractor quotes it and the requirement reads `not_met` instead of `unclear`. Which rule should be the default is a question for the evaluation set in [`eval/`](eval/), not for taste, so the default stays strict until it has been answered.
+
+Ines ranks above Marcus under both rules although her score is no higher, because `needs_review` sits above `gated`.
 
 ## API
 
@@ -243,7 +255,7 @@ There are no browser or end-to-end tests. An evaluation set that will measure ex
 - **Extraction quality has not been measured.** `eval/` holds twenty invented CVs, written by an AI, for two roles, with a labelling file for a person to mark the passages and verdicts they would give. It is not labelled yet, so no figure exists. When it is, it will come from one labeller and twenty invented CVs, which shows whether the stages work on a small varied set and is not an accuracy figure for real CVs. Recall is the number to look at first, because a missed passage becomes `unclear` rather than `not_met`.
 - **The demo's extractor is a keyword matcher.** Extraction defaults to the deterministic mock everywhere unless `LLM_PROVIDER=anthropic` is set. It quotes whole lines containing the most requirement terms. That exercises the pipeline but says nothing about how a real model would do.
 - **Anthropic provider: smoke-tested, not evaluated.** `LLM_PROVIDER=anthropic` builds an adapter that offers (or, where the model allows it, forces) a `record_evidence` tool call, with a timeout and bounded retries. It is tested against a fake client and a loopback stub server, and the opt-in script `server/scripts/live-smoke-anthropic.ts` has made one real request each to `claude-sonnet-5-5` and `claude-haiku-4-5-20251001` on 2026-10-14: both returned a well-formed tool call whose quotes were all verified. That run found that Sonnet 5.5 rejects a forced tool call and rejects any `temperature`, so tool choice and temperature are settings. Extraction quality has not been evaluated. The running app calls the configured provider only when a signed-in recruiter starts an assessment.
-- **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes, as whole words: "Java" is not found in "JavaScript" and "run" is not found in "running". The other side of that is that word forms count as different terms ("mentored" and "mentoring", "service" and "services", "Postgres" and "PostgreSQL"), and paraphrase is missed. Each of these is pinned by a test.
+- **Matching is term coverage, not comprehension.** It counts how many significant words of a requirement appear in the quotes, as whole words: "Java" is not found in "JavaScript" and "run" is not found in "running". The other side of that is that, by default, word forms count as different terms ("mentored" and "mentoring", "service" and "services"), and synonyms never match ("Postgres" and "PostgreSQL"). `MATCH_MODE=folded` closes the first gap at a price ("engineering" meets "engineer", and a job title can be quoted as evidence for a requirement the CV is silent on). Paraphrase is missed either way. Each of these is pinned by a test.
 - **Negation is not understood.** "Never shipped a Node.js service" covers the same terms as "Shipped a Node.js service" and gets the same verdict. The rules count which words appear, not what the sentence says. A test pins the current behaviour so that changing it is a decision.
 - **Prompt injection is reduced, not removed.** The resume is untrusted input. The prompt tells the model so, and the section markers are stripped from the CV text, but the defence that does not depend on the model is structural: a model can only propose quotes, each is checked against the CV, and verdicts and scores are computed by code from quotes. The check on eight invented hostile CVs (instruction override, "score me 100%", marker spoofing, fabricated quotes, hidden instructions, keyword stuffing, an embedded requirement list, a 150,000-character CV) found no verdict or score raised above what the genuine content supports, on either model. It also found that Haiku 4.5, on two of them, quoted an irrelevant genuine line for mentoring and so lowered a verdict, and that both the deterministic stand-in and Haiku were taken in by keyword stuffing (Sonnet 5.5 quoted nothing for it). One run per model; results in `docs/results/`.
 - **Words can be stuffed.** A quote that lists every term of a requirement covers it. Verification makes sure the passage is really in the CV and at least 15 characters long (a bare "Node.js" is refused), but it cannot tell a skills list from an achievement.
@@ -345,6 +357,7 @@ Copy `server/.env.example` to a file named `.env` in the same folder and set onl
 | `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Sent verbatim; the adapter names no model of its own. The ID was confirmed against the live Models API on 2026-10-14, and the smoke script ran on it |
 | `ANTHROPIC_TOOL_CHOICE` | `auto` | `auto` lets the model call the tool (and a reply without the call is rejected); `forced` makes the call mandatory. `claude-sonnet-5-5` rejects `forced`; both Haiku models accept it |
 | `ANTHROPIC_TEMPERATURE` | unset | 0 to 1, sent only when set. `claude-haiku-4-5-20251001` accepts 0; `claude-sonnet-5-5` and `claude-haiku-5-5` reject any temperature ("deprecated for this model") |
+| `MATCH_MODE` | `strict` | How requirement words are compared with a quote. `strict`: whole words only ("run" is not found in "running", "service" is not "services"). `folded`: plural -s/-es, -ing and -ed endings are reduced first. Neither handles synonyms ("Postgres" is never "PostgreSQL") or negation. Recorded in the audit trail of every score |
 | `ANTHROPIC_TIMEOUT_MS` | 60000 | Per-request timeout, maximum 300000 |
 | `ANTHROPIC_MAX_RETRIES` | 2 | Retries for transient failures only, maximum 5 |
 | `OPERATOR_PASSWORD_HASH` | empty | Required for anyone to sign in |

@@ -2,6 +2,7 @@ import { DEMO_JOB, DEMO_CANDIDATES, ingestInputFor, type DemoCandidate } from '.
 import { createJob, ingestResume } from '../agent/ingest.ts';
 import { openEvaluation, extractEvidence } from '../agent/extract.ts';
 import { matchAndScore } from '../agent/match.ts';
+import type { MatchMode } from '../agent/matchRules.ts';
 import { createMockLlmProvider } from '../adapters/llm/mock.ts';
 import { installDeterministicExtractor } from '../agent/mockExtractor.ts';
 import type { Repositories } from '../db/repositories/index.ts';
@@ -21,6 +22,8 @@ import type { Logger } from '../lib/logger.ts';
 export type SeedDeps = {
   repos: Repositories;
   logger?: Logger;
+  /** How words are compared by the extractor stand-in and the matcher. Default strict. */
+  matchMode?: MatchMode;
 };
 
 export type SeededCandidate = {
@@ -110,10 +113,10 @@ async function seedCandidate(
   }
 
   const provider = createMockLlmProvider();
-  installDeterministicExtractor(provider);
+  installDeterministicExtractor(provider, deps.matchMode ? { matchMode: deps.matchMode } : {});
 
   await extractEvidence({ repos, provider, logger: deps.logger }, evaluation.id);
-  await matchAndScore({ repos, logger: deps.logger }, evaluation.id);
+  await matchAndScore({ repos, logger: deps.logger, ...(deps.matchMode ? { matchMode: deps.matchMode } : {}) }, evaluation.id);
 
   return {
     reference: candidate.reference,

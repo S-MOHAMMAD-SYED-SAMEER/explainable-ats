@@ -1,4 +1,5 @@
 import { scoreEvaluation, type ScoreBreakdown } from './score.ts';
+import { DEFAULT_MATCH_MODE, type MatchMode } from './matchRules.ts';
 import { AppError } from '../lib/errors.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -21,6 +22,8 @@ import type { Evaluation } from '../domain/ats.ts';
 export type MatchDeps = {
   repos: Repositories;
   logger?: Logger;
+  /** How words are compared: `strict` (the default) or `folded`. Recorded in the audit trail. */
+  matchMode?: MatchMode;
 };
 
 export type MatchOutcome = {
@@ -39,6 +42,7 @@ export type MatchOutcome = {
  */
 export async function matchAndScore(deps: MatchDeps, evaluationId: string): Promise<MatchOutcome> {
   const { repos, logger } = deps;
+  const matchMode = deps.matchMode ?? DEFAULT_MATCH_MODE;
 
   const evaluation = await repos.evaluations.getById(evaluationId);
   if (!evaluation) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
@@ -68,7 +72,7 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
   const all = await repos.evidence.listForEvaluation(evaluation.id);
   const evidenceIgnored = all.length - verified.length;
 
-  const breakdown = scoreEvaluation(requirements, verified);
+  const breakdown = scoreEvaluation(requirements, verified, matchMode);
 
   // Matches and the score land together. A score without the matches behind it
   // is an unexplainable number, and an explanation without its score is a page
@@ -126,6 +130,7 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
         confidence: row.decision.confidence,
       })),
       evidenceCounted: verified.length,
+      matchMode,
     },
     entityType: 'evaluation',
     entityId: evaluation.id,

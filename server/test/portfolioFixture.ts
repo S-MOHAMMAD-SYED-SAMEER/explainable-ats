@@ -152,7 +152,8 @@ export type PortfolioDemoResult = {
 
 export type PortfolioDemoModule = {
   DEMO_TIMESTAMP: string;
-  runDemo(): Promise<PortfolioDemoResult>;
+  /** `matchMode` is how words are compared; the runner's own default when omitted. */
+  runDemo(options?: { matchMode?: 'strict' | 'folded' }): Promise<PortfolioDemoResult>;
 };
 
 // --- the 2D portfolio's copy of the runner -----------------------------------

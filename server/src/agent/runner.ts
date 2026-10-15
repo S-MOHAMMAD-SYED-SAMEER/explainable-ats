@@ -1,6 +1,7 @@
 import { extractEvidence } from './extract.ts';
 import { matchAndScore } from './match.ts';
 import { FAILURE_WORDING } from './failures.ts';
+import type { MatchMode } from './matchRules.ts';
 import type { LlmProvider } from '../adapters/llm/types.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -41,6 +42,8 @@ export type RunnerDeps = {
   logger?: Logger;
   /** At most this many evaluations are in flight at once. */
   maxConcurrent?: number;
+  /** How words are compared when an assessment is scored. */
+  matchMode?: MatchMode;
 };
 
 export const DEFAULT_MAX_CONCURRENT_EVALUATIONS = 3;
@@ -72,7 +75,7 @@ export function createEvaluationRunner(deps: RunnerDeps): EvaluationRunner {
       if (!evaluation || evaluation.status !== 'pending') return;
 
       await extractEvidence({ repos, provider, ...(logger ? { logger } : {}) }, evaluationId);
-      await matchAndScore({ repos, ...(logger ? { logger } : {}) }, evaluationId);
+      await matchAndScore({ repos, ...(logger ? { logger } : {}), ...(deps.matchMode ? { matchMode: deps.matchMode } : {}) }, evaluationId);
     } catch (err) {
       logger?.error('Evaluation run failed', {
         evaluationId,
