@@ -1,0 +1,9 @@
+Name: Oluwaseun Brandt
+Email: oluwaseun.brandt@example.invalid
+Phone: +44 20 7946 0706
+Date of birth: 14 May 1996
+Nationality: Nigerian
+Gender: Male
+Address: 2 Beacon Hill, Glasgow G12 8QQ
+
+Backend dev, 4 yrs. Shipped Node.js APIs to production for a payments startup (Pennywise). Some Postgres. TypeScript, Docker, AWS.

@@ -1,0 +1,30 @@
+Name: Valentina Moretti-Osei
+Email: valentina.moretti-osei@example.invalid
+Phone: +44 20 7946 0710
+Date of birth: 17 August 1993
+Nationality: Italian
+Gender: Female
+Address: 31 Chapel Lane, Leeds LS6 2AB
+
+SKILLS
+Node.js, PostgreSQL, Mentoring, Kubernetes, TypeScript, REST, GraphQL, AWS, CI/CD, Agile, Scrum, Leadership
+
+SUMMARY
+Passionate and results-driven engineer with a proven track record. Team player with strong communication skills.
+
+EXPERIENCE
+Software Engineer, Ashgrove Solutions (2019 - present)
+Worked on backend APIs for several customers.
+Maintained databases and improved their performance.
+Collaborated with colleagues across teams.
+Contributed to code reviews.
+
+Junior Engineer, Bluebell Tech (2017 - 2019)
+Supported the development team.
+Fixed bugs and wrote unit tests.
+
+EDUCATION
+BSc Information Systems, University of Leeds, 2017
+
+INTERESTS
+Travel, photography, volunteering

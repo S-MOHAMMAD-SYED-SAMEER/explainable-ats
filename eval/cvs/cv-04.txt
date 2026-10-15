@@ -1,0 +1,30 @@
+Name: Rosalind Achterberg
+Email: rosalind.achterberg@example.invalid
+Phone: +44 20 7946 0704
+Date of birth: 26 January 1990
+Nationality: Dutch
+Gender: Female
+Address: 41 Harbour Street, Edinburgh EH6 6HU
+
+SUMMARY
+Backend engineer focused on real-time systems: chat, notifications and live dashboards.
+
+EXPERIENCE
+Staff Engineer, Pigeonhole Messaging (2019 - present)
+Designed and shipped production Node.js services for a messaging platform serving 800,000 daily users, including the websocket gateway.
+Moved message storage from a single MongoDB replica set to a sharded cluster, and introduced Redis for presence and rate limiting.
+Mentored junior engineers on the platform team; I ran a fortnightly code-reading session and paired with every new starter during their first month.
+Reduced median delivery time from 900 ms to 140 ms.
+
+Senior Engineer, Cobalt Alerts (2016 - 2019)
+Built the push notification pipeline in Node.js and TypeScript. It delivered about 40 million notifications a day.
+Took part in the on-call rota and wrote runbooks for the three services I owned.
+
+Engineer, Tern Analytics (2013 - 2016)
+Wrote data collection endpoints and a reporting dashboard.
+
+EDUCATION
+MSc Computer Science, University of Edinburgh
+
+SKILLS
+Node.js, TypeScript, WebSockets, MongoDB, Redis, Kafka, Kubernetes

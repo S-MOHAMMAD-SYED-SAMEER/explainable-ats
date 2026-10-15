@@ -1,0 +1,24 @@
+Name: Tomasz Wieczorek-Hale
+Email: tomasz.wieczorek-hale@example.invalid
+Phone: +44 20 7946 0702
+Date of birth: 3 September 1985
+Nationality: Polish
+Gender: Male
+Address: 8 Canal Row, Manchester M1 5GG
+
+PROFILE
+Engineer who has spent most of a career on booking and reservation platforms. Happiest when the pager is quiet.
+
+WHAT I HAVE DONE
+
+Principal Engineer, Skyline Reservations, 2016 to date
+- Built the server-side JavaScript APIs, on the V8 runtime that most people just call Node, that carry live traffic for an airline booking site. They have been live since 2017 and take bookings every minute of every day.
+- Responsible for the Postgres fleet: fourteen clusters, the largest around six terabytes, with replicas in three regions.
+- Coached apprentices and recent graduates, and ran a weekly clinic where newer team members could bring any problem. Four of the people I coached now lead teams of their own.
+- Introduced load testing before every release.
+
+Senior Developer, Brightwater Travel, 2011 to 2016
+- Wrote the fare search backend. Originally in PHP; I moved it to server-side JavaScript in 2013.
+- Looked after the MySQL and later Postgres databases behind it.
+
+Education: MSc Software Engineering, University of Manchester

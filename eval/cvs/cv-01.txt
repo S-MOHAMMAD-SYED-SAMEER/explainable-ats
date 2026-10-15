@@ -1,0 +1,32 @@
+Name: Amara Okonkwo-Reyes
+Email: amara.okonkwo-reyes@example.invalid
+Phone: +44 20 7946 0701
+Date of birth: 11 April 1988
+Nationality: British
+Gender: Female
+Address: 23 Willow Court, Bristol BS3 4QT
+
+SUMMARY
+Backend engineer with ten years in payments and financial services. I like systems that are boring in production.
+
+EXPERIENCE
+Senior Backend Engineer, Redwater Payments (2018 - 2024)
+Designed and shipped production Node.js services that settle card payments for about three million customers.
+Ran PostgreSQL at scale: a 4 TB primary with five read replicas, online schema changes and a tested failover every quarter.
+Cut settlement latency by 38 percent by moving the slowest queries off the primary and adding a read-through cache.
+Mentored six junior engineers over four years; two of them have since been promoted to mid-level.
+Led the incident review process and wrote the team's on-call handbook.
+
+Backend Engineer, Larkfield Insurance (2014 - 2018)
+Built the claims intake API in Java and later rewrote the hot path in Node.js, which halved the cloud bill for that service.
+Owned the claims database, a PostgreSQL 9.6 instance, through two major version upgrades.
+Ran the graduate onboarding programme for the engineering team in 2017.
+
+Software Developer, Hartwell Logistics (2012 - 2014)
+Maintained the dispatch system, a Ruby on Rails application, and wrote the first automated tests it ever had.
+
+EDUCATION
+BSc Computer Science, University of the West of England, 2012
+
+SKILLS
+Node.js, TypeScript, PostgreSQL, Java, Docker, Terraform, AWS

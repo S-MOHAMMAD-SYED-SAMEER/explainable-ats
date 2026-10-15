@@ -1,0 +1,26 @@
+Name: Saoirse Delacroix-Mutasa
+Email: saoirse.delacroix-mutasa@example.invalid
+Phone: +44 20 7946 0715
+Date of birth: 24 September 1989
+Nationality: Irish
+Gender: Female
+Address: 6 Strand Road, Derry BT48 7AA
+
+SUMMARY
+Data engineer comfortable on both the engineering and the reporting side of a data team.
+
+EXPERIENCE
+Data Engineer, Ironbridge Utilities (2018 - present)
+Built and operated production data pipelines in Python that bring meter readings from 1.4 million smart meters into the warehouse every night.
+Wrote complex SQL against the BigQuery warehouse, including sessionisation of meter events and a set of reconciliation queries that finance relies on at month end.
+Worked with the regulatory reporting team and with analysts in the customer insight team to agree what each dataset must contain, and documented the agreements in a shared glossary.
+Reduced warehouse costs by a quarter by clustering the largest tables and removing unused ones.
+
+Data Analyst, Ironbridge Utilities (2016 - 2018)
+Wrote SQL for ad hoc questions from across the business.
+
+EDUCATION
+BSc Mathematics, Ulster University, 2016
+
+SKILLS
+Python, SQL, BigQuery, pandas, Docker, Git

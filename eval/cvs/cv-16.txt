@@ -1,0 +1,24 @@
+Name: Anselm Rutherford-Nkemelu
+Email: anselm.rutherford-nkemelu@example.invalid
+Phone: +44 20 7946 0716
+Date of birth: 18 April 1986
+Nationality: British
+Gender: Male
+Address: 33 Quarry Bank, Bradford BD1 2LQ
+
+PROFILE
+Engineer who looks after the data behind a retailer's decisions.
+
+WORK HISTORY
+
+Lead Data Engineer, Ashdown Home Stores, 2017 to now
+- Wrote the extract, transform and load jobs, all in Python, that fill the analytics platform with orders, returns and stock levels from 25 systems. They run every night and almost always finish before the stores open.
+- Wrote analytical queries on the cloud warehouse (Redshift) used by merchandising: sessionisation, cohort retention, basket analysis, with query plans I tuned myself.
+- Schedule everything through a DAG-based scheduler that we built on top of a workflow library, with retries, alerting and backfills.
+- Collaborated closely with the BI team and the buying team, running a fortnightly session where they could ask for new datasets and I explained what was feasible.
+
+Data Developer, Ashdown Home Stores, 2013 to 2017
+- Wrote reports in SQL for the finance department.
+
+STUDIED
+BSc Information Technology, University of Bradford

@@ -1,0 +1,26 @@
+Name: Perpetua Lindgren-Adebayo
+Email: perpetua.lindgren-adebayo@example.invalid
+Phone: +44 20 7946 0720
+Date of birth: 7 November 1993
+Nationality: Swedish
+Gender: Female
+Address: 48 Bridge Street, Norwich NR1 3LQ
+
+SUMMARY
+Analytics engineer who sits between the data team and the business.
+
+EXPERIENCE
+Analytics Engineer, Cobble and Stone Property (2020 - present)
+Wrote complex SQL against the Snowflake warehouse every day: dimensional models for lettings and sales, window functions for rent arrears ageing, and tests for each model.
+Used Dagster to schedule the reporting jobs and the nightly refresh of the models, with alerts when a run fails.
+Built dashboards for the lettings, sales and finance teams, and a few small Python scripts that tidy files before they are loaded.
+Meet the heads of lettings and finance every fortnight to agree what the dashboards should show and which numbers they can trust.
+
+Data Analyst, Hollis Estates (2017 - 2020)
+Wrote reports in SQL and Excel for the sales director.
+
+EDUCATION
+BA Geography, University of East Anglia, 2016
+
+SKILLS
+SQL, Snowflake, Dagster, dbt, Tableau, Python (scripts)

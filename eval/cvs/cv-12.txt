@@ -1,0 +1,23 @@
+Name: Cordelia Fitzgerald-Banda
+Email: cordelia.fitzgerald-banda@example.invalid
+Phone: +44 20 7946 0712
+Date of birth: 13 March 1991
+Nationality: Irish
+Gender: Female
+Address: 9 Linen Hall Street, Belfast BT2 8BG
+
+PROFILE
+Backend engineer who enjoys the unglamorous parts of the job: migrations, capacity planning, and the second pass over an alert that kept paging.
+
+WORK
+Lead Engineer, Dunmore Fintech
+Ship production Node.js service for the lending team every sprint, and keep the services small enough that one person can explain each one.
+Run PostgreSQL replica sets for three products; the largest takes about eight thousand writes a second.
+Mentor junior engineer on the team, and run the monthly learning session for the wider department.
+
+Engineer, Corrib Software
+Wrote Node.js integration for the payments gateway and the accounting package.
+Looked after a PostgreSQL database for the finance team.
+
+EDUCATION
+BSc Computing, Queen's University Belfast

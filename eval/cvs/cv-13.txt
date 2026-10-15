@@ -1,0 +1,28 @@
+Name: Imogen Castellanos-Reid
+Email: imogen.castellanos-reid@example.invalid
+Phone: +44 20 7946 0713
+Date of birth: 9 February 1990
+Nationality: British
+Gender: Female
+Address: 27 Foundry Road, Sheffield S1 4RH
+
+SUMMARY
+Data engineer with eight years of building the pipes that analysts and models depend on.
+
+EXPERIENCE
+Senior Data Engineer, Kiln Commerce (2020 - present)
+Built and operated production data pipelines in Python, using pandas and PySpark, that ingest about two terabytes a day from 40 sources into the lake.
+Wrote complex SQL against our Snowflake warehouse: window functions, recursive queries and a slowly changing dimension framework that other teams reuse.
+Ran Apache Airflow for the data group: around 300 DAGs, a custom operator for our ingestion pattern, and an on-call rota for failed runs.
+Worked with finance analysts and the head of product to define the revenue and retention metrics, and wrote the data contract that sits behind them.
+Cut the nightly batch from six hours to ninety minutes by repartitioning the heaviest joins.
+
+Data Engineer, Marlowe Retail (2016 - 2020)
+Wrote Python ETL jobs that loaded sales and stock data into Redshift.
+Wrote reporting queries in SQL for the merchandising team and sat with them to understand what they actually needed.
+
+EDUCATION
+MSc Data Science, University of Sheffield, 2016
+
+SKILLS
+Python, SQL, PySpark, Airflow, Snowflake, Redshift, dbt, Docker

@@ -1,0 +1,26 @@
+Name: Thaddeus Okafor-Lindqvist
+Email: thaddeus.okafor-lindqvist@example.invalid
+Phone: +44 20 7946 0717
+Date of birth: 12 December 1991
+Nationality: Swedish
+Gender: Male
+Address: 19 Mercer Street, Aberdeen AB10 1XH
+
+SUMMARY
+Data engineer, six years, mostly in energy trading.
+
+EXPERIENCE
+Data Engineer, Northern Lights Energy (2019 - present)
+Built and operated production data pipelines in Python that load trade, price and weather data into the warehouse every five minutes.
+Wrote complex SQL against the Postgres-based warehouse, including the settlement queries the back office reconciles against.
+I have not used Airflow or any other workflow orchestrator. Our jobs are scheduled with cron and monitored by a script I wrote.
+I have never worked directly with business stakeholders: requirements reach me through my manager as tickets.
+
+Junior Data Engineer, Spey Valley Power (2018 - 2019)
+Maintained SQL scripts and fixed failing nightly loads.
+
+EDUCATION
+MSc Computational Physics, University of Aberdeen
+
+SKILLS
+Python, SQL, PostgreSQL, Linux, Git
