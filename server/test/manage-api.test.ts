@@ -95,16 +95,23 @@ type Client = {
 
 async function withApi(
   fn: (client: Client, ctx: TestContext, provider: ControlledProvider) => Promise<void>,
+  options: { env?: Record<string, string>; defaultProvider?: boolean } = {},
 ): Promise<void> {
   const ctx = await createTestContext();
   const config: AppConfig = {
-    ...loadConfig({}).config,
+    ...loadConfig(options.env ?? {}).config,
     operatorPasswordHash: await hashPassword(PASSWORD),
     cookieSecure: false,
   };
   const provider = createControlledProvider();
 
-  const app = createApp({ db: ctx.db, config, provider, logger: createMemoryLogger().logger });
+  // `defaultProvider` builds the app the way a real start does, from configuration alone.
+  const app = createApp({
+    db: ctx.db,
+    config,
+    ...(options.defaultProvider ? {} : { provider }),
+    logger: createMemoryLogger().logger,
+  });
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once('listening', () => resolve()));
   const { port } = server.address() as AddressInfo;
@@ -554,6 +561,36 @@ test('when the model finds nothing the evaluation is scored with every requireme
     const trail = await client.get<{ events: Array<{ eventType: string }> }>(`/api/evaluations/${added.body.evaluationId}/audit`);
     assert.ok(trail.body.events.some((event) => event.eventType === 'extraction_empty'));
   });
+});
+
+test('started from configuration alone, the mock provider assesses a CV, in the mode MATCH_MODE names', async () => {
+  const outcome: Record<string, { verdicts: string[]; mode: unknown }> = {};
+
+  for (const mode of ['strict', 'folded']) {
+    await withApi(
+      async (client, ctx) => {
+        const job = await createJobViaApi(client);
+        const added = await addCandidate(client, job.id, `cv-${mode}`, `${RESUME_TEXT}
+Running PostgreSQL at scale for the payments team.`);
+        assert.equal((await client.post(`/api/evaluations/${added.body.evaluationId}/run`, {})).status, 202);
+        await waitForStatus(client, added.body.evaluationId, 'scored');
+
+        const detail = await client.get<{ requirements: Array<{ label: string; verdict: string }> }>(`/api/evaluations/${added.body.evaluationId}`);
+        const events = await ctx.repos.audit.listForCorrelation(added.body.evaluationId);
+        outcome[mode] = {
+          verdicts: detail.body.requirements.map((requirement) => requirement.verdict),
+          mode: events.find((event) => event.eventType === 'requirements_matched')?.payload.matchMode,
+        };
+      },
+      { env: { MATCH_MODE: mode }, defaultProvider: true },
+    );
+  }
+
+  assert.equal(outcome.strict?.mode, 'strict');
+  assert.equal(outcome.folded?.mode, 'folded');
+  // The job asks for someone who has "run PostgreSQL at scale"; the CV says "Running PostgreSQL ...".
+  assert.equal(outcome.strict?.verdicts[1], 'partial');
+  assert.equal(outcome.folded?.verdicts[1], 'met');
 });
 
 // --- wiring ------------------------------------------------------------------

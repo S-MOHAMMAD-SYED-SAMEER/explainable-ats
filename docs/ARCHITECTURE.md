@@ -100,7 +100,7 @@ Each row below names the file, what the stage reads and writes, and what it guar
 `decideMatch` takes a requirement and the verified quotes cited for it.
 
 1. The requirement's **terms** are the significant words of its label and criterion: lower-cased, at least three characters, minus a short stop-word list, de-duplicated.
-2. It joins the verified quotes and counts how many terms appear in that text **as whole words** (`wordsOf`: lower-cased, split on anything that is not a letter, digit, `+`, `#` or `.`, so `Node.js` and `C++` are one word each and a sentence-ending full stop is not part of the word before it). "Java" is not found in "JavaScript" and "run" is not found in "running". There is no stemming and no synonym list, so "service" does not satisfy "services".
+2. It joins the verified quotes and counts how many terms appear in that text **as whole words** (`wordsOf`: lower-cased, split on anything that is not a letter, digit, `+`, `#` or `.`, so `Node.js` and `C++` are one word each and a sentence-ending full stop is not part of the word before it). "Java" is not found in "JavaScript" and "run" is not found in "running". That is the default, `MATCH_MODE=strict`: no stemming and no synonym list, so "service" does not satisfy "services". The alternative, `MATCH_MODE=folded`, first reduces both sides with `foldWord` (plural -s/-es, then -ing and -ed, then a doubled final consonant and a final -e, on purely alphabetic words of four letters or more), so "running", "runs" and "run" are one word. It is a fold, not a stemmer, and it has costs: "engineering" meets "engineer", and a job title such as "Backend Engineer" can be quoted as evidence for "mentored junior engineers", turning a silence into a `not_met`. The mode is read once from configuration, passed to the extractor stand-in (so the line it picks is the line credited) and to the matcher, and written into the `requirements_matched` audit event so a score says which rule produced it.
 3. With *covered* as the share of terms found:
    - 75% or more: `met`
    - 35% or more: `partial`
@@ -112,7 +112,7 @@ The comparisons are integer (`covered * 100 >= terms * 75`), and the score is in
 
 This is term coverage, not comprehension. It is crude on purpose, and the rationale shows exactly what it counted so a recruiter can see when it is wrong. Three limits are known and each is pinned by a test, so changing one is a decision rather than an accident:
 
-- **Word forms and synonyms count as different terms.** "service" is not "services", "Postgres" is not "PostgreSQL". The precision gained over substring matching is paid for in recall.
+- **Word forms and synonyms count as different terms by default.** "service" is not "services", "Postgres" is not "PostgreSQL". The precision gained over substring matching is paid for in recall. `folded` mode recovers word forms and nothing else; which default is better is an empirical question, and the evaluation set (`eval/`) exists to answer it.
 - **Negation is not understood.** "Never shipped a Node.js service" covers exactly the terms "Shipped a Node.js service" covers and gets the same verdict.
 - **Words can be stuffed.** A quote that merely lists the terms of a criterion covers it. Verification stops a fabricated quote and a bare keyword (see the Verify row: at least 15 characters), but not a skills list quoted as evidence.
 

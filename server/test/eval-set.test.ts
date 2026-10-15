@@ -165,7 +165,8 @@ test('a real passage from the CV is accepted, however it is spaced or punctuated
   const cv = cvTexts.get('cv-08') as string;
   // cv-08 hard-wraps its sentences, and a spreadsheet may curl quotes and dashes.
   const wrapped = 'Designed and shipped production Node.js\nservices for a freight tracking product';
-  assert.ok(cv.includes(wrapped), 'precondition: this wrapped sentence is really in cv-08');
+  // (A checkout with Windows line endings has \r\n; the sentence is the same.)
+  assert.ok(cv.replace(/\r\n/g, '\n').includes(wrapped), 'precondition: this wrapped sentence is really in cv-08');
 
   const asTyped = 'Designed and shipped production Node.js services for a freight tracking product';
   assert.deepEqual(validateLabels(build({ 'cv-08/demo-node': ['cv-08', 'demo-node', asTyped, 'met', ''] }), dataset, cvTexts).problems, []);

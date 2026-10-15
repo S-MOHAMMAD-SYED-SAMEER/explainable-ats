@@ -3,17 +3,28 @@ import type { RankTier } from '../agent/rankRules.ts';
 
 // The demo dataset.
 //
-// Five invented candidates against one invented role, chosen so that the four
+// Five invented candidates against one invented role, written so that the four
 // outcomes the product distinguishes are all visible on one screen — and so
 // that the most important of them, the must-have gate, is impossible to miss.
 //
 // THE POINT OF THE NUMBERS
 //
-// Devi and Marcus both score 71%. Devi is placed above Marcus, and the only
-// reason is that Marcus's CV does not demonstrate an essential requirement.
-// Same number, different placement, and the ranking says why in a sentence. A
-// dataset where the qualified candidate simply scored higher would demonstrate
-// nothing: it would look like ordinary sorting.
+// With plural, -ing and -ed endings folded (`MATCH_MODE=folded`), Devi and Marcus
+// both score 71%. Devi is placed above Marcus, and the only reason is that Marcus's
+// CV does not demonstrate an essential requirement. Same number, different
+// placement, and the ranking says why in a sentence. A dataset where the qualified
+// candidate simply scored higher would demonstrate nothing: it would look like
+// ordinary sorting.
+//
+// THE DEFAULT MODE TELLS A DIFFERENT STORY, AND THE DATA IS NOT BENT TO HIDE IT
+//
+// The CVs were written to say "Running PostgreSQL at scale" against the criterion
+// "Has run PostgreSQL at scale". Under the default `strict` matching, "running" is
+// not the criterion's word "run", so PostgreSQL covers two of three terms: partial.
+// Rowan and Devi, who would be qualified, are gated, and nobody is qualified. That
+// is the cost of whole-word matching, shown on this data and left as it is: the CVs
+// were not reworded to fit the matcher. `expected` is what the default mode
+// produces; `expectedFolded` is what the folded mode produces; the tests check both.
 //
 // EVERYTHING HERE IS INVENTED
 //
@@ -87,15 +98,20 @@ export type DemoCandidate = {
    * produces, and it is the one a recruiter can actually see.
    */
   assess: 'scored' | 'queued';
-  /** What this candidate is in the dataset to demonstrate. Checked by a test. */
-  expected: {
-    tier: RankTier;
-    scoreBasisPoints: number | null;
-    /** Verdict per requirement, in the order the requirements are declared. */
-    verdicts: Array<'met' | 'partial' | 'not_met' | 'unclear'>;
+  /** What the DEFAULT (`strict`) matching produces for this candidate. Checked by a test. */
+  expected: DemoOutcome & {
     /** One line, for the report and for a human reading this file. */
     demonstrates: string;
   };
+  /** What `folded` matching produces for the same CV. Checked by a test. */
+  expectedFolded: DemoOutcome;
+};
+
+export type DemoOutcome = {
+  tier: RankTier;
+  scoreBasisPoints: number | null;
+  /** Verdict per requirement, in the order the requirements are declared. */
+  verdicts: Array<'met' | 'partial' | 'not_met' | 'unclear'>;
 };
 
 export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
@@ -119,18 +135,21 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
       'EXPERIENCE',
       'Senior Engineer, Halden Freight',
       'Designed and shipped production Node.js services for a freight booking platform.',
-      'Run PostgreSQL at scale, moving a single instance to a replicated cluster.',
+      'Running PostgreSQL at scale, moving a single instance to a replicated cluster.',
       'Mentoring: mentored four junior engineers through their first releases.',
       '',
       'SKILLS',
       'TypeScript, Docker, Kubernetes, Terraform',
     ].join('\n'),
     expected: {
-      tier: 'qualified',
-      scoreBasisPoints: 10_000,
-      verdicts: ['met', 'met', 'met'],
-      demonstrates: 'Every requirement demonstrated, each backed by a quoted line. The top of the list.',
+      tier: 'gated',
+      // (3x10000 + 2x5000 + 2x10000) / 7
+      scoreBasisPoints: 8_571,
+      verdicts: ['met', 'partial', 'met'],
+      demonstrates:
+        'The highest score on the list and still gated: "Running PostgreSQL at scale" covers two of the three words of "Has run PostgreSQL at scale" ("running" is not "run"), so PostgreSQL is only partly met. Whole-word matching, shown costing something.',
     },
+    expectedFolded: { tier: 'qualified', scoreBasisPoints: 10_000, verdicts: ['met', 'met', 'met'] },
   },
 
   {
@@ -153,20 +172,24 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
       'EXPERIENCE',
       'Backend Engineer, Corvid Systems',
       'Designed and shipped production Node.js services behind a payments API.',
-      'Run PostgreSQL at scale for a multi-tenant billing system.',
+      'Running PostgreSQL at scale for a multi-tenant billing system.',
       'Reduced tail latency by tuning slow queries and adding read replicas.',
       '',
       'SKILLS',
       'TypeScript, Redis, Docker',
     ].join('\n'),
     expected: {
-      tier: 'qualified',
-      // (3x10000 + 2x10000 + 2x0) / 7
-      scoreBasisPoints: 7_142,
-      verdicts: ['met', 'met', 'unclear'],
+      tier: 'gated',
+      // (3x10000 + 2x5000 + 2x0) / 7
+      scoreBasisPoints: 5_714,
+      verdicts: ['met', 'partial', 'unclear'],
       demonstrates:
-        'Meets both essentials; the CV says nothing about the desirable one. Scores the same as Marcus and is placed above him.',
+        'Meets Node.js and has nothing about the desirable requirement; "Running PostgreSQL at scale" is partial for the same whole-word reason as Rowan, which gates her. With folded matching she is qualified at 71% and sits above Marcus on the same score (but see the note on mentoring below).',
     },
+    // Folded, the job title "Backend Engineer" shares a folded word with "engineers", so the
+    // extractor quotes it for mentoring and a requirement the CV is silent on reads not_met
+    // instead of unclear. Her tier does not change (mentoring is desirable), her verdict does.
+    expectedFolded: { tier: 'qualified', scoreBasisPoints: 7_142, verdicts: ['met', 'met', 'not_met'] },
   },
 
   {
@@ -201,8 +224,9 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
       scoreBasisPoints: 7_142,
       verdicts: ['met', 'not_met', 'met'],
       demonstrates:
-        'THE CENTREPIECE. Scores exactly what Devi scores, and is placed below her: the CV speaks to PostgreSQL and what it says does not show the requirement. The score is not reduced — only the placement changes.',
+        'THE CENTREPIECE when matching is folded: scores exactly what Devi scores and is placed below her, because the CV speaks to PostgreSQL and what it says does not show the requirement. The score is not reduced — only the placement changes. Under strict matching Devi falls to a lower score and the pair no longer ties.',
     },
+    expectedFolded: { tier: 'gated', scoreBasisPoints: 7_142, verdicts: ['met', 'not_met', 'met'] },
   },
 
   {
@@ -237,8 +261,9 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
       scoreBasisPoints: 5_714,
       verdicts: ['met', 'unclear', 'partial'],
       demonstrates:
-        'The CV says nothing at all about PostgreSQL — neither for nor against. Held for a human to look at rather than ruled out, because an absence of evidence is not evidence of absence.',
+        'The CV says nothing at all about PostgreSQL — neither for nor against. Held for a human to look at rather than ruled out, because an absence of evidence is not evidence of absence. Strict matching scores her mentoring partial; folded matching meets it ("mentored" and "mentoring" are one word) and lifts the score to 71%.',
     },
+    expectedFolded: { tier: 'needs_review', scoreBasisPoints: 7_142, verdicts: ['met', 'unclear', 'met'] },
   },
 
   {
@@ -261,7 +286,7 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
       'EXPERIENCE',
       'Engineer, Northgate Logistics',
       'Built and shipped production Node.js services for depot scheduling.',
-      'Run PostgreSQL at scale behind a routing API.',
+      'Running PostgreSQL at scale behind a routing API.',
       '',
       'SKILLS',
       'TypeScript, Go, Docker',
@@ -273,6 +298,7 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
       demonstrates:
         'CV received, assessment queued but not run. Listed and visibly unranked with no score, because a list that quietly omits someone looks complete and is not. On the strength of the CV they would likely do well — which is exactly why they are shown rather than hidden.',
     },
+    expectedFolded: { tier: 'not_evaluated', scoreBasisPoints: null, verdicts: [] },
   },
 ];
 

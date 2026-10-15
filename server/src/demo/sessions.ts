@@ -6,6 +6,7 @@ import { createFixedClock, systemClock, type Clock } from '../lib/clock.ts';
 import { createSequentialIds } from '../lib/ids.ts';
 import { DEMO_JOB } from './dataset.ts';
 import { seedDemoData } from './seed.ts';
+import type { MatchMode } from '../agent/matchRules.ts';
 import { isDemoScenarioId, type DemoScenarioId } from './scenarios.ts';
 import type { Database } from '../db/types.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -89,6 +90,8 @@ export type DemoSessionStore = {
 export type DemoSessionStoreOptions = {
   migrationsDir: string;
   logger?: Logger;
+  /** How words are compared when the sandbox is seeded. Default strict. */
+  matchMode?: MatchMode;
   /** Injectable so a test can move time. Governs expiry only, never the data. */
   clock?: Clock;
   ttlMs?: number;
@@ -146,7 +149,7 @@ export function createDemoSessionStore(options: DemoSessionStoreOptions): DemoSe
 
       // The canonical seeder, pointed at a private database. Nothing about the
       // dataset or the pipeline is restated here.
-      const seeded = await seedDemoData({ repos });
+      const seeded = await seedDemoData({ repos, ...(options.matchMode ? { matchMode: options.matchMode } : {}) });
       seeding = false;
 
       const evaluations = new Map<string, string>();

@@ -1,5 +1,5 @@
 import { parseExtractionPrompt, type PromptRequirement } from './extractionPrompt.ts';
-import { significantTerms, wordsOf } from './matchRules.ts';
+import { DEFAULT_MATCH_MODE, containsTerm, significantTerms, wordsOf, type MatchMode } from './matchRules.ts';
 import { MIN_QUOTE_CHARS } from './verifyEvidence.ts';
 import { MASK_CHAR } from './redact.ts';
 import type { LlmRequest } from '../adapters/llm/types.ts';
@@ -53,6 +53,8 @@ function linesWithOffsets(text: string): Line[] {
 export type MockExtractorOptions = {
   /** How many passages to quote per requirement. One keeps fixtures readable. */
   maxPerRequirement?: number;
+  /** How words are compared. Use the matcher's mode, so the line picked is the line credited. */
+  matchMode?: MatchMode;
 };
 
 /**
@@ -63,6 +65,7 @@ export type MockExtractorOptions = {
  */
 export function createDeterministicExtractor(options: MockExtractorOptions = {}) {
   const maxPerRequirement = options.maxPerRequirement ?? 1;
+  const matchMode = options.matchMode ?? DEFAULT_MATCH_MODE;
 
   return function respond(request: LlmRequest): Record<string, unknown> {
     const message = request.messages[request.messages.length - 1];
@@ -88,8 +91,8 @@ export function createDeterministicExtractor(options: MockExtractorOptions = {})
 
         // Whole words, as the matcher counts them, so the line picked is the line
         // that will actually be credited.
-        const words = wordsOf(trimmed);
-        const hits = keywords.filter((keyword) => words.has(keyword)).length;
+        const words = wordsOf(trimmed, matchMode);
+        const hits = keywords.filter((keyword) => containsTerm(words, keyword, matchMode)).length;
         if (hits > 0) scored.push({ line, hits });
       }
 

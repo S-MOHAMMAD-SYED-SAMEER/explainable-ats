@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { DEFAULT_MATCH_MODE, MATCH_MODES, type MatchMode } from '../agent/matchRules.ts';
 import { fileURLToPath } from 'node:url';
 import type { LogLevel } from '../lib/logger.ts';
 import { APP_MODES, DEFAULT_APP_MODE, isAppMode, type AppMode } from './mode.ts';
@@ -211,6 +212,8 @@ export type AppConfig = {
   anthropicToolChoice: (typeof ANTHROPIC_TOOL_CHOICES)[number];
   /** Sent only when set; several current models reject it. */
   anthropicTemperature: number | null;
+  /** How requirement terms are compared with quotes: whole words only, or with plural, -ing and -ed endings folded. */
+  matchMode: MatchMode;
   operatorPasswordHash: string | null;
   sessionTtlHours: number;
   cookieSecure: boolean;
@@ -307,6 +310,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         ),
         anthropicToolChoice: readEnum('ANTHROPIC_TOOL_CHOICE', ANTHROPIC_TOOL_CHOICES, 'auto', problems),
         anthropicTemperature: readTemperature('ANTHROPIC_TEMPERATURE', problems),
+        matchMode: readEnum('MATCH_MODE', MATCH_MODES, DEFAULT_MATCH_MODE, problems),
         operatorPasswordHash,
         sessionTtlHours: readInt('SESSION_TTL_HOURS', 12, problems),
         cookieSecure,
