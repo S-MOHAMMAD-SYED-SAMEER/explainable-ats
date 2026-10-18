@@ -18,6 +18,7 @@ import { createApp } from '../src/app.ts';
 import { ConfigError, configSummary, loadConfig } from '../src/config/env.ts';
 import { handleHealth } from '../src/handlers/health.ts';
 import { extractEvidence } from '../src/agent/extract.ts';
+import { VERDICT_PROMPT_VERSION, VERDICT_PURPOSE, VERDICT_TOOL, buildVerdictSystemPrompt } from '../src/agent/verdictExtraction.ts';
 import { matchAndScore } from '../src/agent/match.ts';
 import { EXTRACTION_PROMPT_VERSION, EXTRACTION_TOOL } from '../src/agent/extractionSchema.ts';
 import { buildSystemPrompt, buildUserMessage } from '../src/agent/extractionPrompt.ts';
@@ -973,4 +974,39 @@ test('an unknown tool choice or an out-of-range temperature is refused when the 
   for (const temperature of [-0.1, 1.5, Number.NaN]) {
     assert.throws(() => createAnthropicProvider({ ...base, temperature }), /temperature must be a number from 0 to 1/);
   }
+});
+
+// --- the verdict tool (`model_checked`): the list the reply must carry is named by the tool ----------------------------------------
+
+function verdictRequest(): LlmRequest {
+  return {
+    purpose: VERDICT_PURPOSE,
+    promptVersion: VERDICT_PROMPT_VERSION,
+    systemPrompt: buildVerdictSystemPrompt(),
+    messages: [{ role: 'user', content: buildUserMessage(REQUIREMENTS, 'A short resume. Designed Node.js services.') }],
+    tool: VERDICT_TOOL,
+    maxTokens: 2048,
+  };
+}
+
+test('the verdict tool is sent as the forced tool, and a reply carrying a "requirements" list is accepted', async () => {
+  const answer = { requirements: [{ requirementId: 'req-1', verdict: 'met', passages: ['Designed Node.js services.'], reason: 'Direct.' }] };
+  const { client, calls } = fakeClient(reply({ content: [toolUse(answer, 'record_verdicts')] }));
+  const response = await build(client, { toolChoice: 'forced' }).provider.complete(verdictRequest());
+  assert.deepEqual(response.output, answer);
+  assert.equal(calls.length, 1);
+  assert.equal((calls[0]?.body.tools?.[0] as { name?: string } | undefined)?.name, 'record_verdicts');
+  assert.deepEqual(calls[0]?.body.tool_choice, { type: 'tool', name: 'record_verdicts', disable_parallel_tool_use: true });
+});
+
+test('a verdict reply with no "requirements" list (a quotes-only reply, say) is a provider failure, and the quotes-only tool still needs "findings"', async () => {
+  for (const input of [{}, { findings: [] }, { requirements: 'not an array' }, { requirements: null }]) {
+    const { client, calls } = fakeClient(reply({ content: [toolUse(input, 'record_verdicts')] }));
+    const err = await failure(build(client).provider.complete(verdictRequest()));
+    assert.match(err.message, /rejected/, `${JSON.stringify(input)} was accepted`);
+    assert.equal(calls.length, 1, 'a malformed answer must not be retried');
+  }
+  const { client } = fakeClient(reply({ content: [toolUse({ requirements: [] })] }));
+  const err = await failure(build(client).provider.complete(extractionRequest()));
+  assert.match(err.message, /rejected/, 'the quotes-only tool is still held to its own list');
 });

@@ -175,6 +175,8 @@ async function withApi(
     ...loadConfig({}).config,
     operatorPasswordHash: await hashPassword(PASSWORD),
     cookieSecure: false,
+    // These tests drive the quotes-only path with their own `extract_evidence` stand-ins, so they ask for the matcher to judge.
+    verdictMode: 'matcher',
   };
 
   const seeded = await seed(ctx.repos);

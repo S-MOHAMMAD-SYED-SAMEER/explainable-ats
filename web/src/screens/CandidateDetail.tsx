@@ -16,6 +16,7 @@ import {
   OUTCOMES,
   kindLabel,
   outcomeWording,
+  SECOND_OPINION,
   tierWording,
   toneClass,
   verdictWording,
@@ -68,6 +69,12 @@ function Headline({ detail, demo = false }: { detail: EvaluationDetail; demo?: b
       </div>
 
       <p className={`mt-2 text-small ${toneClass(wording.tone)}`}>{wording.detail}</p>
+
+      {detail.needsReview ? (
+        <p data-second-opinion-banner className="mt-3 rounded-control bg-signal-tint px-3 py-2 text-small text-signal">
+          {SECOND_OPINION.banner}
+        </p>
+      ) : null}
 
       {detail.isCurrent ? null : (
         <p className="mt-3 rounded-control bg-signal-tint px-3 py-2 text-small text-signal">
@@ -164,6 +171,45 @@ function Fairness({ detail }: { detail: EvaluationDetail }): ReactNode {
 }
 
 /**
+ * The model's verdict and the second opinion, for one requirement.
+ *
+ * Shows what the model proposed and why, what the code left standing (and why it lowered it, if it did), and the deterministic
+ * matcher's own verdict on the same quoted passages. The quotes themselves are listed above, each one checked against the CV.
+ * A disagreement of two steps or more is flagged: that is what routes a candidate to a person.
+ */
+function VerdictCheckPanel({ check }: { check: NonNullable<RequirementOutcome['check']> }): ReactNode {
+  const model = verdictWording(check.modelVerdict);
+  const enforced = verdictWording(check.enforcedVerdict);
+  const matcher = verdictWording(check.matcherVerdict);
+  return (
+    <div data-verdict-check className="mt-3 rounded-control border border-line bg-canvas p-3 text-small">
+      <p>
+        <span className="font-semibold text-ink">Model&apos;s verdict: </span>
+        <span className={toneClass(model.tone)}>{check.modelVerdict === null ? 'no answer' : model.label}</span>
+        {check.modelReason ? <span className="text-ink-muted"> — {check.modelReason}</span> : null}
+      </p>
+      {check.downgradeReason === 'no_verified_passage' ? (
+        <p data-downgraded className="mt-1 text-signal">
+          {SECOND_OPINION.lowered(enforced.label)}
+        </p>
+      ) : null}
+      <p className="mt-1">
+        <span className="font-semibold text-ink">Matcher&apos;s verdict{check.matcherMode ? ` (${check.matcherMode} words)` : ''}: </span>
+        <span className={toneClass(matcher.tone)}>{check.matcherVerdict === null ? 'not run' : matcher.label}</span>
+        <span className="text-ink-muted"> — the second opinion, from the same quoted passages</span>
+      </p>
+      {check.disagreement === 'two_plus' ? (
+        <p data-second-opinion-disagrees className="mt-1 font-semibold text-signal">
+          {SECOND_OPINION.disagrees}
+        </p>
+      ) : check.disagreement === 'one_step' ? (
+        <p className="mt-1 text-ink-muted">{SECOND_OPINION.oneStep}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * One requirement, its verdict, and the passages behind it.
  *
  * The contribution is shown in points rather than as a rounded percentage, and
@@ -250,6 +296,8 @@ function RequirementCard({
           ) : null}
         </div>
       ) : null}
+
+      {requirement.check ? <VerdictCheckPanel check={requirement.check} /> : null}
 
       <Technical summary={demo ? `${DEMO_LABELS.match}: how this requirement was judged` : 'How this requirement was judged'}>
         <p>{requirement.rationale ?? 'This requirement was not judged, because the assessment did not finish.'}</p>

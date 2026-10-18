@@ -1,5 +1,7 @@
 import { scoreEvaluation, type ScoreBreakdown } from './score.ts';
-import { DEFAULT_MATCH_MODE, type MatchMode } from './matchRules.ts';
+import { DEFAULT_MATCH_MODE, type MatchDecision, type MatchMode } from './matchRules.ts';
+import { confidenceOf, reconcileWithMatcher, scoreFromVerdicts, type EnforcedVerdict, type Reconciled } from './verdictEnforcement.ts';
+import { DEFAULT_VERDICT_MODE, type VerdictMode } from './verdictMode.ts';
 import { AppError } from '../lib/errors.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
@@ -22,8 +24,14 @@ import type { Evaluation } from '../domain/ats.ts';
 export type MatchDeps = {
   repos: Repositories;
   logger?: Logger;
-  /** How words are compared: `strict` (the default) or `folded`. Recorded in the audit trail. */
+  /** How words are compared: `strict` (the default) or `folded`. Recorded in the audit trail. In `model_checked` mode this is the second opinion's mode. */
   matchMode?: MatchMode;
+  /**
+   * Who decides a verdict: the model, checked by the code and a second opinion (`model_checked`), or the matcher alone (`matcher`).
+   * Used only when the evaluation was extracted in `model_checked` mode; an evaluation extracted any other way is scored by the matcher.
+   * Recorded in the audit trail.
+   */
+  verdictMode?: VerdictMode;
 };
 
 export type MatchOutcome = {
@@ -31,6 +39,10 @@ export type MatchOutcome = {
   breakdown: ScoreBreakdown;
   /** Unverified rows that were present and ignored. Reported, never counted. */
   evidenceIgnored: number;
+  /** The mode that produced the verdicts that were scored. */
+  verdictMode: VerdictMode;
+  /** True when the second opinion disagreed by two steps or more on some requirement: the candidate is routed to a person. */
+  needsReview: boolean;
 };
 
 /**
@@ -43,6 +55,7 @@ export type MatchOutcome = {
 export async function matchAndScore(deps: MatchDeps, evaluationId: string): Promise<MatchOutcome> {
   const { repos, logger } = deps;
   const matchMode = deps.matchMode ?? DEFAULT_MATCH_MODE;
+  const requestedVerdictMode = deps.verdictMode ?? DEFAULT_VERDICT_MODE;
 
   const evaluation = await repos.evaluations.getById(evaluationId);
   if (!evaluation) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
@@ -72,7 +85,41 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
   const all = await repos.evidence.listForEvaluation(evaluation.id);
   const evidenceIgnored = all.length - verified.length;
 
-  const breakdown = scoreEvaluation(requirements, verified, matchMode);
+  // The verdicts. In `model_checked` mode they are the model's, after the code's rules and the matcher's second opinion; the
+  // checks were written when the evaluation was extracted. An evaluation extracted without them (the quotes-only way) is
+  // scored by the matcher alone, and the audit trail says which, never the mode that was merely requested.
+  const checks = requestedVerdictMode === 'model_checked' ? await repos.verdictChecks.listForEvaluation(evaluation.id) : [];
+  const verdictMode: VerdictMode = checks.length > 0 ? 'model_checked' : 'matcher';
+
+  let reconciled: Reconciled[] = [];
+  let breakdown: ScoreBreakdown;
+  if (verdictMode === 'model_checked') {
+    const enforced: EnforcedVerdict[] = requirements.map((requirement) => {
+      const check = checks.find((entry) => entry.requirementId === requirement.id);
+      return {
+        requirementId: requirement.id,
+        modelVerdict: check?.modelVerdict ?? null,
+        modelReason: check?.modelReason ?? null,
+        enforcedVerdict: check?.enforcedVerdict ?? 'unclear',
+        downgrade: check?.downgradeReason ?? (check ? null : 'no_answer'),
+        verifiedPassages: verified.filter((item) => item.requirementId === requirement.id).length,
+      };
+    });
+    reconciled = reconcileWithMatcher(requirements, enforced, verified, matchMode);
+    const decisions: MatchDecision[] = reconciled.map((entry) => ({
+      requirementId: entry.requirementId,
+      verdict: entry.scoredVerdict,
+      confidence: confidenceOf(entry),
+      matchedTerms: entry.matcher.matchedTerms,
+      missingTerms: entry.matcher.missingTerms,
+      evidenceCount: entry.verifiedPassages,
+      rationale: modelCheckedRationale(entry, matchMode),
+    }));
+    breakdown = scoreFromVerdicts(requirements, decisions);
+  } else {
+    breakdown = scoreEvaluation(requirements, verified, matchMode);
+  }
+  const needsReview = reconciled.some((entry) => entry.disagreement === 'two_plus');
 
   // Matches and the score land together. A score without the matches behind it
   // is an unexplainable number, and an explanation without its score is a page
@@ -87,6 +134,22 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
         weightApplied: row.weightApplied,
         contributionBasisPoints: row.contributionBasisPoints,
         rationale: row.decision.rationale,
+      });
+    }
+
+    for (const entry of reconciled) {
+      await tx.verdictChecks.record({
+        evaluationId: evaluation.id,
+        requirementId: entry.requirementId,
+        verdictMode: 'model_checked',
+        modelVerdict: entry.modelVerdict,
+        modelReason: entry.modelReason,
+        enforcedVerdict: entry.enforcedVerdict,
+        downgradeReason: entry.downgrade,
+        matcherVerdict: entry.matcher.verdict,
+        matcherMode: matchMode,
+        disagreement: entry.disagreement,
+        scoredVerdict: entry.scoredVerdict,
       });
     }
 
@@ -131,10 +194,52 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
       })),
       evidenceCounted: verified.length,
       matchMode,
+      // Present only when the model's verdicts were scored. Its absence means the matcher alone judged (the behaviour the
+      // portfolio demo copies are checked against byte for byte), so the matcher path's payload is exactly what it always was.
+      ...(verdictMode === 'model_checked'
+        ? {
+            verdictMode,
+            checks: reconciled.map((entry) => ({
+              requirementId: entry.requirementId,
+              model: entry.modelVerdict,
+              enforced: entry.enforcedVerdict,
+              matcher: entry.matcher.verdict,
+              disagreement: entry.disagreement,
+              scored: entry.scoredVerdict,
+            })),
+          }
+        : {}),
     },
     entityType: 'evaluation',
     entityId: evaluation.id,
   });
+
+  if (needsReview) {
+    const disagreeing = reconciled.filter((entry) => entry.disagreement === 'two_plus');
+    await repos.audit.append({
+      correlationId: evaluation.id,
+      stage: 'match',
+      eventType: 'verdict_disagreement',
+      actor: 'system',
+      outcome: 'blocked',
+      summary:
+        `The model and the second opinion disagree by two steps or more on ${disagreeing.length} requirement(s), ` +
+        "so this candidate is routed to a person. Where the passages quoted share no word with the requirement, the score uses the matcher's lower verdict until a person decides.",
+      payload: {
+        matchMode,
+        requirements: disagreeing.map((entry) => ({
+          requirementId: entry.requirementId,
+          model: entry.modelVerdict,
+          enforced: entry.enforcedVerdict,
+          matcher: entry.matcher.verdict,
+          scored: entry.scoredVerdict,
+          capped: entry.capped,
+        })),
+      },
+      entityType: 'evaluation',
+      entityId: evaluation.id,
+    });
+  }
 
   // The event that makes the number checkable: every input to the arithmetic
   // is in the payload, so the score can be recomputed from the trail alone.
@@ -171,5 +276,28 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
     mustHavesTotal: breakdown.mustHavesTotal,
   });
 
-  return { evaluation: updated, breakdown, evidenceIgnored };
+  return { evaluation: updated, breakdown, evidenceIgnored, verdictMode, needsReview };
+}
+
+/** What a recruiter reads for one requirement in `model_checked` mode: what the model said, what the code did, what the second opinion said. */
+function modelCheckedRationale(entry: Reconciled, matchMode: MatchMode): string {
+  const model =
+    entry.modelVerdict === null
+      ? 'The model gave no answer for this requirement.'
+      : `Model: ${entry.modelVerdict.replace('_', ' ')}${entry.modelReason ? ` (${entry.modelReason.replace(/[.\s]+$/, '')})` : ''}.`;
+  const code =
+    entry.downgrade === 'no_verified_passage'
+      ? ' The code lowered it to unclear: no passage the model quoted for it was found in the resume.'
+      : entry.downgrade === 'no_answer'
+        ? ' It reads as unclear.'
+        : '';
+  const matcher = entry.matcher.verdict.replace('_', ' ');
+  const second =
+    entry.disagreement === 'none'
+      ? ` Second opinion (matcher, ${matchMode}): ${matcher}, which agrees.`
+      : entry.disagreement === 'one_step'
+        ? ` Second opinion (matcher, ${matchMode}): ${matcher}, one step apart. Shown, not acted on.`
+        : ` Second opinion (matcher, ${matchMode}): ${matcher}, two steps or more apart, so a person should look.` +
+          (entry.capped ? ` No word of the requirement appears in the passages quoted, so the matcher's lower verdict (${entry.scoredVerdict.replace('_', ' ')}) is scored until then.` : '');
+  return `${model}${code}${second}`;
 }

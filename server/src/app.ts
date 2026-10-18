@@ -11,6 +11,7 @@ import { createRepositories } from './db/repositories/index.ts';
 import { createLlmProvider } from './adapters/llm/index.ts';
 import { createEvaluationRunner } from './agent/runner.ts';
 import { installDeterministicExtractor } from './agent/mockExtractor.ts';
+import { installDeterministicVerdictExtractor } from './agent/mockVerdictExtractor.ts';
 import type { MockLlmProvider } from './adapters/llm/mock.ts';
 import { createDemoSessionStore, type DemoSessionStore } from './demo/sessions.ts';
 import { config as defaultConfig, type AppConfig } from './config/env.ts';
@@ -186,8 +187,11 @@ function mountApplication(app: Express, { db, logger, config, provider, rateLimi
   // The mock provider replays fixtures and has none here, so with LLM_PROVIDER=mock (the
   // default) the recruiter's "run" would fail on an empty provider. Give it the deterministic
   // stand-in, which quotes real lines and costs nothing. An injected provider is left alone.
-  if (!provider && llm.name === 'mock') installDeterministicExtractor(llm as MockLlmProvider, { matchMode: config.matchMode });
-  const runner = createEvaluationRunner({ repos, provider: llm, logger, matchMode: config.matchMode });
+  if (!provider && llm.name === 'mock') {
+    installDeterministicExtractor(llm as MockLlmProvider, { matchMode: config.matchMode });
+    installDeterministicVerdictExtractor(llm as MockLlmProvider, { matchMode: config.matchMode });
+  }
+  const runner = createEvaluationRunner({ repos, provider: llm, logger, matchMode: config.matchMode, verdictMode: config.verdictMode });
 
   app.use('/api', attachSession({ repos }));
   app.use('/api', rateLimiter);

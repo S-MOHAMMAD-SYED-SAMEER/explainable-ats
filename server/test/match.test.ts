@@ -565,6 +565,8 @@ test('no ranking table exists, and matching added no table at all', async (t) =>
     'schema_migrations',
     'sensitive_findings',
     'sessions',
+    // The model's verdicts and what the code made of them (the verdict mode); neither matching nor ranking added it.
+    'verdict_checks',
   ]);
 });
 
