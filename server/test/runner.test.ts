@@ -20,7 +20,7 @@ test('a run takes a pending evaluation to scored and then reports idle', async (
   const ctx = await createTestContext();
   try {
     const { evaluation } = await seedScenario(ctx.repos);
-    const runner = createEvaluationRunner({ repos: ctx.repos, provider: mockProvider() });
+    const runner = createEvaluationRunner({ repos: ctx.repos, provider: mockProvider(), verdictMode: 'matcher' });
 
     runner.start(evaluation.id);
     assert.equal(runner.isRunning(evaluation.id), true);
@@ -38,7 +38,7 @@ test('starting the same evaluation twice runs it once', async () => {
   try {
     const { evaluation } = await seedScenario(ctx.repos);
     const provider = mockProvider();
-    const runner = createEvaluationRunner({ repos: ctx.repos, provider });
+    const runner = createEvaluationRunner({ repos: ctx.repos, provider, verdictMode: 'matcher' });
 
     runner.start(evaluation.id);
     runner.start(evaluation.id);
@@ -70,7 +70,7 @@ test('no more than the cap are in flight at once, and all of them finish', async
         return inner.complete(request);
       },
     };
-    const runner = createEvaluationRunner({ repos: ctx.repos, provider, maxConcurrent: 2 });
+    const runner = createEvaluationRunner({ repos: ctx.repos, provider, maxConcurrent: 2, verdictMode: 'matcher' });
 
     for (const scenario of scenarios) runner.start(scenario.evaluation.id);
     await runner.idle();
@@ -96,7 +96,7 @@ test('an unexpected error is recorded as a failure with a safe message, not left
       throw new Error('disk on fire: secret-internal-detail');
     };
 
-    const runner = createEvaluationRunner({ repos: ctx.repos, provider: mockProvider(), logger });
+    const runner = createEvaluationRunner({ repos: ctx.repos, provider: mockProvider(), logger, verdictMode: 'matcher' });
     runner.start(evaluation.id);
     await runner.idle();
     ctx.repos.evidence.record = original;
@@ -123,7 +123,7 @@ test('an evaluation that is not pending is left alone', async () => {
     const { evaluation } = await seedScenario(ctx.repos);
     await ctx.repos.evaluations.recordFailure(evaluation.id, 'Already failed.');
     const provider = mockProvider();
-    const runner = createEvaluationRunner({ repos: ctx.repos, provider });
+    const runner = createEvaluationRunner({ repos: ctx.repos, provider, verdictMode: 'matcher' });
 
     runner.start(evaluation.id);
     await runner.idle();

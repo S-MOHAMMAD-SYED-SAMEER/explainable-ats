@@ -36,6 +36,27 @@ export type EvidenceView = {
   charEnd: number;
 };
 
+/**
+ * What the model said about one requirement and what the code made of it (`model_checked` mode). Null for an assessment the
+ * matcher alone judged. The quote is in `evidence`; this is the verdict, the reason, and the second opinion.
+ */
+export type VerdictCheckView = {
+  /** What the model proposed. Null when it gave no answer for this requirement. */
+  modelVerdict: MatchVerdict | null;
+  /** The model's one-line reason. Shown to a person; never used as evidence. */
+  modelReason: string | null;
+  /** After the code's rules: never above the model's. */
+  enforcedVerdict: MatchVerdict;
+  /** Set when the code lowered the model's verdict because no passage it quoted was found in the resume. */
+  downgradeReason: 'no_verified_passage' | 'no_answer' | null;
+  /** The matcher's own verdict from the same verified passages, and how it compares: none, one step (shown), two or more (routed to a person). */
+  matcherVerdict: MatchVerdict | null;
+  matcherMode: 'strict' | 'folded' | null;
+  disagreement: 'none' | 'one_step' | 'two_plus';
+  /** The verdict the score used. */
+  scoredVerdict: MatchVerdict;
+};
+
 export type RequirementOutcome = {
   requirementId: string;
   label: string;
@@ -49,6 +70,8 @@ export type RequirementOutcome = {
   rationale: string | null;
   /** Verified passages only. Never anything the verifier rejected. */
   evidence: EvidenceView[];
+  /** The model's verdict and the second opinion; null when the matcher alone judged this assessment. */
+  check: VerdictCheckView | null;
 };
 
 export type DecisionView = {
@@ -100,6 +123,10 @@ export type EvaluationDetail = {
   evidenceRejectedCount: number;
   /** Null for an evaluation that has no extraction record (one made before records were kept). */
   extraction: ExtractionView | null;
+  /** Who decided the verdicts that were scored: the model, checked by the code and a second opinion, or the matcher alone. */
+  verdictMode: 'model_checked' | 'matcher';
+  /** True when the second opinion disagreed by two steps or more on some requirement: this candidate is routed to a person. */
+  needsReview: boolean;
   /**
    * True when the model answered properly and quoted nothing. Every requirement then
    * reads as not demonstrated, which is also what an empty or garbled paste looks
@@ -119,7 +146,7 @@ export async function handleEvaluationDetail(
   const evaluation = await repos.evaluations.getById(evaluationId);
   if (!evaluation) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
 
-  const [job, candidate, requirements, matches, verified, all, findings, decision, record] = await Promise.all([
+  const [job, candidate, requirements, matches, verified, all, findings, decision, record, checks] = await Promise.all([
     repos.jobs.getById(evaluation.jobId),
     repos.candidates.getById(evaluation.candidateId),
     repos.requirements.listForJob(evaluation.jobId),
@@ -129,11 +156,17 @@ export async function handleEvaluationDetail(
     repos.sensitiveFindings.listForResume(evaluation.resumeId),
     repos.decisions.getForEvaluation(evaluation.id),
     repos.evaluationRecords.getForEvaluation(evaluation.id),
+    repos.verdictChecks.listForEvaluation(evaluation.id),
   ]);
 
   if (!job || !candidate) throw new AppError('NOT_FOUND', 'That evaluation does not exist.');
 
-  const { tier, failedMustHaves, unclearMustHaves } = classify(evaluation, matches, requirements);
+  const classified = classify(evaluation, matches, requirements);
+  const { failedMustHaves, unclearMustHaves } = classified;
+  const checkByRequirement = new Map(checks.map((check) => [check.requirementId, check]));
+  const needsReview = classified.tier !== 'not_evaluated' && checks.some((check) => check.disagreement === 'two_plus');
+  // The same routing as the ranking (`rankReview.ts`): a two-step disagreement puts the candidate with a person.
+  const tier: RankTier = needsReview ? 'needs_review' : classified.tier;
 
   const matchByRequirement = new Map(matches.map((match) => [match.requirementId, match]));
   const evidenceByRequirement = new Map<string, EvidenceView[]>();
@@ -175,6 +208,20 @@ export async function handleEvaluationDetail(
           contributionPercent: match ? formatScore(match.contributionBasisPoints) : null,
           rationale: match?.rationale ?? null,
           evidence: evidenceByRequirement.get(requirement.id) ?? [],
+          check: ((): VerdictCheckView | null => {
+            const check = checkByRequirement.get(requirement.id);
+            if (!check) return null;
+            return {
+              modelVerdict: check.modelVerdict,
+              modelReason: check.modelReason,
+              enforcedVerdict: check.enforcedVerdict,
+              downgradeReason: check.downgradeReason,
+              matcherVerdict: check.matcherVerdict,
+              matcherMode: check.matcherMode,
+              disagreement: check.disagreement,
+              scoredVerdict: check.scoredVerdict,
+            };
+          })(),
         };
       }),
       protectedAttributes: {
@@ -197,6 +244,8 @@ export async function handleEvaluationDetail(
             findingsReturned: record.findingsReturned,
           }
         : null,
+      verdictMode: checks.length > 0 ? 'model_checked' : 'matcher',
+      needsReview,
       modelFoundNothing: record !== null && record.result === 'succeeded' && record.findingsReturned === 0,
       decision: decision
         ? {

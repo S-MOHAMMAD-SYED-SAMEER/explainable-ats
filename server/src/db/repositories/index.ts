@@ -13,6 +13,7 @@ import {
 } from './evaluations.ts';
 import { createAuditRepository } from './audit.ts';
 import { createEvaluationRecordRepository } from './records.ts';
+import { createVerdictCheckRepository } from './verdictChecks.ts';
 import { systemClock, type Clock } from '../../lib/clock.ts';
 import { newId as randomId, type IdGenerator } from '../../lib/ids.ts';
 import type { Database } from '../types.ts';
@@ -49,6 +50,7 @@ export type Repositories = {
   decisions: ReturnType<typeof createRecruiterDecisionRepository>;
   audit: ReturnType<typeof createAuditRepository>;
   evaluationRecords: ReturnType<typeof createEvaluationRecordRepository>;
+  verdictChecks: ReturnType<typeof createVerdictCheckRepository>;
   transaction<T>(fn: (tx: Repositories) => Promise<T>): Promise<T>;
 };
 
@@ -73,6 +75,7 @@ export function createRepositories(db: Database, options: RepositoryOptions = {}
     decisions: createRecruiterDecisionRepository(deps),
     audit: createAuditRepository(deps),
     evaluationRecords: createEvaluationRecordRepository(deps),
+    verdictChecks: createVerdictCheckRepository(deps),
     transaction<T>(fn: (tx: Repositories) => Promise<T>): Promise<T> {
       return db.transaction((txDb) => fn(createRepositories(txDb, options)));
     },

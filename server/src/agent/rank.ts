@@ -1,11 +1,12 @@
 import { rankCandidates, type RankInput, type Ranking } from './rankRules.ts';
+import { routeToReview } from './rankReview.ts';
 import { AppError } from '../lib/errors.ts';
 import type { Repositories } from '../db/repositories/index.ts';
 import type { Logger } from '../lib/logger.ts';
 
 // Loading the inputs a ranking needs, and nothing else.
 //
-// This function performs FIVE queries whatever the number of candidates. That
+// This function performs a FIXED number of queries (five, and one more to see which candidates the second opinion disagreed with) whatever the number of candidates. That
 // is deliberate rather than incidental: inbox-crm-agent shipped a list screen that
 // issued 57 round trips and took ten seconds, and the fix was the same shape as
 // the batch calls below. A ranking is the screen a recruiter opens first.
@@ -80,7 +81,12 @@ export async function rankJob(deps: RankDeps, jobId: string, options: RankOption
     });
   }
 
-  const ranking = rankCandidates(jobId, requirements, inputs);
+  const ranked = rankCandidates(jobId, requirements, inputs);
+
+  // A candidate whose verdicts the second opinion disagreed with by two steps or more goes to a person (`rankReview.ts`). One more
+  // query, not one per candidate; none when no evaluation was judged by a model.
+  const disagreements = await repos.verdictChecks.disagreementsForEvaluations(current.map((entry) => entry.id));
+  const ranking = routeToReview(ranked, disagreements);
 
   logger?.info('Ranked a job', {
     jobId,

@@ -285,8 +285,10 @@ function readResponse(
 
   const input = call.input;
   if (!isPlainObject(input)) fail('malformed', 'the tool input was not an object', input);
-  if (!Array.isArray((input as Record<string, unknown>).findings)) {
-    fail('malformed', 'the tool input has no "findings" array', input);
+  // The list the reply must carry is named by the tool: `findings` for the quotes-only tool, `requirements` for the verdict tool.
+  const listKey = toolName === 'record_verdicts' ? 'requirements' : 'findings';
+  if (!Array.isArray((input as Record<string, unknown>)[listKey])) {
+    fail('malformed', `the tool input has no "${listKey}" array`, input);
   }
 
   const response: LlmResponse = {

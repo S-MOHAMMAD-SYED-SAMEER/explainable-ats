@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { DEFAULT_MATCH_MODE, MATCH_MODES, type MatchMode } from '../agent/matchRules.ts';
+import { DEFAULT_VERDICT_MODE, VERDICT_MODES, type VerdictMode } from '../agent/verdictMode.ts';
 import { fileURLToPath } from 'node:url';
 import type { LogLevel } from '../lib/logger.ts';
 import { APP_MODES, DEFAULT_APP_MODE, isAppMode, type AppMode } from './mode.ts';
@@ -214,6 +215,11 @@ export type AppConfig = {
   anthropicTemperature: number | null;
   /** How requirement terms are compared with quotes: whole words only, or with plural, -ing and -ed endings folded. */
   matchMode: MatchMode;
+  /**
+   * Who decides a verdict: the model, checked by the code and the matcher's second opinion (`model_checked`, the default), or the
+   * matcher alone (`matcher`, the old behaviour, kept for comparison). `matchMode` is then the second opinion's mode.
+   */
+  verdictMode: VerdictMode;
   operatorPasswordHash: string | null;
   sessionTtlHours: number;
   cookieSecure: boolean;
@@ -311,6 +317,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         anthropicToolChoice: readEnum('ANTHROPIC_TOOL_CHOICE', ANTHROPIC_TOOL_CHOICES, 'auto', problems),
         anthropicTemperature: readTemperature('ANTHROPIC_TEMPERATURE', problems),
         matchMode: readEnum('MATCH_MODE', MATCH_MODES, DEFAULT_MATCH_MODE, problems),
+        verdictMode: readEnum('VERDICT_MODE', VERDICT_MODES, DEFAULT_VERDICT_MODE, problems),
         operatorPasswordHash,
         sessionTtlHours: readInt('SESSION_TTL_HOURS', 12, problems),
         cookieSecure,

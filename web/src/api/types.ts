@@ -84,6 +84,22 @@ export type Ranking = {
 
 export type Evidence = { id: string; quote: string; charStart: number; charEnd: number };
 
+/** What the model said about one requirement and what the code made of it (`model_checked` mode). Absent when the matcher alone judged. */
+export type VerdictCheck = {
+  modelVerdict: string | null;
+  modelReason: string | null;
+  /** After the code's rules: never above the model's. */
+  enforcedVerdict: string;
+  /** Set when the code lowered the model's verdict because no passage it quoted was found in the CV. */
+  downgradeReason: 'no_verified_passage' | 'no_answer' | null;
+  matcherVerdict: string | null;
+  matcherMode: 'strict' | 'folded' | null;
+  /** none: agree. one_step: differ, shown only. two_plus: routed to a person. */
+  disagreement: 'none' | 'one_step' | 'two_plus';
+  /** The verdict the score used. */
+  scoredVerdict: string;
+};
+
 export type RequirementOutcome = {
   requirementId: string;
   label: string;
@@ -96,6 +112,8 @@ export type RequirementOutcome = {
   contributionPercent: string | null;
   rationale: string | null;
   evidence: Evidence[];
+  /** The model's verdict and the second opinion. Absent (or null) for an assessment the matcher alone judged. */
+  check?: VerdictCheck | null;
 };
 
 export type Decision = {
@@ -144,6 +162,10 @@ export type EvaluationDetail = {
   extraction: ExtractionView | null;
   /** The model answered properly and quoted nothing. */
   modelFoundNothing: boolean;
+  /** Who decided the verdicts that were scored. Absent means the matcher alone. */
+  verdictMode?: 'model_checked' | 'matcher';
+  /** The second opinion disagreed by two steps or more on some requirement: a person should look. */
+  needsReview?: boolean;
   decision: Decision | null;
   createdAt: string;
 };

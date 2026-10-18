@@ -533,6 +533,8 @@ test('ranking added no table, and nothing stores a rank', async (t) => {
     'schema_migrations',
     'sensitive_findings',
     'sessions',
+    // The model's verdicts and what the code made of them (the verdict mode); neither matching nor ranking added it.
+    'verdict_checks',
   ]);
 
   const files = fs.readdirSync(MIGRATIONS_DIR).filter((file) => file.endsWith('.sql'));
@@ -540,7 +542,7 @@ test('ranking added no table, and nothing stores a rank', async (t) => {
   // for another reason (the extraction record) is added here deliberately.
   assert.deepEqual(
     [...files].sort(),
-    ['001_foundation.sql', '002_domain.sql', '003_evaluation_records.sql'],
+    ['001_foundation.sql', '002_domain.sql', '003_evaluation_records.sql', '004_verdict_checks.sql'],
     'ranking must not have added a migration',
   );
   for (const file of files) {

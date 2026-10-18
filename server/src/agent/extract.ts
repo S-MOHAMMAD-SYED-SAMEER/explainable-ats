@@ -83,53 +83,8 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
   // `redactedText` and nothing else. The original never enters this scope.
   const maxTokens = deps.maxTokens ?? maxTokensFor({ requirementCount: requirements.length, resumeChars: resume.redactedText.length });
 
-  // Every way this can fail is recorded as a failure of its own kind, with its own
-  // audit event and message. None of them becomes an empty result, because "the
-  // model found nothing" and "the model did not answer properly" are different
-  // facts and only the first says anything about the candidate.
-  const failExtraction = async (err: unknown): Promise<never> => {
-    const kind = failureKindOf(err);
-    const detail = err instanceof LlmFailure ? err.details : {};
-    const wording = FAILURE_WORDING[kind];
-
-    await repos.evaluations.recordFailure(evaluationId, wording.message);
-    await repos.evaluationRecords.record({
-      evaluationId,
-      result: kind,
-      model: detail.model ?? null,
-      maxTokens,
-      usage: detail.usage ?? null,
-      latencyMs: detail.latencyMs ?? null,
-      raw: detail.raw,
-    });
-    await repos.audit.append({
-      correlationId: evaluation.id,
-      stage: 'extract',
-      eventType: wording.eventType,
-      actor: 'system',
-      outcome: 'failed',
-      summary: wording.summary,
-      // Kinds, counts and the key-free label ("timeout", "HTTP 529"). Never the
-      // provider's own message, which may quote a request.
-      payload: {
-        provider: provider.name,
-        kind,
-        maxTokens,
-        ...(detail.label ? { label: detail.label } : {}),
-        ...(detail.attempts ? { attempts: detail.attempts } : {}),
-        ...(detail.model ? { model: detail.model } : {}),
-        ...(detail.usage ? { usage: detail.usage } : {}),
-      },
-      entityType: 'evaluation',
-      entityId: evaluation.id,
-    });
-    logger?.error('Extraction failed', {
-      evaluationId,
-      kind,
-      internal: err instanceof Error ? err.message : String(err),
-    });
-    throw new AppError('PROVIDER_UNAVAILABLE', wording.message);
-  };
+  // Every way this can fail is recorded as a failure of its own kind (see `recordExtractionFailure`).
+  const failExtraction = (err: unknown): Promise<never> => recordExtractionFailure(deps, evaluation, maxTokens, err);
 
   let output: Record<string, unknown>;
   let model: string;
@@ -322,6 +277,64 @@ export async function extractEvidence(deps: ExtractDeps, evaluationId: string): 
   });
 
   return { evaluation: updated, verified: verified.length, rejected: rejected.length, malformed: malformed.length };
+}
+
+/**
+ * Records a failed extraction and throws the person-facing error.
+ *
+ * Every way this can fail is a failure of its own kind, with its own audit event and message. None of them becomes an empty
+ * result, because "the model found nothing" and "the model did not answer properly" are different facts and only the first
+ * says anything about the candidate. Shared by the quotes-only extraction and the verdict extraction.
+ */
+export async function recordExtractionFailure(
+  deps: Pick<ExtractDeps, 'repos' | 'provider' | 'logger'>,
+  evaluation: Evaluation,
+  maxTokens: number,
+  err: unknown,
+): Promise<never> {
+  const { repos, provider, logger } = deps;
+  const evaluationId = evaluation.id;
+  const kind = failureKindOf(err);
+  const detail = err instanceof LlmFailure ? err.details : {};
+  const wording = FAILURE_WORDING[kind];
+
+  await repos.evaluations.recordFailure(evaluationId, wording.message);
+  await repos.evaluationRecords.record({
+    evaluationId,
+    result: kind,
+    model: detail.model ?? null,
+    maxTokens,
+    usage: detail.usage ?? null,
+    latencyMs: detail.latencyMs ?? null,
+    raw: detail.raw,
+  });
+  await repos.audit.append({
+    correlationId: evaluation.id,
+    stage: 'extract',
+    eventType: wording.eventType,
+    actor: 'system',
+    outcome: 'failed',
+    summary: wording.summary,
+    // Kinds, counts and the key-free label ("timeout", "HTTP 529"). Never the
+    // provider's own message, which may quote a request.
+    payload: {
+      provider: provider.name,
+      kind,
+      maxTokens,
+      ...(detail.label ? { label: detail.label } : {}),
+      ...(detail.attempts ? { attempts: detail.attempts } : {}),
+      ...(detail.model ? { model: detail.model } : {}),
+      ...(detail.usage ? { usage: detail.usage } : {}),
+    },
+    entityType: 'evaluation',
+    entityId: evaluation.id,
+  });
+  logger?.error('Extraction failed', {
+    evaluationId,
+    kind,
+    internal: err instanceof Error ? err.message : String(err),
+  });
+  throw new AppError('PROVIDER_UNAVAILABLE', wording.message);
 }
 
 /** Opens an evaluation for a job/candidate pair, superseding any earlier one. */

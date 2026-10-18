@@ -1,4 +1,6 @@
 import { extractEvidence } from './extract.ts';
+import { extractVerdicts } from './extractVerdicts.ts';
+import { DEFAULT_VERDICT_MODE, type VerdictMode } from './verdictMode.ts';
 import { matchAndScore } from './match.ts';
 import { FAILURE_WORDING } from './failures.ts';
 import type { MatchMode } from './matchRules.ts';
@@ -42,8 +44,10 @@ export type RunnerDeps = {
   logger?: Logger;
   /** At most this many evaluations are in flight at once. */
   maxConcurrent?: number;
-  /** How words are compared when an assessment is scored. */
+  /** How words are compared when an assessment is scored (in `model_checked` mode: the second opinion's mode). */
   matchMode?: MatchMode;
+  /** Who decides a verdict. `model_checked` (the default) asks the model for verdicts and checks them; `matcher` asks it only to quote. */
+  verdictMode?: VerdictMode;
 };
 
 export const DEFAULT_MAX_CONCURRENT_EVALUATIONS = 3;
@@ -74,8 +78,13 @@ export function createEvaluationRunner(deps: RunnerDeps): EvaluationRunner {
       // Not ours to run: gone, already finished, or already failed.
       if (!evaluation || evaluation.status !== 'pending') return;
 
-      await extractEvidence({ repos, provider, ...(logger ? { logger } : {}) }, evaluationId);
-      await matchAndScore({ repos, ...(logger ? { logger } : {}), ...(deps.matchMode ? { matchMode: deps.matchMode } : {}) }, evaluationId);
+      const verdictMode = deps.verdictMode ?? DEFAULT_VERDICT_MODE;
+      const extract = verdictMode === 'model_checked' ? extractVerdicts : extractEvidence;
+      await extract({ repos, provider, ...(logger ? { logger } : {}) }, evaluationId);
+      await matchAndScore(
+        { repos, ...(logger ? { logger } : {}), ...(deps.matchMode ? { matchMode: deps.matchMode } : {}), verdictMode },
+        evaluationId,
+      );
     } catch (err) {
       logger?.error('Evaluation run failed', {
         evaluationId,
