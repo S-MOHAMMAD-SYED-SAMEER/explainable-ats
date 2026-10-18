@@ -4,7 +4,7 @@ You are writing down, for each CV and each requirement, **what a careful human r
 
 So label what you actually think. Do not try to predict what the system will do, and do not make your answers match its wording. If you read "ran the Postgres fleet" as meeting "has run PostgreSQL at scale", say so, even though the words differ. How well the system copes with that is the thing being measured.
 
-**Nothing has been run on these CVs.** No model has seen them and no scoring has been done, so there is nothing to be influenced by. Please keep it that way until you have finished: do not run the app or the scripts on them.
+*This paragraph was written before the first run on the main set. It still holds for the held-out CVs (see the last section), which nothing has ever been run on: keep it that way until they are labelled, and do not run the app or the scripts on them.*
 
 There are 68 rows (20 CVs, 3 or 4 requirements each). Plan on two to three hours.
 
@@ -138,3 +138,21 @@ cv-XX,data-stakeholders,"Agreed the definition of ""active customer"" with the m
 5. Tell Claude the labels are done. Nothing else happens until you do.
 
 You may edit `notes` as much as you like. It is never scored, and it is the place to record a judgement call.
+
+## Who made which labels
+
+| Set | Labels | Provenance |
+|---|---|---|
+| Main set (20 CVs, 68 rows, `eval/labels_TODO.csv`) | passages and verdicts | **drafted by ChatGPT, checked by Sameer; full review in progress.** Not an independent human labelling. |
+| Held-out set (5 CVs, 17 rows, `eval/labels_heldout_TODO.csv`) | passages and verdicts | **Sameer, no AI.** |
+
+Say exactly that wherever the labels are used. Every results file records it as `labelsProvenance`, and a test fails if it is missing.
+
+## The five held-out CVs (labelled by Sameer alone, without AI)
+
+`eval/heldout/cv-h1.txt` to `cv-h5.txt` are five more invented CVs for the same two roles, with a realistic mix, and `eval/labels_heldout_TODO.csv` has one row per CV and requirement (17), with **the three label columns empty: nothing is suggested**.
+
+- **Sameer labels these alone, without AI.** No assistant drafts, suggests, checks or comments on them. The rules above (the four verdicts, the passages, torn between two choose the lower) apply unchanged.
+- **They are never used for tuning**: not prompts, not rules, not thresholds, not matching modes, not wording. If a result on them looks wrong, the fix is not to change the system until they look right; it is to report them as they are.
+- **Nothing has been run on them.** Do not run the app or the scripts on them until the labels are finished.
+- Check the file with `node server/scripts/validate-labels.ts --heldout`. An empty file is reported as waiting; a half-filled one is an error.

@@ -1,14 +1,15 @@
 # Evaluation set
 
-Twenty invented CVs and the hand labels that will measure the extraction and matching stages against a human reader.
+Twenty invented CVs and 68 labels, to measure the extraction and matching stages against a careful reader's passages and verdicts. **Who made the labels: drafted by ChatGPT, checked by Sameer; full review in progress.** They are not an independent human labelling.
 
-**Status: waiting for labels.** `labels_TODO.csv` is empty on purpose. The harness that compares the system with the labels is not built yet; it is built after the labels exist, so that nothing about the system can shape them.
+**Status.** `labels_TODO.csv` holds the 68 labels, drafted by ChatGPT, checked by Sameer; full review in progress. A held-out set of five more CVs (`heldout/`, `labels_heldout_TODO.csv`) is labelled by Sameer alone, without AI, and is never used for tuning prompts, rules, thresholds or matching; its label columns are empty until he fills them in. `server/scripts/validate-labels.ts` checks both files.
 
 | File | What it is |
 |---|---|
 | `dataset.json` | The version (`eval-set-v1`), the two roles and their requirements, and the list of CVs |
 | `cvs/` | The twenty CVs, plain text, one file each |
-| `labels_TODO.csv` | One row per CV and requirement (68), with `gold_passages` and `expected_verdict` to be filled in by hand |
+| `labels_TODO.csv` | One row per CV and requirement (68), with `gold_passages` and `expected_verdict` (drafted by ChatGPT, checked by Sameer; full review in progress) |
+| `heldout/`, `labels_heldout_TODO.csv` | Five more invented CVs and their 17 rows, labelled by Sameer alone, without AI |
 | `LABELLING_GUIDE.md` | What the labels mean, with two worked examples on CVs that are not in the set |
 
 ## What is in it
@@ -19,7 +20,7 @@ Twenty invented CVs and the hand labels that will measure the extraction and mat
 
 ## What it can and cannot say
 
-- **The CVs were written by an AI**, and **the labels are written by one person**, the owner of the project. Twenty CVs and one labeller will show whether the stages work on a small, varied set. They will not give a figure to quote as accuracy on real CVs.
+- **The CVs were written by an AI**, and **the 68 labels were drafted by ChatGPT, checked by Sameer; full review in progress**, so they are not independent of AI. Twenty CVs and one set of labels of that kind will show whether the stages work on a small, varied set. They will not give a figure to quote as accuracy on real CVs.
 - It measures how well the system finds the passages a person would point to, how often it quotes something that is not there, whether its verdicts agree with the labeller's, and what a run costs.
 - Matching is term coverage, not comprehension, so a CV that says the right thing in other words is expected to do worse than one that echoes the requirement. The set includes such CVs on purpose.
 
