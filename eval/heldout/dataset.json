@@ -1,0 +1,38 @@
+{
+  "version": "heldout-v1",
+  "note": "Five invented CVs, held out. They are labelled by Sameer alone, without AI, and are never used for tuning prompts, rules, thresholds or matching. Every person, employer, address, email and phone number is invented; emails use the reserved .invalid top level and phone numbers come from the range set aside for fiction. The CVs were written by an AI. The roles and requirement ids are the ones in ../dataset.json.",
+  "rolesFrom": "../dataset.json",
+  "labelsProvenance": "Sameer, no AI",
+  "cvs": [
+    {
+      "id": "cv-h1",
+      "role": "demo",
+      "displayName": "Imogen Castellanos-Pike",
+      "file": "cv-h1.txt"
+    },
+    {
+      "id": "cv-h2",
+      "role": "data",
+      "displayName": "Kofi Abernathy-Osei",
+      "file": "cv-h2.txt"
+    },
+    {
+      "id": "cv-h3",
+      "role": "demo",
+      "displayName": "Delphine Vasquez-Ronan",
+      "file": "cv-h3.txt"
+    },
+    {
+      "id": "cv-h4",
+      "role": "data",
+      "displayName": "Raphael Kowalczyk-Mbeki",
+      "file": "cv-h4.txt"
+    },
+    {
+      "id": "cv-h5",
+      "role": "demo",
+      "displayName": "Anneliese Obuya-Fitzgerald",
+      "file": "cv-h5.txt"
+    }
+  ]
+}

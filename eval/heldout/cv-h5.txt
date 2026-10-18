@@ -1,0 +1,26 @@
+Name: Anneliese Obuya-Fitzgerald
+Email: anneliese.obuya-fitzgerald@example.invalid
+Phone: +44 20 7946 0735
+Date of birth: 12 December 1988
+Nationality: British
+Gender: Female
+Address: 44 Gasworks Row, Cardiff CF10 5JH
+
+SUMMARY
+Server-side engineer who has run production systems for a ticketing business and likes teaching.
+
+EXPERIENCE
+Lead Engineer, Pontcanna Tickets (2020 - present)
+We sell around two million tickets a year through server-side JS that I architect: node-based services behind an API gateway, in production since 2018. I am the engineer on call for them.
+Look after the company's Postgres clusters: three of them, 2 TB between them, with streaming replication to a second site and a rehearsed failover.
+Was the mentor for the 2021 and 2022 graduate cohorts, eight people in all, meeting each one every two weeks; four of them are now senior.
+
+Engineer, Taffs Mead Software (2015 - 2020)
+Built the booking back end in JavaScript on Node, and moved it from one data centre to another.
+Moved the booking database from MySQL to Postgres, with no lost orders.
+
+EDUCATION
+BSc Computing, Cardiff University, 2010
+
+SKILLS
+JavaScript, Node, Postgres, Docker, Grafana

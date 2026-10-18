@@ -1,0 +1,27 @@
+Name: Delphine Vasquez-Ronan
+Email: delphine.vasquez-ronan@example.invalid
+Phone: +44 20 7946 0733
+Date of birth: 17 June 1992
+Nationality: British
+Gender: Female
+Address: 6 Mill Street, Norwich NR2 4AB
+
+SUMMARY
+Software developer with several years of experience across web and server work, comfortable picking up whatever the team needs.
+
+EXPERIENCE
+Developer, Finchley Logistics (2020 - present)
+Work on the company's server-side JavaScript, adding endpoints and fixing bugs in the services that the delivery apps talk to.
+Look after the databases when something needs doing, such as adding a column or restoring a backup.
+Help new colleagues get settled and show them how the codebase fits together.
+Took part in the move to the cloud, which went well.
+
+Junior Developer, Cobalt Web Studio (2017 - 2020)
+Built websites for small businesses, mostly in PHP and some JavaScript.
+Sat in on client calls and wrote up the notes.
+
+EDUCATION
+BSc Software Engineering, University of East Anglia, 2016
+
+SKILLS
+JavaScript, PHP, SQL, Git, Linux

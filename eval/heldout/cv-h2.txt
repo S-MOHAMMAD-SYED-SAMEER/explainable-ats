@@ -1,0 +1,26 @@
+Name: Kofi Abernathy-Osei
+Email: kofi.abernathy-osei@example.invalid
+Phone: +44 20 7946 0732
+Date of birth: 4 February 2000
+Nationality: British
+Gender: Male
+Address: 31 Quarry Road, Sheffield S10 1HT
+
+SUMMARY
+Recent graduate looking for a first role working with data. Enthusiastic, organised and keen to learn.
+
+EXPERIENCE
+Retail Assistant, Hallam Home Stores (2022 - present)
+Count stock, update the weekly price spreadsheet and send the sales totals to the area manager every Friday.
+Asked the manager for the sales figures by department, and made a chart in Excel to show which departments were busiest.
+
+Volunteer, Sheffield Food Bank (2021 - 2022)
+Kept the rota of volunteers in a shared spreadsheet.
+
+EDUCATION
+BSc Geography, University of Sheffield, 2021
+Dissertation: mapping bus routes against local deprivation scores, using a free mapping tool.
+Introduction to Databases (a six-week evening course), 2023
+
+SKILLS
+Excel, Word, basic SQL (SELECT and WHERE), presentation

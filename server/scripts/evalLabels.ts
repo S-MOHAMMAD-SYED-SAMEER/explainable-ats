@@ -9,6 +9,37 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EVAL_DIR = path.resolve(HERE, '../../eval');
+export const HELDOUT_DIR = path.join(EVAL_DIR, 'heldout');
+
+/**
+ * WHO MADE THE LABELS, said exactly and in one place. Every results file, and every sentence anywhere that says what the labels are,
+ * must say this and nothing grander. The main set's 68 labels were DRAFTED BY CHATGPT and then checked and submitted by Sameer: they are
+ * not an independent human labelling, and Sameer's full review is in progress. The held-out set is labelled by Sameer alone, without AI,
+ * and is never used for tuning prompts, rules, thresholds or matching.
+ */
+export const LABELS_PROVENANCE = {
+  main: 'drafted by ChatGPT, checked by Sameer; full review in progress',
+  heldout: 'Sameer, no AI',
+} as const;
+export type LabelSet = keyof typeof LABELS_PROVENANCE;
+
+/** The provenance entry to write into a results file, for the sets that run covers. */
+export function provenanceFor(sets: readonly LabelSet[]): Partial<Record<LabelSet, string>> {
+  return Object.fromEntries(sets.map((set) => [set, LABELS_PROVENANCE[set]])) as Partial<Record<LabelSet, string>>;
+}
+
+/** Throws unless a results object says who made the labels it was scored against, in the exact words. */
+export function requireProvenance(results: { labelsProvenance?: unknown }, expectedSets?: readonly LabelSet[]): void {
+  const found = results.labelsProvenance;
+  if (typeof found !== 'object' || found === null) throw new Error('labelsProvenance is missing from the results.');
+  const entries = Object.entries(found as Record<string, unknown>);
+  if (entries.length === 0) throw new Error('labelsProvenance is empty.');
+  for (const [set, text] of entries) {
+    if (!(set in LABELS_PROVENANCE)) throw new Error(`labelsProvenance names an unknown label set "${set}".`);
+    if (text !== LABELS_PROVENANCE[set as LabelSet]) throw new Error(`labelsProvenance for "${set}" is "${String(text)}", not "${LABELS_PROVENANCE[set as LabelSet]}".`);
+  }
+  for (const set of expectedSets ?? []) if (!(set in (found as object))) throw new Error(`labelsProvenance has no entry for the "${set}" set.`);
+}
 
 export const LABEL_COLUMNS = ['cv_id', 'requirement_id', 'gold_passages', 'expected_verdict', 'notes'] as const;
 export const VERDICTS = ['met', 'partial', 'not_met', 'unclear'] as const;
@@ -24,6 +55,16 @@ export type Dataset = { version: string; roles: Record<string, Role>; cvs: CvEnt
 
 export function loadDataset(dir = EVAL_DIR): Dataset {
   return JSON.parse(fs.readFileSync(path.join(dir, 'dataset.json'), 'utf8')) as Dataset;
+}
+
+/**
+ * The held-out set: five CVs for the same two roles, labelled by Sameer alone, without AI. Its manifest names the roles by the
+ * ids in the main dataset, so the requirements are defined once.
+ */
+export function loadHeldoutDataset(dir = HELDOUT_DIR): Dataset {
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'dataset.json'), 'utf8')) as { version: string; rolesFrom: string; cvs: CvEntry[] };
+  const roles = (JSON.parse(fs.readFileSync(path.resolve(dir, manifest.rolesFrom), 'utf8')) as Dataset).roles;
+  return { version: manifest.version, roles, cvs: manifest.cvs };
 }
 
 export function loadCvText(entry: CvEntry, dir = EVAL_DIR): string {

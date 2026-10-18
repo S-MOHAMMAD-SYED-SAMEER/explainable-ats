@@ -1,0 +1,26 @@
+Name: Raphael Kowalczyk-Mbeki
+Email: raphael.kowalczyk-mbeki@example.invalid
+Phone: +44 20 7946 0734
+Date of birth: 29 March 1990
+Nationality: British
+Gender: Male
+Address: 18 Bridge Gate, York YO1 8AB
+
+SUMMARY
+Data engineer who has spent the last six years keeping a small company's reporting data flowing.
+
+EXPERIENCE
+Data Engineer, Ashdown Energy (2018 - present)
+Built and run the nightly jobs, written in Python, that load meter readings from four supplier feeds, check them and publish them for the finance team. They have run every night for five years and I fix them when they break.
+I have not used Airflow, Dagster or any other workflow orchestrator; our jobs are started by cron and a few shell scripts, and I know that is a weakness.
+I have never written SQL against a data warehouse. Our reports are produced from the production database, using simple queries.
+Meet the finance analysts every month to agree what they need from the data, and wrote down the definitions of each field in a shared document that both teams use.
+
+Analyst, Greystone Utilities (2015 - 2018)
+Prepared monthly usage reports for regulators, in Excel.
+
+EDUCATION
+BSc Mathematics, University of York, 2014
+
+SKILLS
+Python, cron, Bash, Git, PostgreSQL (basic)

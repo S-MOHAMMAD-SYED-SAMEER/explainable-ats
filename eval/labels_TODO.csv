@@ -1,69 +1,75 @@
 cv_id,requirement_id,gold_passages,expected_verdict,notes
-cv-01,demo-node,,,
-cv-01,demo-postgres,,,
-cv-01,demo-mentoring,,,
-cv-02,demo-node,,,
-cv-02,demo-postgres,,,
-cv-02,demo-mentoring,,,
-cv-03,demo-node,,,
-cv-03,demo-postgres,,,
-cv-03,demo-mentoring,,,
-cv-04,demo-node,,,
-cv-04,demo-postgres,,,
-cv-04,demo-mentoring,,,
-cv-05,demo-node,,,
-cv-05,demo-postgres,,,
-cv-05,demo-mentoring,,,
-cv-06,demo-node,,,
-cv-06,demo-postgres,,,
-cv-06,demo-mentoring,,,
-cv-07,demo-node,,,
-cv-07,demo-postgres,,,
-cv-07,demo-mentoring,,,
-cv-08,demo-node,,,
-cv-08,demo-postgres,,,
-cv-08,demo-mentoring,,,
-cv-09,demo-node,,,
-cv-09,demo-postgres,,,
-cv-09,demo-mentoring,,,
-cv-10,demo-node,,,
-cv-10,demo-postgres,,,
-cv-10,demo-mentoring,,,
-cv-11,demo-node,,,
-cv-11,demo-postgres,,,
-cv-11,demo-mentoring,,,
-cv-12,demo-node,,,
-cv-12,demo-postgres,,,
-cv-12,demo-mentoring,,,
-cv-13,data-python,,,
-cv-13,data-sql,,,
-cv-13,data-orchestration,,,
-cv-13,data-stakeholders,,,
-cv-14,data-python,,,
-cv-14,data-sql,,,
-cv-14,data-orchestration,,,
-cv-14,data-stakeholders,,,
-cv-15,data-python,,,
-cv-15,data-sql,,,
-cv-15,data-orchestration,,,
-cv-15,data-stakeholders,,,
-cv-16,data-python,,,
-cv-16,data-sql,,,
-cv-16,data-orchestration,,,
-cv-16,data-stakeholders,,,
-cv-17,data-python,,,
-cv-17,data-sql,,,
-cv-17,data-orchestration,,,
-cv-17,data-stakeholders,,,
-cv-18,data-python,,,
-cv-18,data-sql,,,
-cv-18,data-orchestration,,,
-cv-18,data-stakeholders,,,
-cv-19,data-python,,,
-cv-19,data-sql,,,
-cv-19,data-orchestration,,,
-cv-19,data-stakeholders,,,
-cv-20,data-python,,,
-cv-20,data-sql,,,
-cv-20,data-orchestration,,,
-cv-20,data-stakeholders,,,
+cv-01,demo-node,Designed and shipped production Node.js services that settle card payments for about three million customers.,met,Explicit production Node.js services at substantial scale.
+cv-01,demo-postgres,"Ran PostgreSQL at scale: a 4 TB primary with five read replicas, online schema changes and a tested failover every quarter.",met,"Explicit scale, replicas, schema changes and tested failover."
+cv-01,demo-mentoring,Mentored six junior engineers over four years; two of them have since been promoted to mid-level.,met,Direct evidence of mentoring junior engineers.
+cv-02,demo-node,"Built the server-side JavaScript APIs, on the V8 runtime that most people just call Node, that carry live traffic for an airline booking site. They have been live since 2017 and take bookings every minute of every day.",met,Node is identified by synonym and the APIs carry live production traffic.
+cv-02,demo-postgres,"Responsible for the Postgres fleet: fourteen clusters, the largest around six terabytes, with replicas in three regions.",met,Large multi-cluster Postgres fleet with regional replicas.
+cv-02,demo-mentoring,"Coached apprentices and recent graduates, and ran a weekly clinic where newer team members could bring any problem. Four of the people I coached now lead teams of their own.",met,Coaching newer team members and apprentices is directly described.
+cv-03,demo-node,"Built the website with a Node.js tutorial series and a PostgreSQL database that I accessed through an ORM, so I never wrote much SQL directly. It ran on my laptop and on a free hosting plan for the demo.",partial,"Node.js appears in a project, but this is a tutorial/demo project, not evidence of a shipped production service."
+cv-03,demo-postgres,"Built the website with a Node.js tutorial series and a PostgreSQL database that I accessed through an ORM, so I never wrote much SQL directly. It ran on my laptop and on a free hosting plan for the demo.",partial,PostgreSQL was used for a laptop/free-hosted demo; scale is not shown.
+cv-03,demo-mentoring,,unclear,"The CV mentions helping children with Scratch, but says nothing about mentoring junior engineers."
+cv-04,demo-node,"Designed and shipped production Node.js services for a messaging platform serving 800,000 daily users, including the websocket gateway.",met,"Explicit production Node.js services serving 800,000 daily users."
+cv-04,demo-postgres,,unclear,"The CV describes MongoDB and Redis, but does not mention PostgreSQL."
+cv-04,demo-mentoring,Mentored junior engineers on the platform team; I ran a fortnightly code-reading session and paired with every new starter during their first month.,met,"Direct mentoring, recurring learning sessions and pairing with new starters."
+cv-05,demo-node,"Designed and shipped production Node.js services for an online storefront, including the basket, pricing and order APIs. They handled Black Friday 2022 without incident.",met,Explicit production services with a real peak-traffic example.
+cv-05,demo-postgres,I have not run PostgreSQL in production and have no experience of it at scale. Our data lived in a managed MySQL service that another team looked after.,not_met,The CV explicitly says there is no PostgreSQL production or at-scale experience.
+cv-05,demo-mentoring,I have not had the opportunity to mentor anyone; I have always been the most junior person on the team.,not_met,The CV explicitly says the candidate has not mentored anyone.
+cv-06,demo-node,"Backend dev, 4 yrs. Shipped Node.js APIs to production for a payments startup (Pennywise). Some Postgres. TypeScript, Docker, AWS.",met,Explicitly says Node.js APIs were shipped to production.
+cv-06,demo-postgres,"Backend dev, 4 yrs. Shipped Node.js APIs to production for a payments startup (Pennywise). Some Postgres. TypeScript, Docker, AWS.",partial,Postgres is mentioned only vaguely; operation at scale is not shown.
+cv-06,demo-mentoring,,unclear,No mention of mentoring or junior engineers.
+cv-07,demo-node,"Designed and shipped production Node.js services for three retail clients, including a loyalty points platform that handled a quarter of a million transactions on its busiest day.",met,Production Node.js services with a quantified busy-day workload.
+cv-07,demo-postgres,"Designed a document store on top of PostgreSQL that held about two million case files, and wrote the backup and restore procedures for it. || Tuned the database as the volume grew, adding indexes, partitioning the largest tables by year and moving the reporting queries to a replica.",met,Millions of records plus partitioning and replica-based reporting support scale.
+cv-07,demo-mentoring,"Trained new starters on the council's coding standards. || I have mentored eleven women who are changing career into software, meeting each of them monthly for a year. Seven are now working as developers.",partial,"Clear training and mentoring, but the CV does not explicitly establish that these people were junior engineers."
+cv-08,demo-node,"* Designed and shipped production Node.js
+services for a freight tracking product - used by
+about 1,200 drivers every day. Zero downtime
+deploys.",met,Production Node.js service with daily users and zero-downtime deploys.
+cv-08,demo-postgres,"* ran PostgreSQL at
+   scale for the tracking events table (it grew to
+   9 billion rows, so we partitioned it by month
+and moved cold data to cheap storage)",met,Explicit at-scale PostgreSQL operation on a nine-billion-row table.
+cv-08,demo-mentoring,- mentored 3 junior engineers  (two now seniors!!),met,Directly states that three junior engineers were mentored.
+cv-09,demo-node,Shipped Node.js microservices to production for a scheduling product; there are eleven of them and they handle bookings for about 600 clinics.,met,Explicit production Node.js microservices.
+cv-09,demo-postgres,Administered the PostgreSQL instance behind the team's internal tools. It holds about 20 GB and has one backup a night.,partial,"The candidate administered PostgreSQL, but the single 20 GB instance does not demonstrate operation at scale."
+cv-09,demo-mentoring,Helped new joiners get set up in their first week and answered their questions in the team channel.,partial,"Shows informal onboarding support, but not clearly sustained mentoring of junior engineers."
+cv-10,demo-node,"Node.js, PostgreSQL, Mentoring, Kubernetes, TypeScript, REST, GraphQL, AWS, CI/CD, Agile, Scrum, Leadership",partial,Node.js appears only in the skills list; no production Node.js service is described.
+cv-10,demo-postgres,"Node.js, PostgreSQL, Mentoring, Kubernetes, TypeScript, REST, GraphQL, AWS, CI/CD, Agile, Scrum, Leadership",partial,"PostgreSQL appears in the skills list, but the experience section does not establish operation at scale."
+cv-10,demo-mentoring,"Node.js, PostgreSQL, Mentoring, Kubernetes, TypeScript, REST, GraphQL, AWS, CI/CD, Agile, Scrum, Leadership",partial,"Mentoring is listed as a skill, but no actual mentoring of junior engineers is described."
+cv-11,demo-node,"Evaluated Node.js for the new gateway, but chose Go because the workload was CPU bound and latency sensitive. The gateway has been in production since 2020.",not_met,The only Node.js-specific account says it was evaluated but Go was chosen for the production gateway; no shipped production Node.js service is described.
+cv-11,demo-postgres,"Operated a fleet of PostgreSQL replicas behind a trading platform: three regions, 20 TB in total, with automated failover that has been exercised in production twice.",met,A 20 TB multi-region PostgreSQL fleet with production failover.
+cv-11,demo-mentoring,Mentored four junior engineers and one intern; I set learning goals with each of them every quarter and reviewed their design documents.,met,Direct mentoring with structured goals and design reviews.
+cv-12,demo-node,"Ship production Node.js service for the lending team every sprint, and keep the services small enough that one person can explain each one.",met,Explicit ongoing production Node.js service delivery.
+cv-12,demo-postgres,Run PostgreSQL replica sets for three products; the largest takes about eight thousand writes a second.,met,"PostgreSQL replica sets across three products, with 8,000 writes per second on the largest."
+cv-12,demo-mentoring,"Mentor junior engineer on the team, and run the monthly learning session for the wider department.",met,Direct mentoring of a junior engineer plus a recurring learning session.
+cv-13,data-python,"Built and operated production data pipelines in Python, using pandas and PySpark, that ingest about two terabytes a day from 40 sources into the lake.",met,Explicit production Python pipelines at substantial daily volume and across 40 sources.
+cv-13,data-sql,"Wrote complex SQL against our Snowflake warehouse: window functions, recursive queries and a slowly changing dimension framework that other teams reuse.",met,"Complex warehouse SQL is supported by window functions, recursive queries and reusable dimensional logic."
+cv-13,data-orchestration,"Ran Apache Airflow for the data group: around 300 DAGs, a custom operator for our ingestion pattern, and an on-call rota for failed runs.",met,Direct Airflow operation at meaningful workflow scale.
+cv-13,data-stakeholders,"Worked with finance analysts and the head of product to define the revenue and retention metrics, and wrote the data contract that sits behind them.",met,Explicitly defines metrics with analysts and product leadership and documents the resulting data contract.
+cv-14,data-python,Python (beginner),not_met,Python is listed as beginner-level and the CV describes no Python data pipelines or production pipeline operation.
+cv-14,data-sql,"Write SQL queries against the claims database in Access and, more recently, against a reporting copy in SQL Server, mostly joins and aggregates.",not_met,"SQL experience is described, but it is mostly joins and aggregates against Access/SQL Server, not complex SQL against a data warehouse."
+cv-14,data-orchestration,Attended an Airflow introduction webinar and a Python for analysts workshop.,not_met,"The CV reports attending an introductory webinar, not using a workflow orchestrator."
+cv-14,data-stakeholders,"Work with claims handlers and underwriters to turn their questions into reports, and present the results in a monthly meeting.",partial,"Works directly with business stakeholders to translate questions into reports, but does not clearly define data requirements or datasets."
+cv-15,data-python,Built and operated production data pipelines in Python that bring meter readings from 1.4 million smart meters into the warehouse every night.,met,Explicit production Python pipelines handling nightly data from 1.4 million meters.
+cv-15,data-sql,"Wrote complex SQL against the BigQuery warehouse, including sessionisation of meter events and a set of reconciliation queries that finance relies on at month end.",met,"Explicit complex BigQuery warehouse SQL, including sessionisation and financial reconciliation."
+cv-15,data-orchestration,,unclear,The CV does not mention using a workflow orchestrator.
+cv-15,data-stakeholders,"Worked with the regulatory reporting team and with analysts in the customer insight team to agree what each dataset must contain, and documented the agreements in a shared glossary.",met,Explicitly agrees dataset contents with analysts and a regulatory reporting team.
+cv-16,data-python,"Wrote the extract, transform and load jobs, all in Python, that fill the analytics platform with orders, returns and stock levels from 25 systems. They run every night and almost always finish before the stores open.",met,Nightly Python ETL pipelines aggregate data from 25 systems into the analytics platform.
+cv-16,data-sql,"Wrote analytical queries on the cloud warehouse (Redshift) used by merchandising: sessionisation, cohort retention, basket analysis, with query plans I tuned myself.",met,"Complex warehouse analytics include sessionisation, cohort retention and basket analysis, with query-plan tuning."
+cv-16,data-orchestration,"Schedule everything through a DAG-based scheduler that we built on top of a workflow library, with retries, alerting and backfills.",met,"Describes a DAG-based workflow scheduler with retries, alerting and backfills; functionally an orchestrator."
+cv-16,data-stakeholders,"Collaborated closely with the BI team and the buying team, running a fortnightly session where they could ask for new datasets and I explained what was feasible.",met,Regularly works with BI and buying stakeholders to discuss and scope dataset needs.
+cv-17,data-python,"Built and operated production data pipelines in Python that load trade, price and weather data into the warehouse every five minutes.",met,Explicit production Python pipelines running every five minutes.
+cv-17,data-sql,"Wrote complex SQL against the Postgres-based warehouse, including the settlement queries the back office reconciles against.",met,"Explicit complex SQL against a warehouse, including settlement reconciliation queries."
+cv-17,data-orchestration,I have not used Airflow or any other workflow orchestrator. Our jobs are scheduled with cron and monitored by a script I wrote.,not_met,Explicitly says no workflow orchestrator has been used; jobs use cron and a monitoring script.
+cv-17,data-stakeholders,I have never worked directly with business stakeholders: requirements reach me through my manager as tickets.,not_met,Explicitly states there has been no direct work with business stakeholders.
+cv-18,data-python,"data eng, 3y. py pipelines (airflow) in prod, ~50 jobs.",met,"Concise but explicit claim of production Python pipelines orchestrated by Airflow, around 50 jobs."
+cv-18,data-sql,"sql on warehouse, lots.",partial,"Mentions substantial SQL against a warehouse, but gives no evidence that the SQL is complex."
+cv-18,data-orchestration,"py pipelines (airflow) in prod, ~50 jobs.",met,Explicit Airflow use for about 50 production jobs.
+cv-18,data-stakeholders,talk to analysts weekly to scope stuff.,met,"Explicit weekly collaboration with analysts to scope work, though the CV is brief."
+cv-19,data-python,"Built and operate production data pipelines in Python that take telemetry and booking data through cleansing, enrichment and aggregation into the lakehouse. There are about 90 pipelines.",met,Explicit operation of around 90 production Python pipelines.
+cv-19,data-sql,"Wrote complex SQL against the Snowflake warehouse: sessionisation, billing reconciliation, and a fraud feature set built from trip history with window functions over very large partitions.",met,"Complex Snowflake warehouse SQL with sessionisation, reconciliation and window functions over large partitions."
+cv-19,data-orchestration,"Migrated the batch estate from cron and shell scripts to Dagster, including the backfill tooling. About 150 jobs moved over a year. || Introduced Airflow in 2016 for the new platform; I wrote the first twenty DAGs and the operating guide the team still uses.",met,Direct experience migrating jobs to Dagster and introducing/operating Airflow.
+cv-19,data-stakeholders,"Sat with the finance and operations analysts every week for a year to agree the definitions of utilisation, revenue per vehicle and downtime; the definitions we agreed are still the company's metrics.",met,"Direct, sustained collaboration with analysts to define business metrics."
+cv-20,data-python,"Built dashboards for the lettings, sales and finance teams, and a few small Python scripts that tidy files before they are loaded.",partial,"Some Python data-preparation scripts are described, but building and operating production data pipelines is not established."
+cv-20,data-sql,"Wrote complex SQL against the Snowflake warehouse every day: dimensional models for lettings and sales, window functions for rent arrears ageing, and tests for each model.",met,Explicit complex Snowflake warehouse SQL using dimensional models and window functions.
+cv-20,data-orchestration,"Used Dagster to schedule the reporting jobs and the nightly refresh of the models, with alerts when a run fails.",met,Direct use of Dagster to schedule workflows with failure alerts.
+cv-20,data-stakeholders,Meet the heads of lettings and finance every fortnight to agree what the dashboards should show and which numbers they can trust.,met,Regularly defines reporting needs and trusted metrics with business stakeholders.

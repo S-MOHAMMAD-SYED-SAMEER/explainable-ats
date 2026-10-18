@@ -1,0 +1,26 @@
+Name: Imogen Castellanos-Pike
+Email: imogen.castellanos-pike@example.invalid
+Phone: +44 20 7946 0731
+Date of birth: 23 September 1985
+Nationality: British
+Gender: Female
+Address: 9 Harbour Lane, Leith, Edinburgh EH6 6QT
+
+SUMMARY
+Backend engineer for payments and ledgers. Fifteen years of building services that move money and the teams that keep them running.
+
+EXPERIENCE
+Principal Engineer, Marlowe Pay (2019 - present)
+Lead the ledger platform: eleven Node.js services, written in TypeScript, that post about forty million transactions a month. On call for them for five years, and the person who gets the page when they misbehave.
+Own the PostgreSQL estate behind the ledger: six clusters, the largest 9 TB, each with a hot standby and two read replicas. Designed the partitioning scheme for the postings table and ran the zero-downtime migration to it.
+Mentor the engineers on the platform team. Since 2020 I have brought six graduates and two career-changers up to mid-level, with a fortnightly one-to-one and a written growth plan for each.
+
+Senior Engineer, Brookfield Savings (2013 - 2019)
+Built and ran the card-settlement service in Node.js, from the first commit to nine million customers.
+Tuned PostgreSQL for the end-of-day batch window, taking it from four hours to forty minutes.
+
+EDUCATION
+BSc Computer Science, University of Edinburgh, 2007
+
+SKILLS
+Node.js, TypeScript, PostgreSQL, Kafka, AWS, Terraform
