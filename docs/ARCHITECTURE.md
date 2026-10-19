@@ -2,7 +2,7 @@
 
 This document explains how Explainable ATS is built, stage by stage, and why it is built that way. The README gives the overview; this is the detail behind it.
 
-The one idea everything follows from: **the model quotes, deterministic code judges.** A language model is used in exactly one stage, extraction, to find passages in a CV. Every stage after it is ordinary code that anyone can re-run by hand.
+The one idea everything follows from: **the model proposes, the code checks, a person decides.** A language model is used in exactly one stage. For each requirement it proposes a verdict and quotes the passages it relies on from a CV. Everything after that is ordinary code that anyone can re-run by hand: each quote is looked up in the original CV, a verdict with no verified quote is lowered to `unclear`, a rule-based matcher gives a second opinion that is shown and never changes a score, and the score is integer arithmetic. (The first design was the other way round, with the model only quoting and the rules judging. It was changed after measuring: see [the decision](#the-model-proposes-the-verdict-the-code-checks-it). `VERDICT_MODE=matcher` still runs the first design, and the public demo uses it.)
 
 ## Contents
 
@@ -28,7 +28,7 @@ web/      React 19, Vite, Tailwind, a small hash router
 
 | Directory | Responsibility |
 |---|---|
-| `agent/` | The pipeline: `ingest`, `redact`, `extract`, `verifyEvidence`, `match` / `matchRules`, `score`, `rank` / `rankRules`. The business logic lives here and nowhere else. |
+| `agent/` | The pipeline: `ingest`, `redact`, `extract` / `extractVerdicts`, `verifyEvidence`, `verdictEnforcement` / `verdictMode`, `match` / `matchRules`, `score`, `rank` / `rankRules` / `rankReview`. The business logic lives here and nowhere else. |
 | `domain/` | The vocabulary. `ats.ts` declares every closed set once (verdicts, tiers, decision outcomes, audit stages) and the scoring constants. `session.ts` holds the session token helpers. |
 | `adapters/llm/` | The model boundary: one `LlmProvider` interface, a deterministic `mock` and an `anthropic` adapter. |
 | `db/` | The `Database` interface, the SQLite and PostgreSQL drivers, the migration runner, and one repository per aggregate under `repositories/`. |
@@ -64,9 +64,9 @@ The browser never scores, sorts or classifies anything. The server sends finishe
 flowchart LR
     J[Job requirements<br/>declared by a person] --> I[Ingest]
     I --> R[Redact]
-    R --> E[["Extract<br/>(the only model stage)"]]
+    R --> E[["Extract<br/>(the only model stage:<br/>verdicts and quotes)"]]
     E --> V[Verify]
-    V --> M[Match]
+    V --> M[Check<br/>enforce, second opinion, flag]
     M --> S[Score]
     S --> K[Rank<br/>on read]
     K --> D[Recruiter decision]
@@ -88,19 +88,30 @@ Each row below names the file, what the stage reads and writes, and what it guar
 | **Ingest** | `agent/ingest.ts` (`ingestResume`) | Plain resume text | `candidates`, `resumes` (both texts), `sensitive_findings`; audit `resume_ingested` | Empty or over-200,000-character text is refused. The redacted copy is produced before anything is stored and written with the original in one insert. The same document for the same candidate is one resume (unique on content hash). |
 | **Redact** | `agent/redact.ts` | The resume text, plus the candidate's own name if known | The redacted text; one `sensitive_findings` row per masked span; audit `sensitive_attributes_masked` | Spans are replaced with `█` runs of the *same length*, so offsets are identical in both copies. Only a category and a character range are recorded in `sensitive_findings`, never the value. The original text is stored (`resumes.content_text`) because quote verification checks against it. |
 | **Open evaluation** | `agent/extract.ts` (`openEvaluation`) | A job and a candidate's resume | `evaluations` row in status `pending`; marks any earlier evaluation for the same job and candidate as superseded | Done in one transaction, so a current evaluation and the one it replaces can never both look current. |
-| **Extract** | `agent/extract.ts` (`extractEvidence`) | The job's requirements and **only** `redacted_text` | Calls the provider; audit `extraction_recorded` | The prompt is built from the requirements and the redacted text. The original never enters the function's scope. The provider must answer through a forced tool call (`record_evidence`) against a fixed schema that has no verdict or score field. Malformed findings are dropped with a reason and audited. |
+| **Extract** | `agent/extractVerdicts.ts` (`extractVerdicts`), `agent/extract.ts` (`extractEvidence`, the quotes-only mode) | The job's requirements and **only** `redacted_text` | Calls the provider; audit `extraction_recorded` | The prompt is built from the requirements and the redacted text. The original never enters the function's scope. The provider must answer through a forced tool call against a fixed schema: `record_verdicts` (a verdict, up to four passages and a reason per requirement, prompt `extract-v3`) or, in `matcher` mode, `record_evidence` (quotes only, `extract-v2`). Neither has a score field. Malformed entries are dropped with a reason and audited. |
 | **Verify** | `agent/verifyEvidence.ts` | Each accepted quote and the **original** `content_text` | `evidence` rows (`verified` true or false); audit `evidence_verified` and, if any were rejected, `unverifiable_evidence_rejected` | A quote counts only if it is found in the original text, character for character (whitespace differences are tolerated; case and wording are not). The model's offsets are a hint: the quote is located in the source and the stored offsets are the real ones. A quote overlapping a masked span is refused, and so is one shorter than 15 characters after whitespace is collapsed (`quote_too_short`): a bare "Node.js" is a keyword, not a statement of what someone did, even if it really is in the CV. Rejected quotes are stored unverified so a fabrication stays visible, and are never used again. The evaluation moves to `extracted`. |
-| **Match** | `agent/matchRules.ts`, `agent/match.ts` | Verified evidence only | `requirement_matches` (verdict, confidence, rationale) | One verdict per requirement from term coverage (see below). No model is imported by these files. Evidence is filtered on `verified` twice: by the repository query and again inside `decideMatch`. |
-| **Score** | `agent/score.ts`, `agent/match.ts` | The matches and the weights | `evaluations` (`score_basis_points`, `must_haves_met`, `must_haves_total`), in one transaction with the matches; audit `requirements_matched`, `score_computed` | Integer arithmetic in basis points (0 to 10000). Contributions sum exactly to the score. The audit payload holds every input, so the score can be recomputed from the trail alone. Status becomes `scored`. |
+| **Check** (the Match stage) | `agent/verdictEnforcement.ts`, `agent/verdictMode.ts`, `agent/matchRules.ts`, `agent/match.ts` | Verified evidence, and in `model_checked` mode the model's verdicts | `verdict_checks`, `requirement_matches` (verdict, confidence, rationale) | In `model_checked` mode the code enforces its rules, the matcher gives a second opinion on the same verified quotes and a credited quote with no shared word is flagged (see below). In `matcher` mode the matcher alone gives one verdict per requirement from term coverage. No model is imported by these files. Evidence is filtered on `verified` twice: by the repository query and again inside `decideMatch`. |
+| **Score** | `agent/score.ts`, `agent/verdictEnforcement.ts` (`scoreFromVerdicts`), `agent/match.ts` | The matches and the weights | `evaluations` (`score_basis_points`, `must_haves_met`, `must_haves_total`), in one transaction with the matches; audit `requirements_matched`, `score_computed` | Integer arithmetic in basis points (0 to 10000). Contributions sum exactly to the score. The audit payload holds every input, so the score can be recomputed from the trail alone. Status becomes `scored`. `scoreFromVerdicts` is the same arithmetic as `scoreEvaluation`; a test runs both over every evaluation CV and requires identical results. |
 | **Rank** | `agent/rankRules.ts`, `agent/rank.ts` | The current evaluations and their matches | **Nothing** | Computed on every read. No ranking table, no cached order. Five queries however many candidates there are. |
 | **Decide** | `handlers/evaluations.ts` (`handleDecision`) | One scored, non-superseded evaluation; the operator's session | `recruiter_decisions`; audit `decision_recorded` | A reason of at least 10 characters is mandatory. One decision per evaluation. The decider comes from the session, never from the request. |
 
-### How matching decides a verdict
+### How a model's verdict is checked
+
+`VERDICT_MODE=model_checked`, the default. The model returns, for each requirement, a verdict (`met`, `partial`, `not_met` or `unclear`), up to four passages and a one-line reason. The code then does four things (`agent/extractVerdicts.ts`, `agent/verdictEnforcement.ts`, `agent/match.ts`):
+
+1. **Verify every passage**, as in the Verify row: verbatim in the original CV, at least 15 characters, not over a mask. A passage that fails is stored unverified and dropped.
+2. **Enforce.** `met`, `partial` and `not_met` each need at least one verified passage. With none, the verdict reads `unclear` (audit event `verdict_downgraded_no_evidence`). A CV that says nothing is `unclear`, never `not_met`: `not_met` needs a verified explicit negative ("I have not ..."). A requirement the model did not answer is `unclear`. Enforcement can only lower a verdict. The model's reason is shown to a person and never used as evidence.
+3. **Take a second opinion.** The matcher below judges the same verified passages and the two verdicts are compared on a scale (`met` 3, `partial` 2, `unclear` 1, `not_met` 0). Every difference is shown on the candidate page, and **none changes the score**: the model's verified verdict is what is scored.
+4. **Flag one thing.** A credited verdict (`met` or `partial`) whose verified passages share no word with the requirement is flagged: "Quote shares no words with the requirement; a person should check", audit event `quote_no_overlap_flagged`. If the requirement is a must-have the candidate is placed in `needs_review`. The flag changes no number.
+
+All of it is written to `verdict_checks` (the model's verdict and reason, the enforced verdict and why it was lowered, the matcher's verdict and mode, how far apart they are, the flag), apart from `requirement_matches`, which holds what was scored. `VERDICT_MODE=matcher` skips the model's verdicts: the model only quotes and the matcher alone judges, which is how the public demo runs.
+
+### The matcher (the demo's judge, and the second opinion)
 
 `decideMatch` takes a requirement and the verified quotes cited for it.
 
 1. The requirement's **terms** are the significant words of its label and criterion: lower-cased, at least three characters, minus a short stop-word list, de-duplicated.
-2. It joins the verified quotes and counts how many terms appear in that text **as whole words** (`wordsOf`: lower-cased, split on anything that is not a letter, digit, `+`, `#` or `.`, so `Node.js` and `C++` are one word each and a sentence-ending full stop is not part of the word before it). "Java" is not found in "JavaScript" and "run" is not found in "running". That is the default, `MATCH_MODE=strict`: no stemming and no synonym list, so "service" does not satisfy "services". The alternative, `MATCH_MODE=folded`, first reduces both sides with `foldWord` (plural -s/-es, then -ing and -ed, then a doubled final consonant and a final -e, on purely alphabetic words of four letters or more), so "running", "runs" and "run" are one word. It is a fold, not a stemmer, and it has costs: "engineering" meets "engineer", and a job title such as "Backend Engineer" can be quoted as evidence for "mentored junior engineers", turning a silence into a `not_met`. The mode is read once from configuration, passed to the extractor stand-in (so the line it picks is the line credited) and to the matcher, and written into the `requirements_matched` audit event so a score says which rule produced it.
+2. It joins the verified quotes and counts how many terms appear in that text **as whole words** (`wordsOf`: lower-cased, split on anything that is not a letter, digit, `+`, `#` or `.`, so `Node.js` and `C++` are one word each and a sentence-ending full stop is not part of the word before it). "Java" is not found in "JavaScript" and "run" is not found in "running". That is `MATCH_MODE=strict`, the library default and the demo's: no stemming and no synonym list, so "service" does not satisfy "services". The alternative, `MATCH_MODE=folded` (the app's default outside the demo), first reduces both sides with `foldWord` (plural -s/-es, then -ing and -ed, then a doubled final consonant and a final -e, on purely alphabetic words of four letters or more), so "running", "runs" and "run" are one word. It is a fold, not a stemmer, and it has costs: "engineering" meets "engineer", and a job title such as "Backend Engineer" can be quoted as evidence for "mentored junior engineers", turning a silence into a `not_met`. The mode is read once from configuration, passed to the extractor stand-in (so the line it picks is the line credited) and to the matcher, and written into the `requirements_matched` audit event so a score says which rule produced it.
 3. With *covered* as the share of terms found:
    - 75% or more: `met`
    - 35% or more: `partial`
@@ -112,7 +123,7 @@ The comparisons are integer (`covered * 100 >= terms * 75`), and the score is in
 
 This is term coverage, not comprehension. It is crude on purpose, and the rationale shows exactly what it counted so a recruiter can see when it is wrong. Three limits are known and each is pinned by a test, so changing one is a decision rather than an accident:
 
-- **Word forms and synonyms count as different terms by default.** "service" is not "services", "Postgres" is not "PostgreSQL". The precision gained over substring matching is paid for in recall. `folded` mode recovers word forms and nothing else; which default is better is an empirical question, and the evaluation set (`eval/`) exists to answer it.
+- **Word forms and synonyms count as different terms by default.** "service" is not "services", "Postgres" is not "PostgreSQL". The precision gained over substring matching is paid for in recall. `folded` mode recovers word forms and nothing else. Judging alone against the labels in `eval/`, `folded` agreed with 36.8% of 68 rows and `strict` with 30.9% (the first run, quotes only); in `model_checked` mode the mode only affects the second opinion and the flag.
 - **Negation is not understood.** "Never shipped a Node.js service" covers exactly the terms "Shipped a Node.js service" covers and gets the same verdict.
 - **Words can be stuffed.** A quote that merely lists the terms of a criterion covers it. Verification stops a fabricated quote and a bare keyword (see the Verify row: at least 15 characters), but not a skills list quoted as evidence.
 
@@ -145,7 +156,7 @@ A `partial` must-have counts as a failure for the gate. Only `met` clears it.
 
 ## 3. Data model
 
-Three migrations create everything: `001_foundation.sql` (sessions), `002_domain.sql` (the ten domain tables) and `003_evaluation_records.sql` (one row per extraction: model, tokens, latency, the model's raw answer). The database refuses what the code must never produce: every closed set is a `CHECK` constraint, weights must be positive, scores are integers between 0 and 10000, and a requirement can be judged once per evaluation.
+Five migrations create everything: `001_foundation.sql` (sessions), `002_domain.sql` (the ten domain tables), `003_evaluation_records.sql` (one row per extraction: model, tokens, latency, the model's raw answer), `004_verdict_checks.sql` (what the model said for each requirement, what the code did with it and the matcher's second opinion) and `005_quote_no_overlap.sql` (the flag). The database refuses what the code must never produce: every closed set is a `CHECK` constraint, weights must be positive, scores are integers between 0 and 10000, and a requirement can be judged once per evaluation.
 
 ```mermaid
 erDiagram
@@ -233,6 +244,7 @@ Notes on the shape:
 - **`evaluations` is one row per assessment**, not per person. Re-assessing a candidate opens a new row and sets `superseded_by` on the old one, which keeps its own score, matches and decision.
 - **Superseded evaluations are history.** They cannot be scored or decided on, and rankings read only evaluations where `superseded_by IS NULL`.
 - **`requirement_matches.weight_applied`** stores the weight as it was at scoring time, so an old explanation still adds up after the job is edited.
+- **`verdict_checks` is kept apart from `requirement_matches`** so the verdict that was scored is never confused with the model's proposal. `scored_verdict` is always equal to `enforced_verdict`: no verdict is lowered automatically (the column stays because a column cannot be dropped portably).
 - **There is no ranking table.** A test asserts that none exists.
 
 ## 4. Request flows
@@ -323,7 +335,7 @@ Every automated test runs on SQLite. I also ran the PostgreSQL path by hand agai
 | Provider | Selected by | Behaviour |
 |---|---|---|
 | `mock` | the default | Replays registered fixtures or deterministic responder functions. Anything unregistered raises instead of inventing a reply. In the demo, a responder (`agent/mockExtractor.ts`) reads the prompt and quotes whole lines that contain the most requirement terms. It is a keyword matcher, not a model. |
-| `anthropic` | `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` | Uses the official SDK. Sends the redacted prompt with the `record_evidence` tool and parallel tool use disabled (`ANTHROPIC_TOOL_CHOICE=forced` makes the call mandatory; the default `auto` leaves it to the model and rejects a reply without it), and accepts exactly one well-formed tool call. |
+| `anthropic` | `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` | Uses the official SDK. Sends the redacted prompt with the `record_verdicts` tool (`record_evidence` in `matcher` mode) and parallel tool use disabled (`ANTHROPIC_TOOL_CHOICE=forced`, the default, makes the call mandatory; `auto` leaves it to the model and rejects a reply without it), and accepts exactly one well-formed tool call. |
 
 There is no fallback between them. Asking for `anthropic` without a key stops the server at startup, rather than quietly replaying fixtures and presenting them as a real run.
 
@@ -331,11 +343,11 @@ The Anthropic adapter's rules:
 
 - Hard timeout per request (`ANTHROPIC_TIMEOUT_MS`, default 60000, maximum 300000).
 - Bounded retries (`ANTHROPIC_MAX_RETRIES`, default 2, maximum 5) with a doubling delay, only for transient failures: timeout, dropped connection, HTTP 408, 429 and 5xx. `Retry-After` is honoured within a cap. The SDK's own retries are switched off so there is one policy.
-- A bad request, a bad key, a refusal, a truncated answer, a missing or repeated tool call, or a payload that is not a `findings` object is an `LlmError`, never an empty result.
-- The model name is whatever `ANTHROPIC_MODEL` says. The adapter names no model itself. Checked against the live API on 2026-10-14: `claude-sonnet-5-5` rejects a forced tool call (400) and any `temperature`, because it always runs adaptive thinking; `claude-haiku-4-5-20251001` accepts both; `claude-haiku-5-5` accepts a forced call but rejects `temperature`. So tool choice and temperature are settings (`ANTHROPIC_TOOL_CHOICE`, `ANTHROPIC_TEMPERATURE`), and a model that rejects what is configured fails with the API's own message and is not retried.
-- The adapter never scores, matches or ranks. Its output is a set of candidate quotes that go through the same schema check and the same verification as the mock's.
+- A bad request, a bad key, a refusal, a truncated answer, a missing or repeated tool call, or a payload that is not an object with the expected list (`requirements` for verdicts, `findings` for quotes) is an `LlmError`, never an empty result.
+- The model name is whatever `ANTHROPIC_MODEL` says. The adapter names no model itself. Checked against the live API on 2026-10-14: `claude-sonnet-5-5` rejects a forced tool call (400) and any `temperature`, because it always runs adaptive thinking; `claude-haiku-4-5-20251001` accepts both; `claude-haiku-5-5` accepts a forced call but rejects `temperature`. So tool choice and temperature are settings (`ANTHROPIC_TOOL_CHOICE`, `ANTHROPIC_TEMPERATURE`; `none` sends no temperature), the defaults are the ones Haiku 4.5 was measured with (forced, 0), and a model that rejects what is configured fails with the API's own message and is not retried.
+- The adapter never scores, matches or ranks. Its output is a set of verdicts and candidate quotes (quotes alone in `matcher` mode) that go through the same schema check and the same verification as the mock's.
 
-**What happens when the model call fails.** `extractEvidence` marks the evaluation `failed`, appends an audit event and raises `PROVIDER_UNAVAILABLE`. It never turns a failure into an empty list of findings: "the model found nothing" and "the model did not answer properly" are different facts, and only the first says anything about the candidate. Each way a call can go wrong is its own kind (`adapters/llm/failures.ts`), with its own audit event and its own message for a recruiter (`agent/failures.ts`):
+**What happens when the model call fails.** `extractVerdicts` (and `extractEvidence`, in `matcher` mode) marks the evaluation `failed`, appends an audit event and raises `PROVIDER_UNAVAILABLE`. It never turns a failure into an empty list of findings: "the model found nothing" and "the model did not answer properly" are different facts, and only the first says anything about the candidate. Each way a call can go wrong is its own kind (`adapters/llm/failures.ts`), with its own audit event and its own message for a recruiter (`agent/failures.ts`):
 
 | Kind | Audit event | What it means |
 |---|---|---|
@@ -350,10 +362,10 @@ Every message says that nothing was scored and what kind of problem it was, and 
 
 **The resume is untrusted input.** Whoever wrote it may want to be misread, and everything they wrote reaches the model. Two layers answer that:
 
-1. *The prompt* (`agent/extractionPrompt.ts`, prompt version `extract-v2`) names everything between `=== RESUME ===` and `=== END OF RESUME ===` as untrusted data that is never an instruction, says what to do with text that addresses the model (nothing: it is only a line of text), and says the requirements are listed only above the resume marker. `neutraliseMarkers` also turns any `=== RESUME ===`, `=== REQUIREMENTS ===` or `=== END OF RESUME ===` found inside the CV into the same words in dashes, with the same length so offsets stay valid, so a CV cannot fake a section boundary. This lowers the chance a model is fooled and cannot make it zero.
-2. *The structure*, which does not depend on the model resisting. The extraction tool has no field for a verdict or a score. Every quote is checked against the original CV, and a quote that is not there, is under 15 characters or overlaps a masked detail is refused. A finding against a requirement that does not exist is dropped. Verdicts and the score are computed by code from the quotes that survived. A model that was fooled completely can only propose quotes, and a quote has to exist in the CV to count.
+1. *The prompt* (`agent/verdictExtraction.ts`, prompt version `extract-v3`; `agent/extractionPrompt.ts`, `extract-v2`, in `matcher` mode) names everything between `=== RESUME ===` and `=== END OF RESUME ===` as untrusted data that is never an instruction, says what to do with text that addresses the model (nothing: it is only a line of text), and says the requirements are listed only above the resume marker. `neutraliseMarkers` also turns any `=== RESUME ===`, `=== REQUIREMENTS ===` or `=== END OF RESUME ===` found inside the CV into the same words in dashes, with the same length so offsets stay valid, so a CV cannot fake a section boundary. This lowers the chance a model is fooled and cannot make it zero.
+2. *The structure*, which does not depend on the model resisting. The extraction tool has no field for a score. Every quote is checked against the original CV, and a quote that is not there, is under 15 characters or overlaps a masked detail is refused. An entry for a requirement that does not exist is dropped. A verdict with no surviving quote reads `unclear`. The score is computed by code. A model that was fooled completely can propose a verdict and quotes, and a quote has to exist in the CV to count. If it credits a line that exists but shows nothing of the requirement, the verdict is scored as the model said it: what tells a person is the flag, and on a must-have the placement in `needs_review`, for a quote that shares no word with the requirement.
 
-What gets through both is real text in the CV that happens to contain the words a requirement asks for: keyword stuffing, a documented limit of term coverage that no prompt fixes. `test/prompt-injection.test.ts` simulates a fully hijacked model (invented quotes for every requirement, a finding against a requirement that does not exist, a score and verdicts in fields the contract has no place for) over all eight hostile CVs and shows the outcome equals an empty answer. `docs/TESTING.md` records what two real models did.
+What gets through both is real text in the CV that happens to contain the words a requirement asks for: keyword stuffing, a documented limit that no prompt fixes. Two offline tests simulate a hijacked model over all eight hostile CVs. `test/prompt-injection.test.ts` does it for the quotes-only mode (invented quotes for every requirement, a finding against a requirement that does not exist, a score and verdicts in fields the contract has no place for) and shows the outcome equals an empty answer. `test/verdict-mode.test.ts` does it for `model_checked`: invented quotes are never stored and an honest answer is never flagged, but a model that credits every requirement on the attacker's own lines is scored as it said (100% against 43% for the honest answer) with every such credit flagged and the candidate placed in `needs_review`. That is a weaker guarantee than the quotes-only mode gave, and it is the price of letting the model decide. `docs/TESTING.md` records what real models did.
 
 **The model found nothing.** An answer with a `findings` list that is empty is a real result, not a failure: the evaluation continues, every requirement ends `unclear`, and an `extraction_empty` event is written. It is also exactly what an empty or garbled paste looks like, so the assessment screen shows a notice saying what was found and what that does not mean. Findings that are all malformed are dropped (`malformed_findings_dropped`) but are not "found nothing", because the model did return findings.
 
@@ -382,11 +394,17 @@ A demo session is a private in-memory database seeded by the same code as the ca
 
 Each decision below: what I chose, why, and what it costs.
 
-### The model doesn't score
+### The model proposes the verdict; the code checks it
 
-- **Decision.** The model returns quotes and nothing else. The tool schema has no verdict and no number.
-- **Why.** A score a model produced can't be reproduced, can't be explained beyond "it said so", and can't be defended to a candidate who asks why they were screened out. A verdict from code can be recomputed by hand from stored evidence.
-- **Trade-off.** The judging rules are crude. Term coverage can't tell that "led a team of five" supports "has leadership experience" unless the words overlap. I accept that, and the rationale states exactly what was counted so a person can overrule it.
+- **Decision.** The model returns a verdict for each requirement with the passages it relies on. The code verifies every passage, lowers a verdict that has none to `unclear`, and scores what is left. The deterministic matcher is a second opinion that is shown and changes no score. This was decided on 2026-10-19, after measuring. The first design was the other way round: the model only quoted, and rules judged the quotes.
+- **Why.** With the matcher judging alone, its verdicts agreed with the labels about 35 to 40% of the time even when it was handed the labeller's own passages (35.3% strict, 38.2% folded on 68 rows). The ceiling was the matcher, not the model: a word counter cannot read "ran the Postgres fleet" as "run PostgreSQL". With the model proposing and the code checking, the real run agreed with 86.8% of the labels. A first attempt let the matcher overrule the model by lowering a verdict whose quote shared no word with the requirement; it cost nine points on the same rows (the model's verdict matched the label in all six it lowered), and it was removed.
+- **Trade-off.** A verdict is now the model's reading, so it could differ on another run or another model. What stays checkable: a verdict cannot rest on a quote that is not in the CV, the model cannot score, rank or decide, the arithmetic can be redone by hand from the stored verdicts and quotes, and the audit trail records what the model said and what the code did. What cannot be stopped: a model crediting a real line that does not show the requirement. The flag covers that when the line shares no word with the requirement, and does not when it shares one.
+
+### The score is not the matcher's to change
+
+- **Decision.** Nothing the matcher says changes a score. It is shown beside the model's verdict, and the one flag it raises is for a person to read.
+- **Why.** It was tried both ways (see above) and lowering was worse than trusting the verified verdict, on the only data there is. A flag costs a recruiter a glance; an automatic correction that is wrong costs a candidate a score nobody can explain.
+- **Trade-off.** The simulated worst case is a model that obeys an injected instruction: it is scored as it said. The defences are the quote check, the flag and the placement in review, and a live check on Haiku 4.5, which was not fooled on 7 of 7 asserted hostile CVs (one run).
 
 ### Redaction keeps the same length
 
@@ -422,12 +440,12 @@ Each decision below: what I chose, why, and what it costs.
 
 - **Decision.** There are no embeddings, no vector search and no similarity scores anywhere in the codebase.
 - **Why.** A similarity number is unreproducible across model versions and can't be explained to the person it affects. Rules over verified quotes can be re-run next year and give the same answer.
-- **Trade-off.** Recall. Paraphrase is missed, and word forms count as different terms ("mentored" and "mentoring" are two terms). A missed passage becomes `unclear`, which sends the candidate to a human rather than rejecting them, but it still costs coverage.
+- **Trade-off.** Recall, for the matcher. Paraphrase is missed, and word forms count as different terms ("mentored" and "mentoring" are two terms). That is why the matcher is only a second opinion in the app: the model reads paraphrase, and the matcher is what the demo, which has no model, is scored by. A missed passage becomes `unclear`, which sends the candidate to a human rather than rejecting them, but it still costs coverage.
 
 ### `unclear` is not `not_met`
 
 - **Decision.** "The CV says nothing about this" and "the CV says something that falls short" are separate verdicts, and separate tiers (`needs_review` and `gated`).
-- **Why.** Reporting an absence of evidence as evidence of absence is how a good candidate gets silently filtered out.
+- **Why.** Reporting an absence of evidence as evidence of absence is how a good candidate gets silently filtered out. The same rule binds the model: a `not_met` needs a verified explicit negative, and a CV that says nothing is `unclear`.
 - **Trade-off.** More states to explain on screen, which is why `web/src/copy.ts` exists.
 
 ### The demo is a separate mode, not a flag

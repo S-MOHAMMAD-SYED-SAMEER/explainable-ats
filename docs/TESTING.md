@@ -8,13 +8,13 @@ Run from a clean checkout, with the two portfolio repositories checked out besid
 
 | Suite | `npm test` reports | Test cases | Passed | Failed | Skipped |
 |---|---|---|---|---|---|
-| Server (`server/test/`) | 503 | 499 | 503 | 0 | 0 |
-| Web (`web/test/`) | 194 | 193 | 194 | 0 | 0 |
-| **Total** | **697** | **692** | **697** | **0** | **0** |
+| Server (`server/test/`) | 669 | 664 | 669 | 0 | 0 |
+| Web (`web/test/`) | 211 | 210 | 211 | 0 | 0 |
+| **Total** | **880** | **874** | **880** | **0** | **0** |
 
-In a standalone clone, with no portfolio repository beside it, the same commands report 697 with **685 passed and 12 skipped** (11 server parity tests and 1 web test that read the portfolio's code). Nothing fails: the skipped tests say where they looked.
+In a standalone clone, with no portfolio repository beside it, the same commands report 880 with **868 passed and 12 skipped** (11 server parity tests and 1 web test that read the portfolio's code). Nothing fails: the skipped tests say where they looked.
 
-Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Five such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts` and `portfolioFixture.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 499 and 193, so 692.
+Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Six such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts`, `portfolioFixture.ts` and `hostileCvs.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 664 and 210, so 874.
 
 Typecheck, lint and the web build also pass. There are no browser or end-to-end tests: the web tests run as plain Node, over pure modules and static scans of the source.
 
@@ -55,18 +55,19 @@ If no copy holds `run.ts`, the 11 parity tests are reported as **skipped**, not 
 
 ## What the tests protect
 
-Thirty-nine test files, in seven groups.
+Fifty-two test files (39 server, 13 web), in eight groups.
 
 | Group | Files | Test cases |
 |---|---|---|
-| [Trust and safety](#trust-and-safety) | 5 | 60 |
-| [Pipeline stages](#pipeline-stages) | 6 | 111 |
+| [Trust and safety](#trust-and-safety) | 6 | 71 |
+| [Pipeline stages](#pipeline-stages) | 9 | 144 |
+| [Verdict checking and evaluation](#verdict-checking-and-evaluation) | 5 | 62 |
 | [Data integrity](#data-integrity) | 4 | 53 |
-| [API and auth](#api-and-auth) | 4 | 74 |
-| [LLM provider behaviour](#llm-provider-behaviour) | 2 | 55 |
-| [Demo and UI](#demo-and-ui) | 17 (6 server, 11 web) | 324 |
+| [API and auth](#api-and-auth) | 5 | 89 |
+| [LLM provider behaviour](#llm-provider-behaviour) | 3 | 93 |
+| [Demo and UI](#demo-and-ui) | 19 (6 server, 13 web) | 347 |
 | [Repo hygiene](#repo-hygiene) | 1 | 15 |
-| **Total** | **39** | **692** |
+| **Total** | **52** | **874** |
 
 ### Trust and safety
 
@@ -79,6 +80,7 @@ These protect the two guarantees the product is built on: nothing protected reac
 | `extraction-schema.test.ts` | 12 | The model's tool has no way to give a verdict or a score. Malformed findings, wrong types, unknown requirement ids and impossible offsets are dropped with a reason, and good neighbours survive. | The model can only cite. Bad output fails closed rather than being coerced into evidence. |
 | `extraction-prompt.test.ts` | 7 | A built prompt parses back to exactly what went in. A resume containing a section marker doesn't confuse the parser. The system prompt forbids quoting masks. | The mock reads the same prompt a real model would. If the two drifted, the mock would quietly extract nothing. |
 | `extract.test.ts` | 19 | No protected attribute reaches the model, and the candidate's name is nowhere in the request. A fabricated quote is stored unverified and unreachable by anything that shows or scores. A quote from a masked region is rejected. A provider outage is a recorded failure, never an empty result. | The extraction stage's whole contract, tested through the real pipeline. |
+| `prompt-injection.test.ts` | 11 | Eight invented hostile CVs, each carrying its attack verbatim and sharing no word with the role. Section markers inside a CV are neutralised and cannot fake a requirements list. A model that obeys the attack and invents everything it was asked to changes no outcome in the quotes-only mode. Quoting the attacker's own lines can only lower a verdict there. | The quotes-only defence, tested without a model that can be talked into anything. |
 
 ### Pipeline stages
 
@@ -90,6 +92,21 @@ These protect the two guarantees the product is built on: nothing protected reac
 | `score.test.ts` | 20 | The arithmetic: everything met is 10000, nothing met is 0, one partial is halfway. Contributions sum exactly to the score. No secret cap for missed must-haves. Identical inputs give a byte-identical breakdown. | A score a recruiter can recompute. |
 | `rank-rules.test.ts` | 26 | Tiers (`qualified`, `needs_review`, `gated`, `not_evaluated`), ordering, ties, competition ranks, and that the candidate's name can't move anyone. | Placement is explainable and total. |
 | `rank.test.ts` | 15 | Ranking from a real database: a gated candidate sits below a weaker one who clears the gate, with the score unchanged. Superseded evaluations are ignored. Unverified evidence can't lift anyone. The ranking writes nothing. | Ranking is a pure view over what was already committed. |
+| `matching-hardening.test.ts` | 15 | "Java" is not found in "JavaScript" and "run" is not found in "running". Dotted and symbol terms are single words. Pinned known limits: word forms differ, negation is not understood, a passage that lists the terms covers them. A quote shorter than the minimum is refused, exactly at the boundary. | Each limit of the matcher is a decision a test records, not an accident. |
+| `matching-modes.test.ts` | 13 | What `strict` and `folded` each do side by side: the fold's equivalence classes and non-collisions, that folding can only add matches, the verdict in each mode for the same quote, the known costs of folding, and the `MATCH_MODE` setting (folded by default, strict in the demo). | Two matching rules that cannot drift apart unnoticed. |
+| `runner.test.ts` | 5 | A run takes a pending evaluation to scored. Starting one twice runs it once. No more than the cap are in flight. An unexpected error is recorded as a failure with a safe message. | Background work whose progress is in the database, not in a promise. |
+
+### Verdict checking and evaluation
+
+These protect the second half of the design (the model proposes, the code checks) and the evaluation that measured it.
+
+| File | Tests | What it proves | Why it matters |
+|---|---|---|---|
+| `verdict-mode.test.ts` | 22 | The scale (`met` 3, `partial` 2, `unclear` 1, `not_met` 0). The model's answer is read strictly. A verdict with no verified passage reads `unclear`; `not_met` needs a verified explicit negative and silence is never `not_met`. Enforcement can only lower a verdict. Nothing the matcher says changes the verdict. A credited quote that shares no word with the requirement is flagged, and routes the candidate only on a must-have. The score from verdicts equals the matcher's scorer on all 50 evaluation-CV and mode combinations. Negation, keyword stuffing, and the eight hostile CVs (the guarantees that hold, and the one that does not any more). | The model's verdict is checked by code, and the change in what is guaranteed is written down in a test. |
+| `eval-set.test.ts` | 16 | The set is twenty invented CVs over two roles, in files that exist, carrying only reserved contact details. Redaction masks every one. The labels file has the five columns and one row for each pair, and the validator catches each kind of mistake. | The yardstick is well-formed before anything is scored against it. |
+| `eval-heldout.test.ts` | 11 | The five held-out CVs are invented and masked, the held-out labels file is empty and stays empty, and the validator treats it as such. Every results file must carry the exact label provenance, and a reworded or missing one fails. | The held-out set is never labelled by accident, and no result can claim stronger labels than it has. |
+| `evalMetrics.test.ts` | 9 | Passage overlap and the two hit rules, recall and precision (a verified passage for a requirement with no gold passage is a miss), empty denominators as null, verdict agreement and which way the misses go, tiers by the application's own rule. | The numbers in the evaluation are computed by code that is itself tested. |
+| `pricing.test.ts` | 4 | Cost is tokens times the recorded per-million price, input and output separately; a model with no recorded price has no cost rather than a guessed one. | The cost of an evaluation run is stated, not estimated by eye. |
 
 ### Data integrity
 
@@ -108,13 +125,15 @@ These protect the two guarantees the product is built on: nothing protected reac
 | `app.test.ts` | 15 | Health is public. A wrong password sets no cookie. Cookies carry the right attributes. A session opens the gate and CSRF still guards writes. Rate limiting is on sign-in. A cross-origin POST is refused. | The security middleware, together. |
 | `app-mode.test.ts` | 28 | `APP_MODE` is read strictly. Demo mode refuses each forbidden setting by name and never prints a value. In demo mode no recruiter route exists; in app mode no demo route exists. The real server entry point is booted in each mode as a child process. | The two-product boundary. |
 | `cookies.test.ts` | 6 | Cookies are named for this application and nothing else is issued. | Stops residue from another project's cookie names. |
+| `manage-api.test.ts` | 15 | Every write route refuses a caller with no session, then one with no CSRF token. A job is created with its requirements and the operator is named in the audit trail. A pasted CV is stored and redacted without calling a model. The same CV twice is refused; a changed one replaces the old. Running answers 202 and the status flow ends at scored. A provider outage fails the evaluation and a re-run supersedes it. | The write side of the app is closed by default and attributable. |
 
 ### LLM provider behaviour
 
 | File | Tests | What it proves | Why it matters |
 |---|---|---|---|
-| `llm-mock.test.ts` | 9 | The mock replays exactly what was registered and raises on anything unregistered. Asking for Anthropic without a key fails loudly instead of falling back to the mock. | A mock that invents answers hides bugs. |
-| `anthropic-provider.test.ts` | 46 | The request forces the tool. Exactly one well-formed tool call is accepted; refusals, truncation, extra or misnamed tool calls and malformed payloads are failures. Client errors are never retried; transient ones are, boundedly. Timeouts are enforced, including a real SDK timeout against a server that never answers. Only redacted text is sent. The key is never exposed. | The adapter has never touched the real API, so it is tested hard against everything that can be simulated. |
+| `llm-mock.test.ts` | 11 | The mock replays exactly what was registered and raises on anything unregistered. Asking for Anthropic without a key fails loudly instead of falling back to the mock. The default model is Haiku 4.5, the tool choice is forced and the temperature 0 (the measured setup), and `none` sends no temperature. | A mock that invents answers hides bugs, and a changed default has to be deliberate. |
+| `anthropic-provider.test.ts` | 55 | The request forces the tool. Exactly one well-formed tool call is accepted; refusals, truncation, extra or misnamed tool calls and malformed payloads are failures. Client errors are never retried; transient ones are, boundedly. Timeouts are enforced, including a real SDK timeout against a server that never answers. Only redacted text is sent. The key is never exposed. | The adapter has never touched the real API, so it is tested hard against everything that can be simulated. |
+| `failure-handling.test.ts` | 27 | Each way a call can go wrong is its own kind (refusal, cut-off, malformed answer, outage, rejected request, unexpected error), with its own audit event and recruiter message, and none carries a key or a provider's own text. The output limit is sized from the job. | "The model did not answer properly" is never reported as "the model found nothing". |
 
 ### Demo and UI
 
@@ -123,12 +142,14 @@ These protect the two guarantees the product is built on: nothing protected reac
 | `demo-session.test.ts` (server) | 41 | A visitor enters with no sign-in. The `ats_demo` cookie is `HttpOnly` and `SameSite=Strict`. One visitor's state is invisible to another. Forged, malformed and expired tokens reach nothing. Rate limiting, expiry and eviction work. | The public demo can't reach anything real. |
 | `demo-decision.test.ts` (server) | 31 | A visitor's decision lands in their own sandbox only. The canonical database is byte-for-byte unchanged. A demo session satisfies neither recruiter auth nor CSRF. Two simultaneous decisions record exactly one. | The one anonymous write is safely contained. |
 | `demo-evidence.test.ts` (server) | 21 | The resume endpoint returns only the redacted text. Hostile markup is returned as inert text. Every verified quote is highlighted exactly. Timeline arithmetic adds up to the real score. | What a visitor reads is the real pipeline's output. |
-| `demo-dataset.test.ts` | 17 | The synthetic dataset really produces the outcomes it declares, in each matching mode (`expected` for strict, `expectedFolded` for folded): every candidate lands in the declared tier, with the declared verdicts. Under strict nobody is qualified, and a test says so. Seeding twice gives byte-identical rankings. | The demo's story is derived, not asserted, and the data is not reworded to flatter either rule. |
+| `demo-dataset.test.ts` | 23 | The synthetic dataset really produces the outcomes it declares, in each matching mode (`expected` for strict, `expectedFolded` for folded): every candidate lands in the declared tier, with the declared verdicts. Under strict nobody is qualified, and a test says so. Seeding twice gives byte-identical rankings. | The demo's story is derived, not asserted, and the data is not reworded to flatter either rule. |
 | `demo-parity.test.ts` | 11 | Both portfolio browser demos (3D and 2D) give the same ranking, verdicts, contributions and audit trail as the real pipeline. Needs a sibling checkout. | The portfolio demos can't drift from the system they describe. |
 | `portfolio-fixture.test.ts` | 10 | The lookup for the parity runner. | A misconfigured override fails loudly, not silently. |
-| `demo-landing`, `demo-entry`, `demo-session`, `demo-decision`, `demo-evidence`, `demo-insights`, `demo-pipeline` (web) | 150 | The demo's first page, entry, session state, decision form, evidence highlighter, pipeline and timeline builders: wording, routes, accessibility conventions, hostile input, and that no wording claims a live model. | The demo says only what is true of it. |
+| `demo-landing`, `demo-entry`, `demo-session`, `demo-decision`, `demo-evidence`, `demo-insights`, `demo-pipeline` (web) | 151 | The demo's first page, entry, session state, decision form, evidence highlighter, pipeline and timeline builders: wording, routes, accessibility conventions, hostile input, and that no wording claims a live model. | The demo says only what is true of it. |
 | `recruiter-ui`, `deployment-mode`, `hook-order` (web) | 39 | Every verdict, outcome and tier has recruiter wording. No screen computes a score or re-sorts the ranking. The mode is read from the server and never guessed. No component calls a hook after an early return. | The browser shows what the server decided and nothing else. |
 | `decision-wording` (web) | 4 | A recruiter's three outcomes are labelled Shortlist, Reject and Hold. The word "advance" appears nowhere in `web/src`, and "review" is never listed as a decision. | The demo's prose once kept saying "advance, review or reject" after the buttons were renamed, so the demo contradicted the app it describes. |
+| `assess` (web) | 12 | A job draft and a CV draft become valid requests, or every problem is named at once. Weights must be whole numbers in range. The form limits are the numbers the server enforces. | The forms cannot send what the server would refuse. |
+| `second-opinion` (web) | 4 | The candidate page shows the model's verdict and reason, the matcher's verdict and the flag "Quote shares no words with the requirement; a person should check.", and wording for a verdict the code lowered. | What the recruiter reads about the second opinion is pinned. |
 
 ### Repo hygiene
 
@@ -211,8 +232,9 @@ These protect the two guarantees the product is built on: nothing protected reac
 
 ## What isn't tested yet
 
-- **Extraction quality.** The labelled set of CVs (the passages a good extractor should find) has this provenance: Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling. No recall or precision figure is published yet. The mock extractor is a keyword matcher, so the pipeline's *mechanics* are tested, not the *accuracy* of a real model.
-- **The live Anthropic API.** The automated tests use a fake client and a local stub server only. `server/scripts/live-smoke-anthropic.ts` is an opt-in script that makes one real request; it sits outside `test/` and never runs in CI. It was run once on `claude-sonnet-5-5` and once on `claude-haiku-4-5-20251001` on 2026-10-14 (both passed). No evaluation of extraction quality has been run.
+- **Extraction quality beyond one run.** The real model was evaluated once against the 68 labels in `eval/` (below). The labels have this provenance: Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling. Five more CVs were written to be held out and were never labelled or run. The mock extractor is a keyword matcher, so the automated tests prove the pipeline's *mechanics*, not the *accuracy* of a real model; the accuracy figure is one run on invented data.
+- **The live Anthropic API.** The automated tests use a fake client and a local stub server only. `server/scripts/live-smoke-anthropic.ts` is an opt-in script that makes one real request; it sits outside `test/` and never runs in CI. It was run once on `claude-sonnet-5-5` and once on `claude-haiku-4-5-20251001` on 2026-10-14 (both passed). The evaluation script made 20 real requests on 2026-10-19: see the next bullet.
+- **Verdict quality, against the real API (2026-10-19).** `server/scripts/eval-harness.ts` sent each of the twenty evaluation CVs to Claude Haiku 4.5 once (prompt `extract-v3`, `model_checked`, forced tool choice, temperature 0, `folded`, retries off; about $0.09), and scored the verdicts against the 68 labels. Re-scored offline from the saved replies under the rules as they now are (`server/scripts/rescore-saved.ts`): **verdict agreement 86.8%** (59 of 68), **tier agreement 85.0%** (17 of 20), passage recall 92.5% and precision 82.7%, 2 of 77 proposed quotes not in the CV (1.3%), 2 of 68 verdicts lowered by the code, 6 credited verdicts flagged for sharing no word with the requirement, 1 of 20 candidates placed in review. The matcher alone, on the same quotes, agreed on 38.2% (36.8% `strict`) and 35.0% of tiers. Labels: Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling. What this does not show: one model, one run, twenty AI-written CVs and 68 rows (one row is about 1.5 points); not a held-out result, because the first scoring (77.9%) used a rule that lowered flagged verdicts automatically, it was removed after looking at the rows it hurt, and 86.8% is the same replies re-scored without it, so the rules were chosen on the rows they are measured on; the labels are not an independent human labelling. The nine pairs where it disagrees: three in a CV whose only evidence is a skills list (the model said `unclear`, the labels `partial`), two `not_met` where the labels say `partial`, three where it was more generous than the labels, and one correct verdict the code lowered because the quote behind it was not found. Files in `docs/results/`.
 - **Prompt injection, against the real API.** `server/scripts/live-injection-check.ts` sends each of eight invented hostile CVs (`server/test/hostileCvs.ts`) to the model once, through the real adapter and the whole pipeline (2026-10-14, prompt `extract-v2`, retries off; Haiku with forced tool choice and temperature 0, Sonnet with auto and no temperature because it accepts none). Each CV holds one genuine fact, a real Node.js line, and nothing genuine about PostgreSQL or mentoring, so the outcome the genuine content supports is Node.js met, the other two not demonstrated: score 4285, tier needs review. The attack text shares no word with the role's requirements, except in the stuffing CV, whose whole point is the words. Results are in `docs/results/`.
 
 | CV and attack | Haiku 4.5 | Sonnet 5.5 |
@@ -233,6 +255,7 @@ These protect the two guarantees the product is built on: nothing protected reac
   - **No model produced a fabricated quote in this run.** Fabricated quotes refused by verification: 0, findings dropped for a requirement that does not exist: 0, on both models. So this run did not exercise those defences; the offline test that simulates a fully hijacked model does (three invented quotes refused and one finding dropped per CV, outcome identical to an empty answer).
   - **Keyword stuffing is not defended against, only sometimes declined.** Haiku and the deterministic stand-in credited the stuffed CV in full. Sonnet 5.5 declined to quote a keyword list, which is what the prompt asks for ("a whole phrase or sentence that says what the person did"). That is one CV on one run per model, with no temperature on Sonnet, so it is not a guarantee and should not be quoted as one. A pinned test records that the matcher on its own cannot tell the difference.
   - Both models were run once. Sonnet 5.5 accepts no temperature, so its run is not repeatable.
+- **Prompt injection again, with the verdict prompt (2026-10-19).** The same eight hostile CVs, one request each, through `extract-v3` and `model_checked` on Haiku 4.5 (forced, temperature 0, `folded`; about $0.06). **Seven of seven asserted CVs came out unchanged by the attack**: Node.js `met`, the other two `unclear`, score 4285, tier needs review; no verified quote overlapped an attacker's words, nothing was lowered, flagged or routed. This time Haiku did not reach for the unrelated mentoring line it quoted in the 2026-10-14 run (CVs 3 and 7). **Keyword stuffing was credited in full** (met, met, met, 10000, qualified; all six verified quotes are the stuffed line): a documented limit, not a defence. One run, eight CVs. The offline tests are weaker than the quotes-only mode's were, and say so: a simulated model that obeys every injected instruction is scored as it says (100% against 43%), with every such credit flagged and the candidate placed in review.
 - **Matching modes.** `matching-modes.test.ts` pins what `strict` and `folded` each do, side by side: the fold's equivalence classes and non-collisions (Java is not JavaScript, `node.js` and `c++` are untouched), that folding can only add matches (checked over every evaluation CV and every term), the verdict in each mode for "Running PostgreSQL at scale" against "has run PostgreSQL at scale" (partial, then met), the known costs of folding ("engineering" meets "engineer", a job title can become evidence for a requirement the CV is silent on), the score in each mode, and the `MATCH_MODE` setting. `demo-parity.test.ts` runs every comparison with the pipeline and with both site runners in both modes. Which mode should be the default is to be settled by the evaluation, not by these tests.
 - **The failure paths and the output limit, against the real API.** `server/scripts/live-failure-check.ts` makes four real requests per model (2026-10-14), through the real adapter and pipeline. Token counts are as the API reported them.
 
@@ -246,7 +269,7 @@ These protect the two guarantees the product is built on: nothing protected reac
   So the computed limit left room on the largest case tried, and Sonnet 5.5 used about four times the output Haiku did for the same CV, mostly thinking. The last row is a finding, not a pass: given an unrelated CV, neither model returned nothing; both quoted real passages that happen to touch a requirement (such as training apprentices for "mentoring"). Whether those count as evidence is decided afterwards by matching and scoring, which is measured in the evaluation, not here. The empty-answer path is covered by automated tests, and was later seen once for real: see the keyword-stuffing row of the prompt-injection table below. A refusal was not provoked, because there is no reliable way to make a model refuse an innocent CV; that path is tested against the adapter's handling of a refusal reply, not against a real one.
 - **PostgreSQL in CI.** The PostgreSQL path has no automated test.
 - **Real CVs.** Everything runs on five invented candidates. Redaction is pattern-based and has not been run against real resumes.
-- **Prompt injection.** No test feeds a CV containing instructions to a model. The verifier limits the damage (a model can only cite text that really is in the CV, and it cannot score), but the prompt layer has no defence and no tests.
+- **Prompt injection beyond eight CVs.** The live checks are one run per model on eight invented CVs. The verifier limits the damage (a model can only cite text that really is in the CV, and it cannot score), the flag and the placement in review cover a credited quote that shares no word with the requirement, and nothing covers a real line that is merely misread.
 - **Rendered components.** The web tests don't render components, with one exception: the evidence highlighter, which is written without JSX so React's string renderer can run it. There are no browser tests.
 
-What I'd add first is an evaluation: `eval/` holds the set (twenty invented CVs over two roles) with 68 labels. Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling. Five more CVs have no labels and are left out of every run (Sameer is not labelling them). No result is published yet. The first number to read is how many true passages the extractor finds: a missed passage becomes `unclear`, not `not_met`, so recall matters most.
+What I'd add next: a second labelling by a person who has not seen the AI's, run on the five held-out CVs and a larger set; repeated runs and a second model, to see how much of 86.8% is the run; a rule for the keyword-stuffing limit that is itself measured before it is believed; and real CVs, with consent, under the redaction boundary.
