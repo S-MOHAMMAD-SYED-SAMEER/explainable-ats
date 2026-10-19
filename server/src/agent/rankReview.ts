@@ -3,9 +3,9 @@ import type { RankedCandidate, Ranking } from './rankRules.ts';
 
 // A candidate the second opinion disagreed with goes to a person.
 //
-// In `model_checked` mode the deterministic matcher checks the model's verdicts. When the score of a must-have was lowered pending
-// review (the model's verdict was higher and its quote shares no word with the requirement: `routesToReview`, `verdictMode.ts`), the
-// candidate is routed to `needs_review`: the same tier the ranking already uses for "worth a human look". Any other disagreement routes nobody. The ranking itself (`rankRules.ts`, shared with the portfolio sites and not changed) knows nothing of
+// In `model_checked` mode the deterministic matcher checks the model's verdicts. When a credited must-have rests on a quote that
+// shares no word with the requirement (`routesToReview`, `verdictMode.ts`), the candidate is routed to `needs_review`: the same tier
+// the ranking already uses for "worth a human look". Any other disagreement routes nobody. The score is never touched. The ranking itself (`rankRules.ts`, shared with the portfolio sites and not changed) knows nothing of
 // this; this module applies it afterwards, to the finished ranking, and renumbers it.
 //
 // The score is never touched: it is exactly what the evaluation stored. Only the tier, the order that follows from it, the
@@ -59,8 +59,8 @@ export function routeToReview(ranking: Ranking, routed: ReadonlyMap<string, read
         ...renumbered,
         rationale:
           `${place} Scored ${formatScore(entry.scoreBasisPoints ?? 0)} and meets ${entry.mustHavesMet} of ${entry.mustHavesTotal} must-haves, ` +
-          `but on ${labels.map((label) => `"${label}"`).join(', ')} the score was lowered pending review: the model's quote shares no words with the requirement. ` +
-          'A person should check.',
+          `but on ${labels.map((label) => `"${label}"`).join(', ')} the quote shares no words with the requirement; ` +
+          'a person should check.',
       };
     }
     return { ...renumbered, rationale: PLACE_SENTENCE.test(entry.rationale) ? entry.rationale.replace(PLACE_SENTENCE, place) : entry.rationale };

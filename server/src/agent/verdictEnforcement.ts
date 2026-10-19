@@ -1,11 +1,11 @@
 import { decideMatch, type EvidenceLike, type MatchDecision, type MatchMode } from './matchRules.ts';
-import { disagreementOf, lowerOf, routesToReview, SUPPORT_RANK, type Disagreement } from './verdictMode.ts';
+import { disagreementOf, routesToReview, SUPPORT_RANK, type Disagreement } from './verdictMode.ts';
 import { BASIS_POINTS_MAX, VERDICT_BASIS_POINTS, type ConfidenceLevel, type JobRequirement, type MatchVerdict } from '../domain/ats.ts';
 import type { ScoreBreakdown, ScoredRequirement } from './score.ts';
 
 // THE CODE'S RULES FOR A MODEL'S VERDICT (`model_checked` mode). Pure: no database, no clock, no model.
 //
-// A model's verdict is a PROPOSAL. Three things happen to it, in order, and none of them can raise it:
+// A model's verdict is a PROPOSAL. Enforcement can only lower it, and then it is scored as it stands:
 //
 //   1. ENFORCEMENT. A verdict needs evidence that was found in the CV.
 //        met or partial   needs at least one VERIFIED passage (word for word in the real CV, 15 characters or more),
@@ -17,18 +17,18 @@ import type { ScoreBreakdown, ScoredRequirement } from './score.ts';
 //        no answer        for a requirement the model did not answer is `unclear`.
 //   2. THE SECOND OPINION. The deterministic matcher gives its own verdict from the SAME verified passages. Every difference is
 //      shown to the recruiter.
-//   3. THE SCORED VERDICT. The enforced verdict, with ONE exception: when the model's verdict is higher than the matcher's by
-//      two steps or more AND not one word of the requirement appears in any passage the model relied on (the matcher found
-//      NOTHING in them), the matcher's verdict is scored instead, until a person decides. A passage that shares no word with the
-//      requirement cannot raise a score: that is what stops a model that was fooled into crediting an attacker's line.
-//      That is the ONLY case that is acted on. The score is lowered pending review (audit event `score_lowered_pending_review`),
-//      and if the requirement is a must-have the candidate is routed to `needs_review` (`routesToReview`, `verdictMode.ts`).
-//      Every other disagreement, however large, is shown but changes nothing and routes nobody: the matcher
-//      counts words, so on a passage that really is about the subject it is wrong far more often than it is right (measured:
-//      about 35 to 40% agreement with the labels even when every passage is perfect), and letting it overrule the model
-//      would put the ceiling back where it was.
+//   3. THE SCORED VERDICT IS THE ENFORCED VERDICT. Nothing the matcher says changes the score. The matcher counts words, so on a
+//      passage that really is about the subject it is wrong far more often than it is right (measured: about 35 to 40% agreement
+//      with the labels even when every passage is perfect), and when it was allowed to lower scores it mostly lowered honest
+//      paraphrases (the first real run: 6 of 68 verdicts, 5 of them correct).
+//   4. ONE FLAG, FOR A PERSON. A verdict that credits the candidate (met or partial) with at least one verified quote behind it, where
+//      none of the quotes shares a word with the requirement, is flagged: "Quote shares no words with the requirement; a person
+//      should check" (audit event `quote_no_overlap_flagged`). If the requirement is a must-have the candidate is routed to
+//      `needs_review` (`routesToReview`, `verdictMode.ts`). The flag is for a person to read. It changes no number.
 //
-// So the score is always at most what the enforced verdicts give, and the enforced verdicts are never above the model's.
+// So the score is exactly what the enforced verdicts give, and the enforced verdicts are never above the model's. What this does NOT
+// stop: a model that is fooled into crediting a line that really is in the CV. The line is verified, the verdict is scored, and the
+// flag and the routing are what tell a person to look.
 
 export type ModelAnswer = { verdict: MatchVerdict; reason: string };
 
@@ -80,11 +80,9 @@ export function enforceVerdicts(input: {
 export type Reconciled = EnforcedVerdict & {
   matcher: MatchDecision;
   disagreement: Disagreement;
-  /** The verdict the score uses: the enforced one, or the matcher's lower verdict when the model credited passages that share no word with the requirement. */
-  scoredVerdict: MatchVerdict;
-  /** True when the scored verdict was lowered below the enforced one because the passages share no word with the requirement. */
-  capped: boolean;
-  /** True when this requirement sends the candidate to a person: a must-have whose score was lowered pending review. */
+  /** A credited verdict (met or partial) on verified quotes none of which shares a word with the requirement. Flagged, never scored differently. */
+  quoteNoOverlap: boolean;
+  /** True when this requirement sends the candidate to a person: a must-have with `quoteNoOverlap`. */
   routed: boolean;
 };
 
@@ -104,18 +102,15 @@ export function reconcileWithMatcher(
     const mine = byRequirement.get(requirement.id) as EnforcedVerdict;
     const matcher = decideMatch(requirement, evidence, matchMode);
     const disagreement = disagreementOf(mine.enforcedVerdict, matcher.verdict);
-    // Capped only when the model is HIGHER by two steps or more and the passages share no word with the requirement.
-    const unrelated = matcher.matchedTerms.length === 0;
-    const higher = SUPPORT_RANK[mine.enforcedVerdict] > SUPPORT_RANK[matcher.verdict];
-    const scoredVerdict = disagreement === 'two_plus' && higher && unrelated ? lowerOf(mine.enforcedVerdict, matcher.verdict) : mine.enforcedVerdict;
-    const routed = routesToReview(requirement.kind, mine.enforcedVerdict, scoredVerdict);
-    return { ...mine, matcher, disagreement, scoredVerdict, capped: scoredVerdict !== mine.enforcedVerdict, routed };
+    const credited = mine.enforcedVerdict === 'met' || mine.enforcedVerdict === 'partial';
+    const quoteNoOverlap = credited && mine.verifiedPassages > 0 && matcher.matchedTerms.length === 0;
+    return { ...mine, matcher, disagreement, quoteNoOverlap, routed: routesToReview(requirement.kind, quoteNoOverlap) };
   });
 }
 
 /** How much the evidence backs the scored verdict: agreement with a passage behind it is high, a one-step gap medium, the rest low. */
 export function confidenceOf(entry: Reconciled): ConfidenceLevel {
-  if (entry.disagreement === 'two_plus') return 'low';
+  if (entry.disagreement === 'two_plus' || entry.quoteNoOverlap) return 'low';
   if (entry.disagreement === 'one_step') return 'medium';
   return entry.verifiedPassages > 0 ? 'high' : 'low';
 }

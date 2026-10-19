@@ -413,7 +413,7 @@ test('the record kinds match the failure kinds and the schema constraint', () =>
 
 test('the old migrations are untouched, because their checksums are checked', () => {
   const files = fs.readdirSync(MIGRATIONS_DIR).filter((file) => file.endsWith('.sql')).sort();
-  assert.deepEqual(files, ['001_foundation.sql', '002_domain.sql', '003_evaluation_records.sql', '004_verdict_checks.sql']);
+  assert.deepEqual(files, ['001_foundation.sql', '002_domain.sql', '003_evaluation_records.sql', '004_verdict_checks.sql', '005_quote_no_overlap.sql']);
 });
 
 // --- the output limit is sized from the job -----------------------------------------------

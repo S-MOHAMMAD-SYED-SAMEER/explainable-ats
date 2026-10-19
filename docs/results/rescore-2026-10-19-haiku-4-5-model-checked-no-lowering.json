@@ -1,0 +1,246 @@
+{
+  "kind": "offline re-score of a saved extract-v3 run under the current rules",
+  "date": "2026-10-19",
+  "source": "eval-2026-10-19-claude-haiku-4-5-20251001-model-checked.json",
+  "model": "claude-haiku-4-5-20251001",
+  "toolChoice": "forced",
+  "temperature": 0,
+  "promptVersion": "extract-v3",
+  "verdictMode": "model_checked",
+  "rule": "The model's verified verdict is scored as it stands. A credited verdict (met or partial) whose verified quotes share no word with the requirement is flagged for a person (quote_no_overlap_flagged); the flag routes the candidate to needs_review only on a must-have. Nothing is lowered automatically.",
+  "labelsProvenance": {
+    "main": "Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling."
+  },
+  "requestsMade": 0,
+  "cvs": 20,
+  "verdictAgreement": {
+    "strict": {
+      "rows": 68,
+      "agree": 59,
+      "rate": 0.8676470588235294,
+      "confusion": {
+        "met": {
+          "met": 45,
+          "partial": 0,
+          "not_met": 0,
+          "unclear": 0
+        },
+        "partial": {
+          "met": 2,
+          "partial": 3,
+          "not_met": 2,
+          "unclear": 4
+        },
+        "not_met": {
+          "met": 0,
+          "partial": 1,
+          "not_met": 7,
+          "unclear": 0
+        },
+        "unclear": {
+          "met": 0,
+          "partial": 0,
+          "not_met": 0,
+          "unclear": 4
+        }
+      },
+      "higherThanGold": 3,
+      "lowerThanGold": 6
+    },
+    "folded": {
+      "rows": 68,
+      "agree": 59,
+      "rate": 0.8676470588235294,
+      "confusion": {
+        "met": {
+          "met": 45,
+          "partial": 0,
+          "not_met": 0,
+          "unclear": 0
+        },
+        "partial": {
+          "met": 2,
+          "partial": 3,
+          "not_met": 2,
+          "unclear": 4
+        },
+        "not_met": {
+          "met": 0,
+          "partial": 1,
+          "not_met": 7,
+          "unclear": 0
+        },
+        "unclear": {
+          "met": 0,
+          "partial": 0,
+          "not_met": 0,
+          "unclear": 4
+        }
+      },
+      "higherThanGold": 3,
+      "lowerThanGold": 6
+    }
+  },
+  "tierAgreement": {
+    "strict": {
+      "cvs": 20,
+      "agree": 17,
+      "rate": 0.85
+    },
+    "folded": {
+      "cvs": 20,
+      "agree": 17,
+      "rate": 0.85
+    }
+  },
+  "modelVerdictsBeforeTheCode": {
+    "rows": 68,
+    "agree": 59,
+    "rate": 0.8676470588235294,
+    "confusion": {
+      "met": {
+        "met": 45,
+        "partial": 0,
+        "not_met": 0,
+        "unclear": 0
+      },
+      "partial": {
+        "met": 2,
+        "partial": 4,
+        "not_met": 2,
+        "unclear": 3
+      },
+      "not_met": {
+        "met": 0,
+        "partial": 1,
+        "not_met": 7,
+        "unclear": 0
+      },
+      "unclear": {
+        "met": 0,
+        "partial": 1,
+        "not_met": 0,
+        "unclear": 3
+      }
+    },
+    "higherThanGold": 4,
+    "lowerThanGold": 5
+  },
+  "previousRule": {
+    "description": "The same replies as first scored on 2026-10-19, when a credited verdict with no shared word was lowered to the matcher's verdict automatically (folded).",
+    "agree": 53,
+    "rows": 68
+  },
+  "routed": {
+    "strict": {
+      "count": 1,
+      "candidates": [
+        "cv-02"
+      ]
+    },
+    "folded": {
+      "count": 1,
+      "candidates": [
+        "cv-02"
+      ]
+    }
+  },
+  "flaggedRequirements": {
+    "strict": [
+      {
+        "cv": "cv-02",
+        "requirement": "Node.js",
+        "kind": "must_have",
+        "model": "met",
+        "routed": true
+      },
+      {
+        "cv": "cv-02",
+        "requirement": "PostgreSQL",
+        "kind": "must_have",
+        "model": "met",
+        "routed": true
+      },
+      {
+        "cv": "cv-02",
+        "requirement": "Mentoring",
+        "kind": "nice_to_have",
+        "model": "met",
+        "routed": false
+      },
+      {
+        "cv": "cv-09",
+        "requirement": "Mentoring",
+        "kind": "nice_to_have",
+        "model": "partial",
+        "routed": false
+      },
+      {
+        "cv": "cv-14",
+        "requirement": "Stakeholders",
+        "kind": "nice_to_have",
+        "model": "met",
+        "routed": false
+      },
+      {
+        "cv": "cv-16",
+        "requirement": "Stakeholders",
+        "kind": "nice_to_have",
+        "model": "met",
+        "routed": false
+      },
+      {
+        "cv": "cv-20",
+        "requirement": "Stakeholders",
+        "kind": "nice_to_have",
+        "model": "met",
+        "routed": false
+      }
+    ],
+    "folded": [
+      {
+        "cv": "cv-02",
+        "requirement": "Node.js",
+        "kind": "must_have",
+        "model": "met",
+        "routed": true
+      },
+      {
+        "cv": "cv-02",
+        "requirement": "PostgreSQL",
+        "kind": "must_have",
+        "model": "met",
+        "routed": true
+      },
+      {
+        "cv": "cv-02",
+        "requirement": "Mentoring",
+        "kind": "nice_to_have",
+        "model": "met",
+        "routed": false
+      },
+      {
+        "cv": "cv-09",
+        "requirement": "Mentoring",
+        "kind": "nice_to_have",
+        "model": "partial",
+        "routed": false
+      },
+      {
+        "cv": "cv-16",
+        "requirement": "Stakeholders",
+        "kind": "nice_to_have",
+        "model": "met",
+        "routed": false
+      },
+      {
+        "cv": "cv-20",
+        "requirement": "Stakeholders",
+        "kind": "nice_to_have",
+        "model": "met",
+        "routed": false
+      }
+    ]
+  },
+  "note": "The match mode changes only the matcher's second opinion and the flag, never the scored verdict, so the verdict agreement is the same in both modes."
+}

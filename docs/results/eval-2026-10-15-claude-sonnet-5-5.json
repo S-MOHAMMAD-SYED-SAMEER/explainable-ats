@@ -1,0 +1,2234 @@
+{
+  "kind": "extraction and matching evaluation",
+  "date": "2026-10-15",
+  "model": "claude-sonnet-5-5",
+  "toolChoice": "auto",
+  "temperature": "unset (not sent: the model does not accept one)",
+  "promptVersion": "extract-v2",
+  "dataset": "eval-set-v1",
+  "datasetDescription": "20 invented CVs (20 run), 2 roles, 68 requirement rows",
+  "labelsFile": "eval/labels_TODO.csv",
+  "labelsSha256": "5b5b091053837170367a2ee1505dbb475efe735c526354250d59214be6f1a785",
+  "labelsProvenance": {
+    "main": "Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling."
+  },
+  "matchModes": [
+    "strict",
+    "folded"
+  ],
+  "retries": 0,
+  "stoppedEarly": null,
+  "note": "Counts, character ranges, verdicts, tokens, latency and cost only. No key, prompt, reply or quote is stored; passages can be rebuilt from the ranges and the CVs in eval/cvs/ (contentSha256 identifies the text the ranges index). Both match modes are scored from the same extraction.",
+  "definitions": {
+    "hit": "A verified passage hits a gold passage of the same requirement in the same CV when their character ranges overlap by at least half of the shorter one (\"half\", the headline) or by at least one character (\"any\").",
+    "passageRecall": "gold passages hit by at least one verified passage / gold passages",
+    "passagePrecision": "verified passages that hit a gold passage / verified passages (a verified passage for a requirement with no gold passage is a miss)",
+    "fabricatedQuoteRate": "quotes refused as not found in the CV / quotes proposed in a valid shape (refused-as-too-short and over-a-masked-detail are counted apart)",
+    "verdictAgreement": "requirements where the pipeline's verdict equals the labeller's",
+    "tierAgreement": "CVs where the tier from the pipeline's verdicts equals the tier from the labeller's verdicts, by the application's own rule",
+    "goldThroughMatcher": "what the matching stage says when the labeller's own gold passages are the evidence: the matcher's disagreement with the labels before any model is involved"
+  },
+  "prices": "Anthropic list prices, US dollars per million tokens, as given by the owner on 2026-10-15",
+  "run": {
+    "requests": 20,
+    "inputTokens": 40071,
+    "outputTokens": 53923,
+    "costDollars": 0.619372,
+    "perCvCost": {
+      "count": 20,
+      "mean": 0.030968599999999995,
+      "median": 0.027381000000000003,
+      "max": 0.077164,
+      "total": 0.6193719999999999
+    },
+    "latencyMs": {
+      "count": 20,
+      "mean": 17845.25,
+      "median": 16974,
+      "max": 39480,
+      "total": 356905
+    }
+  },
+  "extraction": {
+    "cvs": 20,
+    "succeeded": 19,
+    "quotesProposed": 66,
+    "quotesVerified": 65,
+    "refusedNotInCv": 0,
+    "refusedTooShort": 1,
+    "refusedOverMask": 0,
+    "fabricatedQuoteRate": 0
+  },
+  "results": {
+    "strict": {
+      "matchMode": "strict",
+      "passage": {
+        "half": {
+          "rule": "half",
+          "goldPassages": 67,
+          "goldPassagesHit": 53,
+          "recall": 0.7910447761194029,
+          "verifiedPassages": 65,
+          "verifiedPassagesHit": 55,
+          "precision": 0.8461538461538461,
+          "requirementsWithGold": 64,
+          "requirementsWithGoldHit": 52
+        },
+        "any": {
+          "rule": "any",
+          "goldPassages": 67,
+          "goldPassagesHit": 53,
+          "recall": 0.7910447761194029,
+          "verifiedPassages": 65,
+          "verifiedPassagesHit": 55,
+          "precision": 0.8461538461538461,
+          "requirementsWithGold": 64,
+          "requirementsWithGoldHit": 52
+        }
+      },
+      "verdictAgreement": {
+        "rows": 68,
+        "agree": 21,
+        "rate": 0.3088235294117647,
+        "confusion": {
+          "met": {
+            "met": 14,
+            "partial": 10,
+            "not_met": 18,
+            "unclear": 2
+          },
+          "partial": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 8,
+            "unclear": 4
+          },
+          "not_met": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 4,
+            "unclear": 4
+          },
+          "unclear": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 1,
+            "unclear": 3
+          }
+        },
+        "higherThanGold": 4,
+        "lowerThanGold": 43
+      },
+      "tierAgreement": {
+        "cvs": 20,
+        "agree": 8,
+        "rate": 0.4
+      }
+    },
+    "folded": {
+      "matchMode": "folded",
+      "passage": {
+        "half": {
+          "rule": "half",
+          "goldPassages": 67,
+          "goldPassagesHit": 53,
+          "recall": 0.7910447761194029,
+          "verifiedPassages": 65,
+          "verifiedPassagesHit": 55,
+          "precision": 0.8461538461538461,
+          "requirementsWithGold": 64,
+          "requirementsWithGoldHit": 52
+        },
+        "any": {
+          "rule": "any",
+          "goldPassages": 67,
+          "goldPassagesHit": 53,
+          "recall": 0.7910447761194029,
+          "verifiedPassages": 65,
+          "verifiedPassagesHit": 55,
+          "precision": 0.8461538461538461,
+          "requirementsWithGold": 64,
+          "requirementsWithGoldHit": 52
+        }
+      },
+      "verdictAgreement": {
+        "rows": 68,
+        "agree": 24,
+        "rate": 0.35294117647058826,
+        "confusion": {
+          "met": {
+            "met": 16,
+            "partial": 9,
+            "not_met": 17,
+            "unclear": 2
+          },
+          "partial": {
+            "met": 0,
+            "partial": 1,
+            "not_met": 7,
+            "unclear": 4
+          },
+          "not_met": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 4,
+            "unclear": 4
+          },
+          "unclear": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 1,
+            "unclear": 3
+          }
+        },
+        "higherThanGold": 4,
+        "lowerThanGold": 40
+      },
+      "tierAgreement": {
+        "cvs": 20,
+        "agree": 8,
+        "rate": 0.4
+      }
+    }
+  },
+  "goldThroughMatcher": {
+    "strict": {
+      "verdictAgreement": {
+        "rows": 68,
+        "agree": 24,
+        "rate": 0.35294117647058826,
+        "confusion": {
+          "met": {
+            "met": 16,
+            "partial": 9,
+            "not_met": 19,
+            "unclear": 0
+          },
+          "partial": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 12,
+            "unclear": 0
+          },
+          "not_met": {
+            "met": 1,
+            "partial": 3,
+            "not_met": 4,
+            "unclear": 0
+          },
+          "unclear": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 0,
+            "unclear": 4
+          }
+        },
+        "higherThanGold": 4,
+        "lowerThanGold": 40
+      },
+      "tierAgreement": {
+        "cvs": 20,
+        "agree": 9,
+        "rate": 0.45
+      }
+    },
+    "folded": {
+      "verdictAgreement": {
+        "rows": 68,
+        "agree": 27,
+        "rate": 0.39705882352941174,
+        "confusion": {
+          "met": {
+            "met": 17,
+            "partial": 9,
+            "not_met": 18,
+            "unclear": 0
+          },
+          "partial": {
+            "met": 0,
+            "partial": 3,
+            "not_met": 9,
+            "unclear": 0
+          },
+          "not_met": {
+            "met": 2,
+            "partial": 3,
+            "not_met": 3,
+            "unclear": 0
+          },
+          "unclear": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 0,
+            "unclear": 4
+          }
+        },
+        "higherThanGold": 5,
+        "lowerThanGold": 36
+      },
+      "tierAgreement": {
+        "cvs": 20,
+        "agree": 9,
+        "rate": 0.45
+      }
+    }
+  },
+  "cvs": [
+    {
+      "id": "cv-01",
+      "role": "demo",
+      "chars": 1590,
+      "contentSha256": "dc655acb71163b19cc38495e9a6fb390ee8945a878e8dcddff6442971295d18e",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 2008,
+      "outputTokens": 2314,
+      "maxTokens": 6836,
+      "latencyMs": 22621,
+      "costDollars": 0.027156,
+      "findingsReturned": 3,
+      "proposedValidShape": 3,
+      "verified": 3,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 405,
+              "end": 514
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 405,
+              "end": 514
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 516,
+              "end": 639
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 516,
+              "end": 639
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 758,
+              "end": 855
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 758,
+              "end": 855
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-02",
+      "role": "demo",
+      "chars": 1267,
+      "contentSha256": "4661540ec0aca4299daba4bf932b4ef9193cd3800db018678419aa7a1f8e6041",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1904,
+      "outputTokens": 2554,
+      "maxTokens": 6816,
+      "latencyMs": 16466,
+      "costDollars": 0.029348,
+      "findingsReturned": 4,
+      "proposedValidShape": 4,
+      "verified": 4,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 413,
+              "end": 631
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 413,
+              "end": 555
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 635,
+              "end": 755
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 635,
+              "end": 755
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 759,
+              "end": 932
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 759,
+              "end": 874
+            },
+            {
+              "start": 875,
+              "end": 932
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-03",
+      "role": "demo",
+      "chars": 1107,
+      "contentSha256": "1cec047212eb4aa0eb886b47673f5661f6ef1970d6a5b6de016c4b6009d1d118",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1882,
+      "outputTokens": 3138,
+      "maxTokens": 6806,
+      "latencyMs": 19831,
+      "costDollars": 0.035144,
+      "findingsReturned": 4,
+      "proposedValidShape": 4,
+      "verified": 4,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 457,
+              "end": 660
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 457,
+              "end": 599
+            },
+            {
+              "start": 600,
+              "end": 660
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 457,
+              "end": 660
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 457,
+              "end": 599
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "unclear",
+          "goldSpans": [],
+          "verifiedSpans": [
+            {
+              "start": 1009,
+              "end": 1031
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-04",
+      "role": "demo",
+      "chars": 1338,
+      "contentSha256": "5be32603f8a719f03e07e950c65274ddee7f0e3942ce96b03af40d896967b231",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1951,
+      "outputTokens": 2307,
+      "maxTokens": 6820,
+      "latencyMs": 13786,
+      "costDollars": 0.026972,
+      "findingsReturned": 3,
+      "proposedValidShape": 3,
+      "verified": 3,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 380,
+              "end": 515
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 380,
+              "end": 515
+            },
+            {
+              "start": 900,
+              "end": 963
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "unclear",
+          "goldSpans": [],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 649,
+              "end": 797
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 649,
+              "end": 797
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "needs_review",
+        "strict": "needs_review",
+        "folded": "needs_review"
+      }
+    },
+    {
+      "id": "cv-05",
+      "role": "demo",
+      "chars": 1101,
+      "contentSha256": "b5ae8f6e363f747ff520c5dce67973725c05b705e60aac6de26af778fef2f840",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1860,
+      "outputTokens": 1201,
+      "maxTokens": 6805,
+      "latencyMs": 8949,
+      "costDollars": 0.01573,
+      "findingsReturned": 1,
+      "proposedValidShape": 1,
+      "verified": 1,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 345,
+              "end": 514
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 345,
+              "end": 465
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 516,
+              "end": 668
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 670,
+              "end": 773
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "needs_review",
+        "folded": "needs_review"
+      }
+    },
+    {
+      "id": "cv-06",
+      "role": "demo",
+      "chars": 330,
+      "contentSha256": "21f918efd8f381b5f84683225d3a929ffde7eeb129df86c0f61caa9de706fa2c",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1585,
+      "outputTokens": 1043,
+      "maxTokens": 6757,
+      "latencyMs": 7276,
+      "costDollars": 0.0136,
+      "findingsReturned": 2,
+      "proposedValidShape": 2,
+      "verified": 1,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 1,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 198,
+              "end": 328
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 218,
+              "end": 288
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 198,
+              "end": 328
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "unclear",
+          "goldSpans": [],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "needs_review",
+        "folded": "needs_review"
+      }
+    },
+    {
+      "id": "cv-07",
+      "role": "demo",
+      "chars": 5402,
+      "contentSha256": "477b73c78c0d277ae612e02e4ac89b908857a73ac7528bdf64949c1c0b6e1a0a",
+      "requests": 1,
+      "result": "truncated",
+      "failureLabel": null,
+      "inputTokens": 3212,
+      "outputTokens": 7074,
+      "maxTokens": 7074,
+      "latencyMs": 39480,
+      "costDollars": 0.077164,
+      "findingsReturned": null,
+      "proposedValidShape": null,
+      "verified": null,
+      "refusedNotInCv": null,
+      "refusedTooShort": null,
+      "refusedOverMask": null,
+      "malformedDropped": null,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 2347,
+              "end": 2526
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 3353,
+              "end": 3491
+            },
+            {
+              "start": 3495,
+              "end": 3636
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 3752,
+              "end": 3807
+            },
+            {
+              "start": 4423,
+              "end": 4568
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "needs_review",
+        "folded": "needs_review"
+      }
+    },
+    {
+      "id": "cv-08",
+      "role": "demo",
+      "chars": 982,
+      "contentSha256": "570c831c0f515af65c2cf318f1b8d9709bea09561233dc2078b04c215b0d1efc",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1874,
+      "outputTokens": 2427,
+      "maxTokens": 6798,
+      "latencyMs": 17507,
+      "costDollars": 0.028018,
+      "findingsReturned": 3,
+      "proposedValidShape": 3,
+      "verified": 3,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 284,
+              "end": 432
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 286,
+              "end": 366
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 435,
+              "end": 595
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 437,
+              "end": 494
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 600,
+              "end": 650
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 602,
+              "end": 629
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-09",
+      "role": "demo",
+      "chars": 1084,
+      "contentSha256": "1d10998da8edfd1ce1271c72b4cb26edcbb8d4bb59eab33becd3b648a60953fc",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1841,
+      "outputTokens": 2376,
+      "maxTokens": 6804,
+      "latencyMs": 16193,
+      "costDollars": 0.027442,
+      "findingsReturned": 4,
+      "proposedValidShape": 4,
+      "verified": 4,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 381,
+              "end": 523
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 381,
+              "end": 523
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 525,
+              "end": 644
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 525,
+              "end": 644
+            },
+            {
+              "start": 908,
+              "end": 955
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 646,
+              "end": 745
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 646,
+              "end": 745
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-10",
+      "role": "demo",
+      "chars": 928,
+      "contentSha256": "431b17d36e79fe317d5a5903c4410618746c90cbcf7be0a8bca4b2c41939bc61",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1831,
+      "outputTokens": 1644,
+      "maxTokens": 6794,
+      "latencyMs": 11555,
+      "costDollars": 0.020102,
+      "findingsReturned": 1,
+      "proposedValidShape": 1,
+      "verified": 1,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 221,
+              "end": 328
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 221,
+              "end": 328
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 572,
+              "end": 624
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 221,
+              "end": 328
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-11",
+      "role": "demo",
+      "chars": 1364,
+      "contentSha256": "c4929acf68c83f58a7064ebc20d1351bedeb6b75f977527ff464b99cf44ab626",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1940,
+      "outputTokens": 3084,
+      "maxTokens": 6822,
+      "latencyMs": 20407,
+      "costDollars": 0.03472,
+      "findingsReturned": 5,
+      "proposedValidShape": 5,
+      "verified": 5,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 849,
+              "end": 1005
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 849,
+              "end": 958
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 411,
+              "end": 577
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 411,
+              "end": 577
+            },
+            {
+              "start": 579,
+              "end": 709
+            },
+            {
+              "start": 1134,
+              "end": 1231
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 711,
+              "end": 847
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 711,
+              "end": 847
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-12",
+      "role": "demo",
+      "chars": 987,
+      "contentSha256": "abedd1e2fdf671ff328345cc71d042630842d22ea7006e509f08c09ceb489bd1",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1798,
+      "outputTokens": 1871,
+      "maxTokens": 6798,
+      "latencyMs": 12419,
+      "costDollars": 0.022306,
+      "findingsReturned": 3,
+      "proposedValidShape": 3,
+      "verified": 3,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "demo-node",
+          "label": "Node.js",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 418,
+              "end": 557
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 418,
+              "end": 483
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "demo-postgres",
+          "label": "PostgreSQL",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 559,
+              "end": 662
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 559,
+              "end": 662
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "demo-mentoring",
+          "label": "Mentoring",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 664,
+              "end": 762
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 664,
+              "end": 698
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-13",
+      "role": "data",
+      "chars": 1449,
+      "contentSha256": "02d1fcec316e15f9da5574f8a108055f5d86be605a94c23f57b829b5903ca8ef",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 2073,
+      "outputTokens": 3981,
+      "maxTokens": 7707,
+      "latencyMs": 25722,
+      "costDollars": 0.043956,
+      "findingsReturned": 6,
+      "proposedValidShape": 6,
+      "verified": 6,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 387,
+              "end": 537
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 387,
+              "end": 467
+            },
+            {
+              "start": 1123,
+              "end": 1192
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 539,
+              "end": 691
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 539,
+              "end": 588
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 693,
+              "end": 830
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 693,
+              "end": 792
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 832,
+              "end": 980
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 832,
+              "end": 928
+            },
+            {
+              "start": 1194,
+              "end": 1310
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-14",
+      "role": "data",
+      "chars": 1144,
+      "contentSha256": "5bb222a92faf18c5916d442df1bb9f2876c7122467cc42390cd77ec9b498b0cb",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1950,
+      "outputTokens": 2342,
+      "maxTokens": 7688,
+      "latencyMs": 17482,
+      "costDollars": 0.02732,
+      "findingsReturned": 4,
+      "proposedValidShape": 4,
+      "verified": 4,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 1125,
+              "end": 1142
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 781,
+              "end": 857
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 507,
+              "end": 651
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 507,
+              "end": 651
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 781,
+              "end": 857
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 781,
+              "end": 857
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 653,
+              "end": 779
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 653,
+              "end": 779
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-15",
+      "role": "data",
+      "chars": 1193,
+      "contentSha256": "31ddf74193852c3e9afd02c07bf505756589a12af667450ed01c247544728242",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1965,
+      "outputTokens": 2126,
+      "maxTokens": 7691,
+      "latencyMs": 13272,
+      "costDollars": 0.02519,
+      "findingsReturned": 3,
+      "proposedValidShape": 3,
+      "verified": 3,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 385,
+              "end": 527
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 385,
+              "end": 527
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 529,
+              "end": 692
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 529,
+              "end": 692
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "unclear",
+          "goldSpans": [],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 694,
+              "end": 875
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 694,
+              "end": 875
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-16",
+      "role": "data",
+      "chars": 1223,
+      "contentSha256": "98f16bfa514e8b13480db514c47f10c1a0344852e2a43d407e80d0f306092478",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1955,
+      "outputTokens": 2919,
+      "maxTokens": 7693,
+      "latencyMs": 18996,
+      "costDollars": 0.0331,
+      "findingsReturned": 4,
+      "proposedValidShape": 4,
+      "verified": 4,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 368,
+              "end": 584
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 368,
+              "end": 514
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 588,
+              "end": 753
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 588,
+              "end": 753
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 757,
+              "end": 888
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 757,
+              "end": 888
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 892,
+              "end": 1053
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 892,
+              "end": 1053
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-17",
+      "role": "data",
+      "chars": 1083,
+      "contentSha256": "9e79336977492580984f599507ea1699587f141e48b3d08bed3718420294802f",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1922,
+      "outputTokens": 1359,
+      "maxTokens": 7684,
+      "latencyMs": 8768,
+      "costDollars": 0.017434,
+      "findingsReturned": 2,
+      "proposedValidShape": 2,
+      "verified": 2,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 357,
+              "end": 490
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 357,
+              "end": 490
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 492,
+              "end": 616
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 492,
+              "end": 616
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 618,
+              "end": 745
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "not_met",
+          "goldSpans": [
+            {
+              "start": 747,
+              "end": 856
+            }
+          ],
+          "verifiedSpans": [],
+          "verdict": {
+            "strict": "unclear",
+            "folded": "unclear"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-18",
+      "role": "data",
+      "chars": 358,
+      "contentSha256": "3dc0e1d8f5e34bea6f810b85e01a3901f9f1399647edd49f8370ede191076406",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1705,
+      "outputTokens": 1458,
+      "maxTokens": 7639,
+      "latencyMs": 10029,
+      "costDollars": 0.01799,
+      "findingsReturned": 4,
+      "proposedValidShape": 4,
+      "verified": 4,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 197,
+              "end": 252
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 211,
+              "end": 252
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 253,
+              "end": 276
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 253,
+              "end": 276
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 211,
+              "end": 252
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 211,
+              "end": 252
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 277,
+              "end": 316
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 277,
+              "end": 316
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-19",
+      "role": "data",
+      "chars": 3796,
+      "contentSha256": "2f9719c5c71aa2f1173713169462c6d0b7275cd0561d107a0951bf6e1b860071",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 2853,
+      "outputTokens": 6052,
+      "maxTokens": 7854,
+      "latencyMs": 38627,
+      "costDollars": 0.066226,
+      "findingsReturned": 6,
+      "proposedValidShape": 6,
+      "verified": 6,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 820,
+              "end": 1006
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 820,
+              "end": 976
+            }
+          ],
+          "verdict": {
+            "strict": "met",
+            "folded": "met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 1579,
+              "end": 1767
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 1579,
+              "end": 1767
+            },
+            {
+              "start": 2392,
+              "end": 2494
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 1444,
+              "end": 1575
+            },
+            {
+              "start": 2498,
+              "end": 2621
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 1444,
+              "end": 1541
+            },
+            {
+              "start": 2498,
+              "end": 2621
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 1771,
+              "end": 1971
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 1771,
+              "end": 1971
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "qualified",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    },
+    {
+      "id": "cv-20",
+      "role": "data",
+      "chars": 1159,
+      "contentSha256": "02c7cef95b80314216bc84b0b47c43492e71689cea75ad5588d3ed9eda20505c",
+      "requests": 1,
+      "result": "succeeded",
+      "failureLabel": null,
+      "inputTokens": 1962,
+      "outputTokens": 2653,
+      "maxTokens": 7689,
+      "latencyMs": 17519,
+      "costDollars": 0.030454,
+      "findingsReturned": 4,
+      "proposedValidShape": 4,
+      "verified": 4,
+      "refusedNotInCv": 0,
+      "refusedTooShort": 0,
+      "refusedOverMask": 0,
+      "malformedDropped": 0,
+      "requirements": [
+        {
+          "requirementId": "data-python",
+          "label": "Python pipelines",
+          "goldVerdict": "partial",
+          "goldSpans": [
+            {
+              "start": 667,
+              "end": 797
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 731,
+              "end": 796
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-sql",
+          "label": "SQL and warehouses",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 380,
+              "end": 551
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 380,
+              "end": 551
+            }
+          ],
+          "verdict": {
+            "strict": "partial",
+            "folded": "partial"
+          }
+        },
+        {
+          "requirementId": "data-orchestration",
+          "label": "Orchestration",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 553,
+              "end": 665
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 553,
+              "end": 665
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        },
+        {
+          "requirementId": "data-stakeholders",
+          "label": "Stakeholders",
+          "goldVerdict": "met",
+          "goldSpans": [
+            {
+              "start": 799,
+              "end": 928
+            }
+          ],
+          "verifiedSpans": [
+            {
+              "start": 799,
+              "end": 928
+            }
+          ],
+          "verdict": {
+            "strict": "not_met",
+            "folded": "not_met"
+          }
+        }
+      ],
+      "tier": {
+        "gold": "gated",
+        "strict": "gated",
+        "folded": "gated"
+      }
+    }
+  ],
+  "labelsNote": "Scored on 2026-10-15 against the labels as they were before the review of 2026-10-19. The only label changed since is cv-07 / demo-mentoring (partial -> met). This run used the quotes-only prompt (extract-v2), with the matcher alone deciding every verdict."
+}

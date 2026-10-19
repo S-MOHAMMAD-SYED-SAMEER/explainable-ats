@@ -127,9 +127,11 @@ function readBoundedInt(
 }
 
 /** An optional temperature from 0 to 1. Unset (or invalid, with a problem noted) means "do not send one". */
-function readTemperature(key: string, problems: string[]): number | null {
+/** `fallback` when unset. The word `none` sends no temperature at all (models such as Sonnet 5.5 reject one). */
+function readTemperature(key: string, fallback: number | null, problems: string[]): number | null {
   const raw = readString(key, '').trim();
-  if (raw === '') return null;
+  if (raw === '') return fallback;
+  if (raw.toLowerCase() === 'none') return null;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
     problems.push(`${key} must be a number from 0 to 1. Not sending a temperature.`);
@@ -211,7 +213,7 @@ export type AppConfig = {
   anthropicMaxRetries: number;
   /** "forced" makes the tool call mandatory; "auto" is accepted by every model. */
   anthropicToolChoice: (typeof ANTHROPIC_TOOL_CHOICES)[number];
-  /** Sent only when set; several current models reject it. */
+  /** 0 unless ANTHROPIC_TEMPERATURE says otherwise; null (not sent) when it says `none`, because several current models reject one. */
   anthropicTemperature: number | null;
   /** How requirement terms are compared with quotes: whole words only, or with plural, -ing and -ed endings folded. */
   matchMode: MatchMode;
@@ -295,11 +297,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         webDistDir: readString('WEB_DIST_DIR', path.join(SERVER_ROOT, '..', 'web', 'dist')),
         llmProvider,
         anthropicApiKey,
-        // Sonnet 5 is the intended tier for resume ranking, and is not a default
-        // to drift from: API spend is real money, so the tier is stated here and
-        // changed deliberately or not at all. The Anthropic provider passes this
-        // string through verbatim and never names a model of its own.
-        anthropicModel: readString('ANTHROPIC_MODEL', 'claude-sonnet-5-5'),
+        // Haiku 4.5 is the model the evaluation was measured with (2026-10-19), so it is the default: forced tool choice, temperature 0,
+        // folded matching, `model_checked`. Sonnet 5.5 stays available, but it rejects a temperature, so set ANTHROPIC_TEMPERATURE=none
+        // with it. API spend is real money, so the tier is stated here and changed deliberately or not at all. The Anthropic provider
+        // passes this string through verbatim and never names a model of its own.
+        anthropicModel: readString('ANTHROPIC_MODEL', 'claude-haiku-4-5-20251001'),
         anthropicTimeoutMs: readBoundedInt(
           'ANTHROPIC_TIMEOUT_MS',
           ANTHROPIC_DEFAULT_TIMEOUT_MS,
@@ -314,9 +316,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
           true,
           problems,
         ),
-        anthropicToolChoice: readEnum('ANTHROPIC_TOOL_CHOICE', ANTHROPIC_TOOL_CHOICES, 'auto', problems),
-        anthropicTemperature: readTemperature('ANTHROPIC_TEMPERATURE', problems),
-        matchMode: readEnum('MATCH_MODE', MATCH_MODES, DEFAULT_MATCH_MODE, problems),
+        anthropicToolChoice: readEnum('ANTHROPIC_TOOL_CHOICE', ANTHROPIC_TOOL_CHOICES, 'forced', problems),
+        anthropicTemperature: readTemperature('ANTHROPIC_TEMPERATURE', 0, problems),
+        // Folded outside the demo. The demo keeps the library default (strict) because the portfolio copies of its fixtures were recorded with it.
+        matchMode: readEnum('MATCH_MODE', MATCH_MODES, isDemo ? DEFAULT_MATCH_MODE : 'folded', problems),
         verdictMode: readEnum('VERDICT_MODE', VERDICT_MODES, DEFAULT_VERDICT_MODE, problems),
         operatorPasswordHash,
         sessionTtlHours: readInt('SESSION_TTL_HOURS', 12, problems),

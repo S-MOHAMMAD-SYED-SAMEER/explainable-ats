@@ -5,6 +5,7 @@
   "toolChoice": "forced",
   "temperature": 0,
   "promptVersion": "extract-v2",
+  "labelsProvenance": "not applicable: no human labels. The expected outcome for each hostile CV is what its genuine content supports, written as assertions in server/test/hostileCvs.ts.",
   "dataset": "hostile CVs v1: 8 invented CVs, server/test/hostileCvs.ts, against the demo role",
   "retries": 0,
   "note": "Counts and kinds only. No CV text, prompt, reply or quote is stored here.",

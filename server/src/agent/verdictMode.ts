@@ -31,10 +31,10 @@ export const DEFAULT_VERDICT_MODE: VerdictMode = 'model_checked';
 // Why partial and not_met count as two steps: a model fooled into calling an irrelevant passage `partial`, against a
 // matcher that finds none of the requirement's words in it, would otherwise be credited half the requirement.
 //
-// WHAT HAPPENS ON A DISAGREEMENT. Every difference is shown on the candidate page. The score changes in one case only, set out in
-// `verdictEnforcement.ts`: the model's verdict is two steps or more HIGHER than the matcher's and the passages it quoted share no word
-// with the requirement, which cannot be evidence for it. Then the score is LOWERED pending review, and if that requirement is a
-// MUST-HAVE the candidate is routed to `needs_review` (`routesToReview` below). Every other disagreement is shown and does neither.
+// WHAT HAPPENS ON A DISAGREEMENT. Every difference is shown on the candidate page, and NONE of them changes the score: the model's
+// verified verdict is what is scored. One thing is flagged and acted on by a person, not by the arithmetic: a verdict that credits the
+// candidate (met or partial) on quotes that share no word with the requirement ("quote_no_overlap_flagged", `verdictEnforcement.ts`).
+// If that requirement is a MUST-HAVE the candidate is routed to `needs_review` (`routesToReview` below).
 
 export const SUPPORT_RANK: Readonly<Record<MatchVerdict, number>> = Object.freeze({ met: 3, partial: 2, unclear: 1, not_met: 0 });
 
@@ -52,21 +52,11 @@ export function disagreementOf(a: MatchVerdict, b: MatchVerdict): Disagreement {
   return steps === 0 ? 'none' : steps >= ROUTING_STEPS ? 'two_plus' : 'one_step';
 }
 
-/** Whether the score uses a lower verdict than the one the model's verdict became after the code's rules. */
-export function scoreLowered(enforced: MatchVerdict, scored: MatchVerdict): boolean {
-  return SUPPORT_RANK[scored] < SUPPORT_RANK[enforced];
-}
-
 /**
- * Whether a requirement sends its candidate to a person: it is a must-have AND its score was lowered pending review. A disagreement
- * that did not lower the score (a model lower than the matcher, a gap on passages that do share words with the requirement, a
- * nice-to-have) is shown and routes nobody.
+ * Whether a requirement sends its candidate to a person: it is a MUST-HAVE and its credited verdict rests on a quote that shares no
+ * word with the requirement. Any other disagreement (a model lower than the matcher, a quote that does share words, a nice-to-have)
+ * is shown and routes nobody.
  */
-export function routesToReview(kind: 'must_have' | 'nice_to_have', enforced: MatchVerdict, scored: MatchVerdict): boolean {
-  return kind === 'must_have' && scoreLowered(enforced, scored);
-}
-
-/** The verdict that demonstrates less. A tie returns the first. */
-export function lowerOf(a: MatchVerdict, b: MatchVerdict): MatchVerdict {
-  return SUPPORT_RANK[b] < SUPPORT_RANK[a] ? b : a;
+export function routesToReview(kind: 'must_have' | 'nice_to_have', quoteNoOverlap: boolean): boolean {
+  return kind === 'must_have' && quoteNoOverlap;
 }
