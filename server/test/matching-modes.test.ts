@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { DEMO_MATCH_MODE } from '../src/demo/dataset.ts';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_MATCH_MODE,
@@ -237,12 +238,13 @@ test('the score follows the mode, and omitting the mode is strict', () => {
 
 // --- the setting ------------------------------------------------------------------------------------------
 
-test('MATCH_MODE is folded by default (the measured setup), strict on request, strict in the demo, and a bad value is reported and ignored', () => {
+test('MATCH_MODE is folded by default (the measured setup), in the demo too, strict on request, and a bad value is reported and ignored', () => {
   assert.equal(loadConfig({}).config.matchMode, 'folded');
   assert.equal(loadConfig({ MATCH_MODE: 'folded' }).config.matchMode, 'folded');
   assert.equal(loadConfig({ MATCH_MODE: 'strict' }).config.matchMode, 'strict');
-  // The demo's fixtures (and their copies in the portfolio sites) were recorded with the library default, so the demo keeps it.
-  assert.equal(loadConfig({ APP_MODE: 'demo' }).config.matchMode, 'strict');
+  // The demo compares words the way the application does, and its blurbs say so.
+  assert.equal(loadConfig({ APP_MODE: 'demo' }).config.matchMode, 'folded');
+  assert.equal(DEMO_MATCH_MODE, 'folded');
 
   const bad = loadConfig({ MATCH_MODE: 'fuzzy' });
   assert.equal(bad.config.matchMode, 'folded', 'a bad value falls back to the default');

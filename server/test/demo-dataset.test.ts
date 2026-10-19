@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEMO_CANDIDATES, demoPersonalDetails, demoCandidateNames } from '../src/demo/dataset.ts';
+import { DEMO_CANDIDATES, DEMO_MATCH_MODE, demoPersonalDetails, demoCandidateNames } from '../src/demo/dataset.ts';
 import { MATCH_MODES, type MatchMode } from '../src/agent/matchRules.ts';
 import { seedDemoData, clearDemoData, containsOnlyDemoData, isEmpty } from '../src/demo/seed.ts';
 import { rankJob } from '../src/agent/rank.ts';
@@ -31,16 +31,17 @@ async function seeded(
 
 /** What a candidate is declared to produce under one mode. */
 function declared(candidate: (typeof DEMO_CANDIDATES)[number], mode: MatchMode) {
-  return mode === 'folded' ? candidate.expectedFolded : candidate.expected;
+  return mode === 'strict' ? candidate.expectedStrict : candidate.expected;
 }
 
 // --- the four cases are all present and all distinct -------------------------
 
-test('the dataset declares all four outcomes the product distinguishes, in the mode that was written for them', () => {
+test('the dataset declares all four outcomes the product distinguishes, in the mode the demo runs', () => {
   // A precondition on the dataset itself, before anything runs. If someone
   // removes a candidate, this says so rather than the demo quietly losing a
   // case nobody notices until a client is watching.
-  const tiers = new Set(DEMO_CANDIDATES.map((candidate) => candidate.expectedFolded.tier));
+  assert.equal(DEMO_MATCH_MODE, 'folded');
+  const tiers = new Set(DEMO_CANDIDATES.map((candidate) => candidate.expected.tier));
 
   assert.ok(tiers.has('qualified'), 'no qualified candidate when matching is folded');
   assert.ok(tiers.has('needs_review'), 'no needs-review candidate');
@@ -48,12 +49,12 @@ test('the dataset declares all four outcomes the product distinguishes, in the m
   assert.ok(tiers.has('not_evaluated'), 'no unevaluated candidate');
 });
 
-test('under the default strict matching nobody is qualified, and the data is not reworded to hide it', () => {
+test('under whole-word (strict) matching nobody is qualified, and the data is not reworded to hide it', () => {
   // The CVs say "Running PostgreSQL at scale" and the criterion says "run". Whole-word
   // matching does not equate them, so the two candidates who would be qualified are gated.
   // This is pinned so that rewording the CVs to make the demo prettier shows up as a change
   // somebody has to mean.
-  const tiers = new Set(DEMO_CANDIDATES.map((candidate) => candidate.expected.tier));
+  const tiers = new Set(DEMO_CANDIDATES.map((candidate) => candidate.expectedStrict.tier));
   assert.ok(!tiers.has('qualified'));
   assert.ok(DEMO_CANDIDATES.every((candidate) => candidate.resume.includes('Running PostgreSQL') || !['demo-001', 'demo-002'].includes(candidate.reference)));
   assert.ok(MATCH_MODES.includes('strict') && MATCH_MODES.includes('folded'));
@@ -429,4 +430,62 @@ test('seeding is repeatable: clear then seed gives the same dataset back', async
     after.entries.map((entry) => [entry.reference, entry.tier, entry.scoreBasisPoints]),
     before.entries.map((entry) => [entry.reference, entry.tier, entry.scoreBasisPoints]),
   );
+});
+
+// --- a blurb is a claim about the result, so it is checked against the result -------------------------------------------------------
+
+const TIER_PHRASES: Array<[RegExp, 'qualified' | 'gated' | 'needs_review' | 'not_evaluated']> = [
+  [/\bqualified\b/i, 'qualified'],
+  [/\bgated\b|missing an essential/i, 'gated'],
+  [/worth a look|held for a human/i, 'needs_review'],
+  [/not assessed yet|queued but not run|unranked/i, 'not_evaluated'],
+];
+
+/**
+ * What a blurb says about where its candidate is: the tier it names, whether it says "the top of the list", and every
+ * "above <name>" / "below <name>". Exported by copy to the portfolio's parity test, which makes the same check on the demo's own text.
+ */
+function claimsOf(blurb: string) {
+  return {
+    tiers: new Set(TIER_PHRASES.filter(([pattern]) => pattern.test(blurb)).map(([, tier]) => tier)),
+    top: /\bthe top of the list\b/i.test(blurb),
+    relations: [...blurb.matchAll(/\b(above|below) ([A-Z][a-z]+)\b/g)].map((match) => ({ relation: match[1] as 'above' | 'below', name: match[2] as string })),
+  };
+}
+
+test('every blurb is true of the demo: its tier, "the top of the list", and "above/below" another candidate', async (t) => {
+  const ctx = await seeded(t);
+  const ranking = await rankJob({ repos: ctx.repos }, ctx.jobId);
+  const byReference = new Map(ranking.entries.map((entry) => [entry.reference, entry]));
+  let relations = 0;
+
+  for (const candidate of DEMO_CANDIDATES) {
+    const entry = byReference.get(candidate.reference);
+    assert.ok(entry, `${candidate.displayName} is not in the ranking`);
+    const claims = claimsOf(candidate.expected.demonstrates);
+
+    assert.deepEqual([...claims.tiers], [entry.tier], `${candidate.displayName}: the blurb names the tier ${[...claims.tiers].join(', ') || '(none)'} but the ranking says ${entry.tier}`);
+    assert.equal(claims.top, entry.position === 1, `${candidate.displayName}: the blurb ${claims.top ? 'says' : 'does not say'} "the top of the list" but the position is ${entry.position}`);
+    for (const { relation, name } of claims.relations) {
+      const other = ranking.entries.find((item) => item.displayName?.split(' ')[0] === name);
+      assert.ok(other, `${candidate.displayName}: the blurb names ${name}, who is not in the ranking`);
+      assert.ok(
+        relation === 'above' ? entry.position < other.position : entry.position > other.position,
+        `${candidate.displayName}: the blurb says ${relation} ${name}, but positions are ${entry.position} and ${other.position}`,
+      );
+      relations += 1;
+    }
+  }
+  assert.ok(relations >= 4, 'the dataset should make at least four placed-above/below claims, or this test is checking nothing');
+});
+
+test('the check above can fail: a blurb that names the wrong tier, top spot or order is caught', () => {
+  assert.deepEqual([...claimsOf('Qualified: meets both essentials.').tiers], ['qualified']);
+  assert.deepEqual([...claimsOf('Gated (missing an essential).').tiers], ['gated']);
+  assert.equal(claimsOf('The top of the list.').top, true);
+  assert.equal(claimsOf('Placed below Devi and above Marcus.').relations.length, 2);
+  assert.deepEqual(claimsOf('Placed below Devi and above Marcus.').relations, [
+    { relation: 'below', name: 'Devi' },
+    { relation: 'above', name: 'Marcus' },
+  ]);
 });

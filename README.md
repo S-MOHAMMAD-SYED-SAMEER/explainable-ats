@@ -12,7 +12,7 @@ Screens a CV against a role and explains every placement with the exact sentence
 - **Nothing counts until it is checked.** Every quote is looked up verbatim in the original CV. A quote that isn't there is stored as rejected and never shown or scored, and a `met`, `partial` or `not_met` verdict left with no verified quote reads `unclear`. A CV that says nothing about a requirement is `unclear`, never `not_met`.
 - **Everything after the verdicts is reproducible.** Scores are integers you can recompute by hand, rankings are derived on every read, and an append-only audit trail records each step. A rule-based matcher reads the same verified quotes as a second opinion: it is shown to the recruiter and never changes a score. A credited verdict whose quote shares no word with the requirement is flagged, and on a must-have it sends the candidate to `needs_review`.
 - **Stack.** Node 24 and TypeScript (run directly, no build step), Express 5, SQLite or PostgreSQL behind one interface, React 19 with Vite and Tailwind. The server has three runtime dependencies: `express`, `pg` and the Anthropic SDK.
-- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 880 passing, 0 failing and 0 skipped (669 server, 211 web). Six of those are helper modules the runner counts, so there are 874 test cases. In a standalone clone the parity tests, which need the portfolio sites, are skipped. [What they protect](docs/TESTING.md).
+- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 882 passing, 0 failing and 0 skipped (671 server, 211 web). Six of those are helper modules the runner counts, so there are 876 test cases. In a standalone clone the parity tests, which need the portfolio sites, are skipped. [What they protect](docs/TESTING.md).
 - **Where it stands.** A portfolio project. The public demo uses the deterministic mock extractor, a keyword matcher, in place of the model, on five invented candidates. The running app calls the real model when a signed-in recruiter starts an assessment, and it has been evaluated once, on invented data: on 2026-10-19 Claude Haiku 4.5 read twenty invented CVs and its verdicts agreed with 86.8% of 68 labels (Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling.) One model, one run. See [Evaluation](#evaluation) for the numbers and what they do not show, and [Limitations](#limitations).
 
 ## Run it locally
@@ -131,47 +131,47 @@ The demo role is *Senior Backend Engineer*, with three requirements:
 | PostgreSQL | must-have | 2 |
 | Mentoring | nice-to-have | 2 |
 
-The weights add up to 7. The worked examples below are the public demo, which runs in `matcher` mode with the mock extractor and `strict` matching, so here the rules rather than a model decide each verdict. With a model the verdicts are its own, checked as described above, and everything from the arithmetic on is the same. Here are three of the five candidates, as the running system scores them.
+The weights add up to 7. The worked examples below are the public demo. It runs in `matcher` mode with the mock extractor, so here the rules rather than a model decide each verdict, and it folds word endings (`MATCH_MODE=folded`, the application's default and the setting its evaluation used), so "Running" counts as the criterion's "run". With a model the verdicts are its own, checked as described above, and everything from the arithmetic on is the same. Here are three of the five candidates, as the running system scores them.
 
-**Rowan** scores 86% and is gated, with the highest score on the list.
+**Rowan** scores 100% and is qualified, the top of the list.
 
 | Requirement | Quote found in the CV | Verdict | Points earned |
 |---|---|---|---|
 | Node.js | "Designed and shipped production Node.js services for a freight booking platform." | `met` (4 of 4 terms) | 3 × 10000 = 30000 |
-| PostgreSQL | "Running PostgreSQL at scale, moving a single instance to a replicated cluster." | `partial` (2 of 3 terms) | 2 × 5000 = 10000 |
+| PostgreSQL | "Running PostgreSQL at scale, moving a single instance to a replicated cluster." | `met` (3 of 3 terms; "running" folds to "run") | 2 × 10000 = 20000 |
 | Mentoring | "Mentoring: mentored four junior engineers through their first releases." | `met` (4 of 4 terms) | 2 × 10000 = 20000 |
 
-`(30000 + 10000 + 20000) / 7 = 8571.4…`, and the floor is **8571** (86%). The shares are 4285.7, 1428.6 and 2857.1; their floors add up to 8570, and the leftover point goes to the largest remainder, so the contributions are **4286, 1428 and 2857**. PostgreSQL is `partial` because the criterion's three words are `postgresql`, `run` and `scale`, and "Running" is not "run". PostgreSQL is essential, so Rowan is gated despite the score.
+`(30000 + 20000 + 20000) / 7 = 10000`, exactly. The shares are 4285.7, 2857.1 and 2857.1; their floors add up to 9999, and the leftover point goes to the largest remainder, so the contributions are **4286, 2857 and 2857**.
 
-**Marcus** scores 7142. His Node.js and Mentoring are `met`, but his only PostgreSQL quote is "Used PostgreSQL for a final-year university project.". It contains one of the three terms (`postgresql`, `run`, `scale`), so the verdict is `not_met`. `(30000 + 0 + 20000) / 7` is 7142.8…, so **7142** (71%). Because a must-have was addressed and fell short, he is **gated**.
+**Marcus** scores 7142. His Node.js and Mentoring are `met`, but his only PostgreSQL quote is "Used PostgreSQL for a final-year university project.". It contains one of the three terms (`postgresql`, `run`, `scale`), so the verdict is `not_met`. `(30000 + 0 + 20000) / 7` is 7142.8…, so **7142** (71%), with contributions 4285, 0 and 2857. Because a must-have was addressed and fell short, he is **gated**.
 
-**Ines** scores 5714. Node.js is `met` and her Mentoring quote ("Mentored a junior developer during onboarding.") covers two of four terms, so it is `partial`. Her CV says nothing about PostgreSQL, so that is `unclear`: `(30000 + 0 + 10000) / 7 = 5714.28…`, so **5714** (57%). The raw shares are 4285 (remainder 5), 0 and 1428 (remainder 4), which add up to 5713, one short. The leftover point goes to the largest remainder, so the contributions are **4286, 0 and 1428**, which add up to 5714.
+**Ines** scores 7142, the same as Marcus. Node.js is `met`, and her Mentoring quote ("Mentored a junior developer during onboarding.") covers three of four terms (the folded "mentored" and "mentoring" are one word), so it is `met`. Her CV says nothing about PostgreSQL, so that is `unclear`: `(30000 + 0 + 20000) / 7 = 7142.8…`, so **7142**, with contributions 4285, 0 and 2857.
 
-The resulting order with the default matching:
+**Devi** also scores 7142 and is qualified: Node.js and PostgreSQL are `met`. Her Mentoring reads `not_met` although her CV says nothing about mentoring, and the cost of folding is the reason: her job title, "Backend Engineer", folds to "engineer", which is one of the criterion's words, so the stand-in extractor quoted it. It is the matcher's mistake, not a finding about her, and it does not move her tier because mentoring is desirable.
+
+The resulting order:
 
 | Rank | Candidate | Score | Tier | Why |
 |---|---|---|---|---|
-| 1 | Ines | 57% | Worth a look | PostgreSQL is `unclear`, so it is unresolved, not failed |
-| 2 | Rowan | 86% | Missing an essential | PostgreSQL is only `partial`: "Running" is not "run" |
-| 3 | Marcus | 71% | Missing an essential | The PostgreSQL evidence fell short |
-| 4 | Devi | 57% | Missing an essential | The same word form as Rowan, and nothing on mentoring |
+| 1 | Rowan | 100% | Meets every must-have | Every requirement `met` |
+| 2 | Devi | 71% | Meets every must-have | Both essentials `met`; mentoring misread, as above |
+| 3 | Ines | 71% | Worth a look | PostgreSQL is `unclear`, so it is unresolved, not failed |
+| 4 | Marcus | 71% | Missing an essential | The PostgreSQL evidence fell short |
 | — | Toby | — | Not assessed yet | Received but not yet assessed |
 
-Nobody is qualified, and that is the honest result of whole-word matching on these CVs. The CVs were written to say "Running PostgreSQL at scale" against the criterion "Has run PostgreSQL at scale", and they have not been reworded to suit the matcher.
+Devi, Ines and Marcus tie at 7142 and are placed by tier, which is the must-have gate shown as clearly as it can be: same number, three placements, each with its sentence ("Ranked 2 of 4 assessed candidates. …"). Ines ranks above Marcus although her score is no higher, because `needs_review` sits above `gated`.
 
-**The same five CVs with word endings folded** (`MATCH_MODE=folded`: plural, -ing and -ed endings are reduced first, so "Running" counts as "run" and "mentored" as "mentoring"):
+**The same five CVs with whole-word matching** (`MATCH_MODE=strict`: "Running" is not "run", "mentored" is not "mentoring"):
 
 | Rank | Candidate | Score | Tier | What changed |
 |---|---|---|---|---|
-| 1 | Rowan | 100% | Meets every must-have | PostgreSQL `met` |
-| 2 | Devi | 71% | Meets every must-have | PostgreSQL `met`; but mentoring reads `not_met`, not `unclear` (see below) |
-| 3 | Ines | 71% | Worth a look | Mentoring now `met` ("mentored" meets "mentoring") |
-| 4 | Marcus | 71% | Missing an essential | Unchanged |
+| 1 | Ines | 57% | Worth a look | Mentoring only `partial`; PostgreSQL `unclear` |
+| 2 | Rowan | 86% | Missing an essential | PostgreSQL only `partial`: "Running" is not "run" |
+| 3 | Marcus | 71% | Missing an essential | Unchanged |
+| 4 | Devi | 57% | Missing an essential | The same word form as Rowan, and nothing on mentoring (`unclear`, not `not_met`) |
 | — | Toby | — | Not assessed yet | Unchanged |
 
-With folding, Devi and Marcus tie at 7142 and are placed a tier apart, which is the must-have gate shown as clearly as it can be. Folding also has a cost the strict rule does not: Devi's CV is silent on mentoring, but her job title "Backend Engineer" folds to "engineer", which is one of the criterion's words, so the stand-in extractor quotes it and the requirement reads `not_met` instead of `unclear`. In `model_checked` mode, which is the app's default, the match mode only sets how the matcher's second opinion and the flag compare words; it never changes a verdict. The app defaults to `folded` outside the demo because that is how it was evaluated. The demo stays `strict`, which is what its recorded examples use. For what it is worth, when the matcher judged alone against the labels, `folded` agreed with 36.8% of the 68 rows and `strict` with 30.9% (the first run, on Haiku 4.5, quotes only).
-
-Ines ranks above Marcus under both rules although her score is no higher, because `needs_review` sits above `gated`.
+Nobody is qualified, and that is the honest result of whole-word matching on these CVs. The CVs were written to say "Running PostgreSQL at scale" against the criterion "Has run PostgreSQL at scale", and they have not been reworded to suit either rule. Folding has a cost the strict rule does not (Devi's mentoring above); whole-word matching has the opposite one. In `model_checked` mode, which is the app's default, the match mode only sets how the matcher's second opinion and the flag compare words; it never changes a verdict. The app and the demo default to `folded` because that is how it was evaluated. For what it is worth, when the matcher judged alone against the labels, `folded` agreed with 36.8% of the 68 rows and `strict` with 30.9% (the first run, on Haiku 4.5, quotes only).
 
 ## API
 
@@ -242,7 +242,7 @@ A demo decision is recorded as the fixed actor `demo-visitor` and reuses the rec
 Tests use Node's built-in runner on both sides. No test needs a credential, a network or a database server. [docs/TESTING.md](docs/TESTING.md) explains what each group of tests protects and walks through eight of them.
 
 ```bash
-cd server && npm test        # 669 reported: 664 test cases and 5 helper modules
+cd server && npm test        # 671 reported: 666 test cases and 5 helper modules
 cd web && npm test           # 211 reported: 210 test cases and 1 helper module
 ```
 
@@ -270,7 +270,7 @@ Files: [`docs/results/`](docs/results/), each with its settings and its label pr
 
 What this does not show:
 
-- **One model, one run, twenty CVs.** One pair is about 1.5 points. There are no repeats, and temperature 0 does not make a model fully repeatable.
+- **One model, one run, twenty CVs.** Each verdict is about 1.5 points. There are no repeats, and temperature 0 does not make a model fully repeatable.
 - **Not independent.** The CVs were written by an AI. The labels were drafted by one AI and reviewed by two, and the final decisions were approved by one person; they are not an independent human labelling. A set of five more CVs was written to be held out, but it was never labelled and never run.
 - **Not a held-out result.** The first scoring of this run used a rule that lowered a flagged verdict automatically, and agreed on 77.9%. The rule was removed after looking at which rows it hurt (the model's verdict matched the label in all six it lowered), and 86.8% is the same replies re-scored without it. The rules were chosen on the same 68 rows they are measured on, so the figure probably flatters.
 - **Where it disagrees.** Nine pairs. Three are a CV whose only evidence is a skills list: the model says `unclear`, the labels say `partial`. Two are `not_met` where the labels say `partial`. Of the other four, three are the model being more generous than the labels (twice in one CV) and one is a correct verdict the code lowered because the quote behind it was not found.
@@ -390,7 +390,7 @@ Copy `server/.env.example` to a file named `.env` in the same folder and set onl
 | `ANTHROPIC_MODEL` | `claude-haiku-4-5-20251001` | Sent verbatim; the adapter names no model of its own. This is the model the evaluation was run with. `claude-sonnet-5-5` stays available, with `ANTHROPIC_TOOL_CHOICE=auto` and `ANTHROPIC_TEMPERATURE=none` |
 | `ANTHROPIC_TOOL_CHOICE` | `forced` | `forced` makes the tool call mandatory; `auto` lets the model call the tool (and a reply without the call is rejected). `claude-sonnet-5-5` rejects `forced`; both Haiku models accept it |
 | `ANTHROPIC_TEMPERATURE` | `0` | 0 to 1; `none` sends no temperature. `claude-haiku-4-5-20251001` accepts 0; `claude-sonnet-5-5` and `claude-haiku-5-5` reject any temperature ("deprecated for this model"), so use `none` with them |
-| `MATCH_MODE` | `folded` (`strict` in the demo) | How requirement words are compared with a quote. `strict`: whole words only ("run" is not found in "running", "service" is not "services"). `folded`: plural -s/-es, -ing and -ed endings are reduced first. Neither handles synonyms ("Postgres" is never "PostgreSQL") or negation. In `model_checked` mode it only sets the second opinion and the flag. Recorded in the audit trail of every score |
+| `MATCH_MODE` | `folded` | How requirement words are compared with a quote. `strict`: whole words only ("run" is not found in "running", "service" is not "services"). `folded`: plural -s/-es, -ing and -ed endings are reduced first. Neither handles synonyms ("Postgres" is never "PostgreSQL") or negation. In `model_checked` mode it only sets the second opinion and the flag. Recorded in the audit trail of every score |
 | `VERDICT_MODE` | `model_checked` | `model_checked`: the model proposes each verdict with its quotes, the code checks them, the matcher is a second opinion. `matcher`: the model only quotes and the matcher alone judges (the earlier design, and what the demo runs) |
 | `ANTHROPIC_TIMEOUT_MS` | 60000 | Per-request timeout, maximum 300000 |
 | `ANTHROPIC_MAX_RETRIES` | 2 | Retries for transient failures only, maximum 5 |

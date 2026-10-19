@@ -145,8 +145,8 @@ function buildRationale(entry: Omit<RankedCandidate, 'rationale'>, total: number
     entry.rank === null
       ? 'Not ranked.'
       : entry.tiedWith > 0
-        ? `Ranked ${entry.rank} of ${total}, tied with ${entry.tiedWith} other${entry.tiedWith === 1 ? '' : 's'}.`
-        : `Ranked ${entry.rank} of ${total}.`;
+        ? `Ranked ${entry.rank} of ${total} assessed candidate${total === 1 ? '' : 's'}, tied with ${entry.tiedWith} other${entry.tiedWith === 1 ? '' : 's'}.`
+        : `Ranked ${entry.rank} of ${total} assessed candidate${total === 1 ? '' : 's'}.`;
 
   switch (entry.tier) {
     case 'qualified':
