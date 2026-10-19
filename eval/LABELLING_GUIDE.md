@@ -143,7 +143,7 @@ You may edit `notes` as much as you like. It is never scored, and it is the plac
 
 | Set | Labels | Provenance |
 |---|---|---|
-| Main set (20 CVs, 68 rows, `eval/labels_TODO.csv`) | passages and verdicts | **drafted by ChatGPT, reviewed by ChatGPT and Claude, final decisions approved by Sameer.** Not an independent human labelling. |
+| Main set (20 CVs, 68 rows, `eval/labels_TODO.csv`) | passages and verdicts | **Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling.** |
 | Held-out set (5 CVs, 17 rows, `eval/labels_heldout_TODO.csv`) | none | **Unlabelled. Sameer is not labelling these; they are excluded from every run.** |
 
 Say exactly that wherever the labels are used. Every results file records it as `labelsProvenance`, and a test fails if it is missing.

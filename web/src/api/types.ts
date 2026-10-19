@@ -97,6 +97,7 @@ export type VerdictCheck = {
   /** How far apart the model and the matcher are: none, one_step, two_plus. Always shown. */
   disagreement: 'none' | 'one_step' | 'two_plus';
   /** True when this requirement sends the candidate to a person: a must-have where the model is two steps or more above the matcher. */
+  scoreLowered: boolean;
   routed: boolean;
   /** The verdict the score used. */
   scoredVerdict: string;

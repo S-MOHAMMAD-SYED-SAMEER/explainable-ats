@@ -16,14 +16,14 @@ import type { ScoreBreakdown, ScoredRequirement } from './score.ts';
 //        unclear          always stands.
 //        no answer        for a requirement the model did not answer is `unclear`.
 //   2. THE SECOND OPINION. The deterministic matcher gives its own verdict from the SAME verified passages. Every difference is
-//      shown to the recruiter. A candidate is ROUTED to a person only when, on a must-have requirement, the model's enforced
-//      verdict is two steps or more HIGHER than the matcher's (`routesToReview`, `verdictMode.ts`). A model that is lower than
-//      the matcher is shown and not routed: it can only have lowered a score.
+//      shown to the recruiter.
 //   3. THE SCORED VERDICT. The enforced verdict, with ONE exception: when the model's verdict is higher than the matcher's by
 //      two steps or more AND not one word of the requirement appears in any passage the model relied on (the matcher found
 //      NOTHING in them), the matcher's verdict is scored instead, until a person decides. A passage that shares no word with the
 //      requirement cannot raise a score: that is what stops a model that was fooled into crediting an attacker's line.
-//      Every other disagreement, however large, is shown (and routed, where it meets the rule above) but does not change the number: the matcher
+//      That is the ONLY case that is acted on. The score is lowered pending review (audit event `score_lowered_pending_review`),
+//      and if the requirement is a must-have the candidate is routed to `needs_review` (`routesToReview`, `verdictMode.ts`).
+//      Every other disagreement, however large, is shown but changes nothing and routes nobody: the matcher
 //      counts words, so on a passage that really is about the subject it is wrong far more often than it is right (measured:
 //      about 35 to 40% agreement with the labels even when every passage is perfect), and letting it overrule the model
 //      would put the ceiling back where it was.
@@ -84,7 +84,7 @@ export type Reconciled = EnforcedVerdict & {
   scoredVerdict: MatchVerdict;
   /** True when the scored verdict was lowered below the enforced one because the passages share no word with the requirement. */
   capped: boolean;
-  /** True when this requirement sends the candidate to a person: a must-have where the model is two steps or more above the matcher. */
+  /** True when this requirement sends the candidate to a person: a must-have whose score was lowered pending review. */
   routed: boolean;
 };
 
@@ -108,7 +108,7 @@ export function reconcileWithMatcher(
     const unrelated = matcher.matchedTerms.length === 0;
     const higher = SUPPORT_RANK[mine.enforcedVerdict] > SUPPORT_RANK[matcher.verdict];
     const scoredVerdict = disagreement === 'two_plus' && higher && unrelated ? lowerOf(mine.enforcedVerdict, matcher.verdict) : mine.enforcedVerdict;
-    const routed = routesToReview(requirement.kind, mine.enforcedVerdict, matcher.verdict);
+    const routed = routesToReview(requirement.kind, mine.enforcedVerdict, scoredVerdict);
     return { ...mine, matcher, disagreement, scoredVerdict, capped: scoredVerdict !== mine.enforcedVerdict, routed };
   });
 }

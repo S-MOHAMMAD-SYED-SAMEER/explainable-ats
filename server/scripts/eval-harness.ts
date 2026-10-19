@@ -56,7 +56,7 @@ import { PRICES_SOURCE, costOf, formatDollars } from './pricing.ts';
 // is exact. It never loops, and it stops at once on a refused request (bad key, no credit, a setting), on a 401, 402, 403, 429 or 529,
 // after two outages in a row, or when the next request could take total spend past the budget.
 //
-// THE TWO SETS ARE REPORTED SEPARATELY. `dev` is the twenty CVs whose labels were drafted by ChatGPT, reviewed by ChatGPT and Claude, and approved
+// THE TWO SETS ARE REPORTED SEPARATELY. `dev` is the twenty CVs whose labels carry the provenance in LABELS_PROVENANCE.main (drafted by ChatGPT, reviewed by ChatGPT and Claude, approved
 // by Sameer; `heldout` is the five CVs that have no labels: Sameer is not labelling them, so the default run leaves them out, and a run that
 // asks for them is told they cannot be scored. Each result block says which labels it was scored against.
 //
@@ -652,7 +652,7 @@ async function main(): Promise<number> {
             verdictAgreement: "requirements where the scored verdict equals the labeller's. model_checked: the model's verdict after the code's rules and the second opinion; matcher: the matcher alone judging the same verified passages",
             modelProposedAgreement: "the model's own verdicts against the labels, before the code lowered any (an unanswered requirement counts as unclear)",
             downgradeRate: 'verdicts the code lowered to unclear because no quoted passage was found in the CV / verdicts the model proposed',
-            secondOpinion: "the matcher's verdict from the same verified passages against the model's enforced verdict: agree, one step apart, two steps or more apart (all shown). A candidate is routed to a person only when, on a must-have, the model is two steps or more HIGHER than the matcher; the score is lowered only where the passages share no word with the requirement",
+            secondOpinion: "the matcher's verdict from the same verified passages against the model's enforced verdict: agree, one step apart, two steps or more apart (all shown). The score is lowered pending review only where the model is two steps or more HIGHER and the quoted passages share no word with the requirement; a candidate is routed to a person only when that happens on a must-have",
             tierAgreement: "CVs where the tier from the scored verdicts equals the tier from the labeller's verdicts, by the application's own rule (before any routing to review)",
             goldThroughMatcher: "what the matching stage says when the labeller's own gold passages are the evidence: the matcher's disagreement with the labels before any model is involved",
           },

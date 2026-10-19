@@ -6,8 +6,8 @@ import type { MatchMode } from '../../agent/matchRules.ts';
 import type { RepoDeps } from './types.ts';
 
 // The record of what the model said about each requirement and what the code did with it (`verdict_checks`).
-// Written by the match stage, read by the evaluation detail and by the ranking (to route to a person a candidate for whom, on a
-// must-have, the model's verdict is two or more steps higher than the second opinion's: `routesToReview`).
+// Written by the match stage, read by the evaluation detail and by the ranking (to route to a person a candidate whose score was
+// lowered pending review on a must-have: `routesToReview`).
 
 export type Disagreement = 'none' | 'one_step' | 'two_plus';
 export type DowngradeReason = 'no_verified_passage' | 'no_answer';
@@ -83,24 +83,23 @@ export function createVerdictCheckRepository({ db, clock, newId }: RepoDeps) {
 
     /**
      * The evaluations, among those given, that go to a person, and the labels of the requirements that send them there, in job
-     * order: a MUST-HAVE where the model's enforced verdict is two steps or more above the matcher's (`routesToReview`). Other
-     * disagreements are recorded and shown but route nobody. ONE query whatever the number of evaluations.
+     * order: a MUST-HAVE whose score was lowered pending review (`routesToReview`). Other disagreements are recorded and shown but
+     * route nobody. ONE query whatever the number of evaluations.
      */
     async routedForEvaluations(evaluationIds: readonly string[]): Promise<Map<string, string[]>> {
       const found = new Map<string, string[]>();
       if (evaluationIds.length === 0) return found;
       const marks = evaluationIds.map(() => '?').join(',');
-      const rows = await db.query<{ evaluation_id: string; label: string; kind: string; enforced_verdict: string; matcher_verdict: string | null }>(
+      const rows = await db.query<{ evaluation_id: string; label: string; kind: string; enforced_verdict: string; scored_verdict: string }>(
         `SELECT vc.evaluation_id AS evaluation_id, jr.label AS label, jr.kind AS kind,
-                vc.enforced_verdict AS enforced_verdict, vc.matcher_verdict AS matcher_verdict
+                vc.enforced_verdict AS enforced_verdict, vc.scored_verdict AS scored_verdict
            FROM verdict_checks vc JOIN job_requirements jr ON jr.id = vc.requirement_id
-          WHERE vc.disagreement = 'two_plus' AND vc.evaluation_id IN (${marks})
+          WHERE vc.scored_verdict <> vc.enforced_verdict AND vc.evaluation_id IN (${marks})
           ORDER BY jr.position`,
         [...evaluationIds],
       );
       for (const row of rows) {
-        const matcher = toTextOrNull(row.matcher_verdict) as MatchVerdict | null;
-        if (matcher === null || !routesToReview(toText(row.kind) as 'must_have' | 'nice_to_have', toText(row.enforced_verdict) as MatchVerdict, matcher)) continue;
+        if (!routesToReview(toText(row.kind) as 'must_have' | 'nice_to_have', toText(row.enforced_verdict) as MatchVerdict, toText(row.scored_verdict) as MatchVerdict)) continue;
         const id = toText(row.evaluation_id);
         found.set(id, [...(found.get(id) ?? []), toText(row.label)]);
       }

@@ -115,7 +115,7 @@ function runValidate(args: string[]): { status: number | null; out: string } {
 test('validate-labels checks both files by default, and says who made each set of labels', () => {
   const both = runValidate([]);
   assert.equal(both.status, 0, both.out);
-  assert.match(both.out, /set\s+: main .*drafted by ChatGPT, reviewed by ChatGPT and Claude, final decisions approved by Sameer/);
+  assert.match(both.out, /set\s+: main .*Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude \(agreed on 64 of 68 rows\); final decisions approved by Sameer\. Not an independent human labelling\./);
   assert.match(both.out, /set\s+: heldout .*none: these five CVs are unlabelled/);
 
   const only = runValidate(['--heldout']);
@@ -134,7 +134,7 @@ test('validate-labels checks both files by default, and says who made each set o
 // --- label provenance in every results file -------------------------------------------------------------
 
 test('the provenance is stated exactly, once, in code', () => {
-  assert.equal(LABELS_PROVENANCE.main, 'drafted by ChatGPT, reviewed by ChatGPT and Claude, final decisions approved by Sameer');
+  assert.equal(LABELS_PROVENANCE.main, 'Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling.');
   assert.equal(LABELS_PROVENANCE.heldout, 'none: these five CVs are unlabelled and are not used in any run');
   assert.deepEqual(provenanceFor(['main', 'heldout']), { main: LABELS_PROVENANCE.main, heldout: LABELS_PROVENANCE.heldout });
 });
@@ -143,7 +143,7 @@ test('requireProvenance fails when labelsProvenance is missing, empty, unknown o
   assert.throws(() => requireProvenance({}), /labelsProvenance is missing/);
   assert.throws(() => requireProvenance({ labelsProvenance: null }), /missing/);
   assert.throws(() => requireProvenance({ labelsProvenance: {} }), /empty/);
-  assert.throws(() => requireProvenance({ labelsProvenance: { main: 'hand-labelled by Sameer' } }), /not "drafted by ChatGPT/);
+  assert.throws(() => requireProvenance({ labelsProvenance: { main: 'hand-labelled by Sameer' } }), /not "Labels drafted by ChatGPT/);
   assert.throws(() => requireProvenance({ labelsProvenance: { gold: 'x' } }), /unknown label set/);
   assert.throws(() => requireProvenance({ labelsProvenance: provenanceFor(['main']) }, ['main', 'heldout']), /no entry for the "heldout" set/);
   assert.doesNotThrow(() => requireProvenance({ labelsProvenance: provenanceFor(['main', 'heldout']) }, ['main', 'heldout']));

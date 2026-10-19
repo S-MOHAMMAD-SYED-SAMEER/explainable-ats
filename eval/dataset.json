@@ -1,6 +1,6 @@
 {
   "version": "eval-set-v1",
-  "note": "Twenty invented CVs against two roles. Every person, employer, address, email and phone number is invented; emails use the reserved .invalid top level and phone numbers come from the range set aside for fiction. The CVs were written by an AI. The labels were drafted by ChatGPT, reviewed by ChatGPT and Claude, final decisions approved by Sameer (see LABELLING_GUIDE.md).",
+  "note": "Twenty invented CVs against two roles. Every person, employer, address, email and phone number is invented; emails use the reserved .invalid top level and phone numbers come from the range set aside for fiction. The CVs were written by an AI. Label provenance: Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling. (see LABELLING_GUIDE.md).",
   "roles": {
     "demo": {
       "title": "Senior Backend Engineer",
