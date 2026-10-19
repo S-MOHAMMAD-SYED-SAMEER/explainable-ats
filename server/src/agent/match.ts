@@ -41,7 +41,7 @@ export type MatchOutcome = {
   evidenceIgnored: number;
   /** The mode that produced the verdicts that were scored. */
   verdictMode: VerdictMode;
-  /** True when the score of some must-have was lowered pending review: the candidate is routed to a person. */
+  /** True when a credited must-have rests on a quote that shares no word with the requirement: the candidate is routed to a person. */
   needsReview: boolean;
 };
 
@@ -108,7 +108,7 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
     reconciled = reconcileWithMatcher(requirements, enforced, verified, matchMode);
     const decisions: MatchDecision[] = reconciled.map((entry) => ({
       requirementId: entry.requirementId,
-      verdict: entry.scoredVerdict,
+      verdict: entry.enforcedVerdict,
       confidence: confidenceOf(entry),
       matchedTerms: entry.matcher.matchedTerms,
       missingTerms: entry.matcher.missingTerms,
@@ -149,7 +149,7 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
         matcherVerdict: entry.matcher.verdict,
         matcherMode: matchMode,
         disagreement: entry.disagreement,
-        scoredVerdict: entry.scoredVerdict,
+        quoteNoOverlap: entry.quoteNoOverlap,
       });
     }
 
@@ -205,7 +205,7 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
               enforced: entry.enforcedVerdict,
               matcher: entry.matcher.verdict,
               disagreement: entry.disagreement,
-              scored: entry.scoredVerdict,
+              quoteNoOverlap: entry.quoteNoOverlap,
             })),
           }
         : {}),
@@ -214,32 +214,32 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
     entityId: evaluation.id,
   });
 
-  // The one disagreement that is acted on: the model's verdict is higher and the quote shares no word with the requirement, so the
-  // score uses the lower verdict until a person checks. Recorded here; a must-have among them also routes the candidate.
-  const lowered = reconciled.filter((entry) => entry.capped);
-  if (lowered.length > 0) {
+  // The one thing flagged for a person: a credited verdict whose quote shares no word with the requirement. The score is the model's
+  // verified verdict either way. A must-have among the flagged also routes the candidate to `needs_review`.
+  const flagged = reconciled.filter((entry) => entry.quoteNoOverlap);
+  if (flagged.length > 0) {
     const label = (id: string): string => requirements.find((requirement) => requirement.id === id)?.label ?? id;
     await repos.audit.append({
       correlationId: evaluation.id,
       stage: 'match',
-      eventType: 'score_lowered_pending_review',
+      eventType: 'quote_no_overlap_flagged',
       actor: 'system',
       outcome: 'blocked',
       summary:
-        `Score lowered pending review on ${lowered.length} requirement(s): ` +
-        lowered.map((entry) => `"${label(entry.requirementId)}" (the model said ${(entry.enforcedVerdict).replace('_', ' ')} but the quote shares no words with the requirement)`).join('; ') +
-        '. A person should check.' +
+        'Quote shares no words with the requirement; a person should check. ' +
+        `Flagged on ${flagged.length} requirement(s): ` +
+        flagged.map((entry) => `"${label(entry.requirementId)}" (the model said ${entry.enforcedVerdict.replace('_', ' ')})`).join('; ') +
+        '.' +
         (needsReview ? ' A must-have is among them, so this candidate is routed to a person.' : ''),
       payload: {
         matchMode,
         routed: needsReview,
-        requirements: lowered.map((entry) => ({
+        requirements: flagged.map((entry) => ({
           requirementId: entry.requirementId,
           label: label(entry.requirementId),
           model: entry.modelVerdict,
           enforced: entry.enforcedVerdict,
           matcher: entry.matcher.verdict,
-          scored: entry.scoredVerdict,
           routed: entry.routed,
         })),
       },
@@ -304,8 +304,7 @@ function modelCheckedRationale(entry: Reconciled, matchMode: MatchMode): string 
       ? ` Second opinion (matcher, ${matchMode}): ${matcher}, which agrees.`
       : entry.disagreement === 'one_step'
         ? ` Second opinion (matcher, ${matchMode}): ${matcher}, one step apart. Shown, not acted on.`
-        : entry.capped
-          ? ` Second opinion (matcher, ${matchMode}): ${matcher}. Score lowered pending review: the model said ${entry.enforcedVerdict.replace('_', ' ')} but the quote shares no words with the requirement. A person should check.`
-          : ` Second opinion (matcher, ${matchMode}): ${matcher}, two steps or more apart. Shown, not acted on: the quote does share words with the requirement, or the model is the lower one.`;
-  return `${model}${code}${second}`;
+        : ` Second opinion (matcher, ${matchMode}): ${matcher}, two steps or more apart. Shown, not acted on: the model's verdict is what is scored.`;
+  const flag = entry.quoteNoOverlap ? ' Quote shares no words with the requirement; a person should check.' : '';
+  return `${model}${code}${second}${flag}`;
 }

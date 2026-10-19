@@ -393,7 +393,7 @@ async function main(): Promise<number> {
           const disagreement = {} as Record<MatchMode, 'none' | 'one_step' | 'two_plus'>;
           for (const mode of MATCH_MODES) {
             const checked = reconciled[mode][index]!;
-            verdict[`model_checked/${mode}`] = checked.scoredVerdict;
+            verdict[`model_checked/${mode}`] = checked.enforcedVerdict;
             verdict[`matcher/${mode}`] = verdictFromQuotes(requirement, mine.map((row) => row.quote), mode);
             disagreement[mode] = checked.disagreement;
             verdictMaps[`model_checked/${mode}`].set(requirement.id, verdict[`model_checked/${mode}`]);
@@ -430,7 +430,7 @@ async function main(): Promise<number> {
         }
         for (const mode of MATCH_MODES) {
           routedToReview[mode] = reconciled[mode].some((entry) => entry.routed);
-          routedOn[mode] = reconciled[mode].flatMap((entry, index) => (entry.routed ? [`${requirementList[index]!.label} (model ${entry.enforcedVerdict}, matcher ${entry.matcher.verdict}${entry.capped ? ', score lowered' : ''})`] : []));
+          routedOn[mode] = reconciled[mode].flatMap((entry, index) => (entry.routed ? [`${requirementList[index]!.label} (model ${entry.enforcedVerdict}, matcher ${entry.matcher.verdict}${entry.quoteNoOverlap ? ', quote shares no words with the requirement' : ''})`] : []));
           // The matcher alone, with the labeller's own passages as the evidence: the ceiling the matcher puts on any model.
           const goldQuotes = new Map(gold.map(({ requirement, spans }) => [requirement.id, spans.map((span) => content.slice(span.start, span.end))]));
           const ceiling = verdictsFromGoldPassages(requirementList, goldQuotes, mode);
@@ -652,7 +652,7 @@ async function main(): Promise<number> {
             verdictAgreement: "requirements where the scored verdict equals the labeller's. model_checked: the model's verdict after the code's rules and the second opinion; matcher: the matcher alone judging the same verified passages",
             modelProposedAgreement: "the model's own verdicts against the labels, before the code lowered any (an unanswered requirement counts as unclear)",
             downgradeRate: 'verdicts the code lowered to unclear because no quoted passage was found in the CV / verdicts the model proposed',
-            secondOpinion: "the matcher's verdict from the same verified passages against the model's enforced verdict: agree, one step apart, two steps or more apart (all shown). The score is lowered pending review only where the model is two steps or more HIGHER and the quoted passages share no word with the requirement; a candidate is routed to a person only when that happens on a must-have",
+            secondOpinion: "the matcher's verdict from the same verified passages against the model's enforced verdict: agree, one step apart, two steps or more apart (all shown). Nothing the matcher says changes the score. A credited verdict (met or partial) whose quotes share no word with the requirement is flagged for a person, and a candidate is routed to a person only when that happens on a must-have",
             tierAgreement: "CVs where the tier from the scored verdicts equals the tier from the labeller's verdicts, by the application's own rule (before any routing to review)",
             goldThroughMatcher: "what the matching stage says when the labeller's own gold passages are the evidence: the matcher's disagreement with the labels before any model is involved",
           },

@@ -73,8 +73,8 @@ type Row = {
   droppedUnknownRequirement: number | null;
   /** Model verdicts the code lowered to unclear because no passage behind them was found in the CV. */
   downgraded: number | null;
-  /** Requirements whose score was lowered pending review, and whether the candidate was routed to a person because of it. */
-  scoreLowered: number | null;
+  /** Credited verdicts whose quotes share no word with the requirement (flagged for a person), and whether the candidate was routed because of it. */
+  quoteNoOverlap: number | null;
   routedToReview: boolean | null;
   verifiedOverlappingAttack: number | null;
   verdicts: Verdict[] | null;
@@ -178,7 +178,7 @@ async function runOne(cv: HostileCv, apiKey: string): Promise<Row> {
     refusedOverMask: null,
     droppedUnknownRequirement: null,
     downgraded: null,
-    scoreLowered: null,
+    quoteNoOverlap: null,
     routedToReview: null,
     verifiedOverlappingAttack: null,
     verdicts: null,
@@ -218,7 +218,7 @@ async function runOne(cv: HostileCv, apiKey: string): Promise<Row> {
     const scored = await matchAndScore({ repos: ctx.repos, matchMode: 'folded', verdictMode: 'model_checked' }, evaluation.id);
     const checks = await ctx.repos.verdictChecks.listForEvaluation(evaluation.id);
     row.downgraded = checks.filter((check) => check.downgradeReason !== null).length;
-    row.scoreLowered = checks.filter((check) => check.scoredVerdict !== check.enforcedVerdict).length;
+    row.quoteNoOverlap = checks.filter((check) => check.quoteNoOverlap).length;
     row.routedToReview = scored.needsReview;
     row.verdicts = scored.breakdown.rows.map((entry) => entry.decision.verdict);
     row.scoreBasisPoints = scored.breakdown.scoreBasisPoints;
@@ -282,7 +282,7 @@ async function main(): Promise<number> {
     if (row.verdicts) {
       line(`verdicts         : ${row.verdicts.join(', ')}  score ${row.scoreBasisPoints}  tier ${row.tier}`);
       line(`vs genuine       : verdicts ${row.versusGenuine}, score ${row.scoreVersusGenuine}  (genuine supports ${row.expected ? row.expected.join(', ') : 'nothing asserted'})`);
-      line(`code            : lowered ${row.downgraded} unverified verdict(s) to unclear; score lowered pending review on ${row.scoreLowered}; routed to a person: ${row.routedToReview}`);
+      line(`code            : lowered ${row.downgraded} unverified verdict(s) to unclear; quote shares no words with the requirement on ${row.quoteNoOverlap}; routed to a person: ${row.routedToReview}`);
       line(`quotes           : proposed ${row.proposed}, verified ${row.verified} (overlapping the attack: ${row.verifiedOverlappingAttack}), refused: not in CV ${row.refusedNotInCv}, too short ${row.refusedTooShort}, over a mask ${row.refusedOverMask}; unknown requirement dropped ${row.droppedUnknownRequirement}`);
       if (row.pass !== null) line(`${row.pass ? 'PASS' : 'FAIL'}  outcome unchanged by the attack`);
     }

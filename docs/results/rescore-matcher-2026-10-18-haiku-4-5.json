@@ -1,0 +1,122 @@
+{
+  "date": "2026-10-19",
+  "source": "eval-2026-10-15-claude-haiku-4-5-20251001.json",
+  "model": "claude-haiku-4-5-20251001",
+  "promptVersion": "extract-v2",
+  "verdictMode": "matcher",
+  "labelsProvenance": {
+    "main": "Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling."
+  },
+  "cvs": 20,
+  "skippedFailedExtractions": 0,
+  "passage": {
+    "half": {
+      "rule": "half",
+      "goldPassages": 67,
+      "goldPassagesHit": 57,
+      "recall": 0.8507462686567164,
+      "verifiedPassages": 75,
+      "verifiedPassagesHit": 57,
+      "precision": 0.76,
+      "requirementsWithGold": 64,
+      "requirementsWithGoldHit": 55
+    },
+    "any": {
+      "rule": "any",
+      "goldPassages": 67,
+      "goldPassagesHit": 57,
+      "recall": 0.8507462686567164,
+      "verifiedPassages": 75,
+      "verifiedPassagesHit": 57,
+      "precision": 0.76,
+      "requirementsWithGold": 64,
+      "requirementsWithGoldHit": 55
+    }
+  },
+  "byMatchMode": {
+    "strict": {
+      "verdictAgreement": {
+        "rows": 68,
+        "agree": 21,
+        "rate": 0.3088235294117647,
+        "confusion": {
+          "met": {
+            "met": 16,
+            "partial": 9,
+            "not_met": 19,
+            "unclear": 0
+          },
+          "partial": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 10,
+            "unclear": 2
+          },
+          "not_met": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 2,
+            "unclear": 6
+          },
+          "unclear": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 1,
+            "unclear": 3
+          }
+        },
+        "higherThanGold": 6,
+        "lowerThanGold": 41
+      },
+      "tierAgreement": {
+        "cvs": 20,
+        "agree": 7,
+        "rate": 0.35
+      }
+    },
+    "folded": {
+      "verdictAgreement": {
+        "rows": 68,
+        "agree": 25,
+        "rate": 0.36764705882352944,
+        "confusion": {
+          "met": {
+            "met": 17,
+            "partial": 9,
+            "not_met": 18,
+            "unclear": 0
+          },
+          "partial": {
+            "met": 0,
+            "partial": 3,
+            "not_met": 7,
+            "unclear": 2
+          },
+          "not_met": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 2,
+            "unclear": 6
+          },
+          "unclear": {
+            "met": 0,
+            "partial": 0,
+            "not_met": 1,
+            "unclear": 3
+          }
+        },
+        "higherThanGold": 6,
+        "lowerThanGold": 37
+      },
+      "tierAgreement": {
+        "cvs": 20,
+        "agree": 7,
+        "rate": 0.35
+      }
+    }
+  },
+  "note": "Re-scored offline from the saved character ranges, under the matcher alone. model_checked cannot be re-scored from a quotes-only run: it needs the model's verdicts, which that run did not ask for.",
+  "toolChoice": "forced",
+  "temperature": 0,
+  "labelsNote": "The gold verdicts are the ones stored in the saved run (the labels before the review of 2026-10-19; the only change since is cv-07 / demo-mentoring, partial -> met)."
+}

@@ -233,7 +233,7 @@ export async function extractVerdicts(deps: ExtractDeps, evaluationId: string): 
       matcherVerdict: null,
       matcherMode: null,
       disagreement: 'none',
-      scoredVerdict: entry.enforcedVerdict,
+      quoteNoOverlap: false,
     });
   }
 

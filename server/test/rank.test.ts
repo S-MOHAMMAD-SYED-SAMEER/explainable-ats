@@ -542,7 +542,7 @@ test('ranking added no table, and nothing stores a rank', async (t) => {
   // for another reason (the extraction record) is added here deliberately.
   assert.deepEqual(
     [...files].sort(),
-    ['001_foundation.sql', '002_domain.sql', '003_evaluation_records.sql', '004_verdict_checks.sql'],
+    ['001_foundation.sql', '002_domain.sql', '003_evaluation_records.sql', '004_verdict_checks.sql', '005_quote_no_overlap.sql'],
     'ranking must not have added a migration',
   );
   for (const file of files) {

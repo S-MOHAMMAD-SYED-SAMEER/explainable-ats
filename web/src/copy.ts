@@ -115,13 +115,12 @@ export function kindLabel(kind: string): string {
 
 // --- the model's verdict and the second opinion ----------------------------------------------------------------------------------
 
-/** What a recruiter reads about a requirement's second opinion. Every difference is shown; only a lowered score (and, for a must-have, the routing to review that follows) is acted on. */
+/** What a recruiter reads about a requirement's second opinion. Every difference is shown and none changes the score; a credited quote that shares no word with the requirement is flagged, and on a must-have it routes the candidate to review. */
 export const SECOND_OPINION = {
   banner:
-    'Score lowered pending review. On at least one must-have the model gave a verdict but the passage it quoted shares no words with the requirement, so the score uses the matcher\'s lower verdict until a person checks.',
-  scoreLowered: (verdict: string): string =>
-    `Score lowered pending review: the model said ${verdict.replace('_', ' ')} but the quote shares no words with the requirement. A person should check.`,
-  shownOnly: 'The two differ by two steps or more. Shown, not acted on: the quote does share words with the requirement, or the model is the lower one.',
+    'Quote shares no words with the requirement; a person should check. On at least one must-have the model credited the candidate on a passage that has no word in common with it. The score is the model\'s verified verdict and has not been changed.',
+  quoteNoOverlap: 'Quote shares no words with the requirement; a person should check.',
+  shownOnly: 'The two differ by two steps or more. Shown, not acted on: the model\'s verified verdict is what is scored.',
   oneStep: 'The two differ by one step. Shown, not acted on.',
   lowered: (verdictLabel: string): string => `Lowered to ${verdictLabel.toLowerCase()} by the code: no passage the model quoted for this was found in the CV.`,
 } as const;

@@ -237,12 +237,14 @@ test('the score follows the mode, and omitting the mode is strict', () => {
 
 // --- the setting ------------------------------------------------------------------------------------------
 
-test('MATCH_MODE is strict unless it says folded, and a bad value is reported and ignored', () => {
-  assert.equal(loadConfig({}).config.matchMode, 'strict');
+test('MATCH_MODE is folded by default (the measured setup), strict on request, strict in the demo, and a bad value is reported and ignored', () => {
+  assert.equal(loadConfig({}).config.matchMode, 'folded');
   assert.equal(loadConfig({ MATCH_MODE: 'folded' }).config.matchMode, 'folded');
   assert.equal(loadConfig({ MATCH_MODE: 'strict' }).config.matchMode, 'strict');
+  // The demo's fixtures (and their copies in the portfolio sites) were recorded with the library default, so the demo keeps it.
+  assert.equal(loadConfig({ APP_MODE: 'demo' }).config.matchMode, 'strict');
 
   const bad = loadConfig({ MATCH_MODE: 'fuzzy' });
-  assert.equal(bad.config.matchMode, 'strict', 'a bad value never silently turns folding on');
+  assert.equal(bad.config.matchMode, 'folded', 'a bad value falls back to the default');
   assert.ok(bad.problems.some((problem) => problem.includes('MATCH_MODE')));
 });
