@@ -430,6 +430,12 @@ test('the stand-in extractor is described as what it is, wherever it is describe
 
   assert.equal(historyActorLabel('ai', 'mock'), 'Deterministic demo extraction (no AI model)');
   assert.equal(historyActorLabel('ai', 'some-real-model'), 'By the model', 'a real model must still be described as one');
+  // A replay of a saved real reply is neither the stand-in nor a live call, and the history says so.
+  assert.equal(
+    historyActorLabel('ai', 'replay:claude-haiku-4-5-20251001:2026-10-19'),
+    'Replayed from a saved Claude Haiku 4.5 reply (2026-10-19), no new request',
+  );
+  assert.doesNotMatch(historyActorLabel('ai', 'replay:claude-haiku-4-5-20251001:2026-10-19'), /Deterministic|no AI model/);
   assert.equal(historyActorLabel('human', 'demo-visitor'), 'By a person');
   assert.equal(historyActorLabel('system', null), 'Automatic');
 

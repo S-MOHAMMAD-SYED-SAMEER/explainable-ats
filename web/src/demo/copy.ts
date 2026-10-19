@@ -13,6 +13,8 @@
 // "the model read the CV", a vendor's name — would be the one dishonest thing a
 // demo can do, so none of it belongs in this file.
 
+import { isReplay, replayDescription } from '../copy.ts';
+
 export const DEMO_TITLE = 'Interactive ATS Demo';
 
 /** The one call to action on the front page, and the only button that leads into the demo. */
@@ -245,7 +247,10 @@ export const DEMO_LABELS = {
  * with the `ai` actor is a real model, and is described as one.
  */
 export function historyActorLabel(actor: string, actorId: string | null): string {
-  if (actor === 'ai') return actorId === 'mock' ? 'Deterministic demo extraction (no AI model)' : 'By the model';
+  if (actor === 'ai') {
+    if (isReplay(actorId)) return replayDescription(actorId);
+    return actorId === 'mock' ? 'Deterministic demo extraction (no AI model)' : 'By the model';
+  }
   if (actor === 'human') return 'By a person';
   return 'Automatic';
 }

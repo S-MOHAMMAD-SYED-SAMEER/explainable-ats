@@ -124,3 +124,21 @@ export const SECOND_OPINION = {
   oneStep: 'The two differ by one step. Shown, not acted on.',
   lowered: (verdictLabel: string): string => `Lowered to ${verdictLabel.toLowerCase()} by the code: no passage the model quoted for this was found in the CV.`,
 } as const;
+
+/**
+ * A replay of a saved real reply (`server/scripts/live-replay.ts`) records itself as `replay:<model>:<date>`. It is not the stand-in
+ * extractor and it is not a live call, and the history says exactly that.
+ */
+const MODEL_NAMES: Readonly<Record<string, string>> = {
+  'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
+  'claude-sonnet-5-5': 'Claude Sonnet 5.5',
+};
+
+export function isReplay(actorId: string | null): actorId is string {
+  return actorId !== null && actorId.startsWith('replay:');
+}
+
+export function replayDescription(actorId: string): string {
+  const [, model = '', date = ''] = actorId.split(':');
+  return `Replayed from a saved ${MODEL_NAMES[model] ?? (model || 'model')} reply${date ? ` (${date})` : ''}, no new request`;
+}

@@ -1,5 +1,5 @@
 import type { AuditEntry, EvaluationDetail } from '../api/types.ts';
-import { outcomeWording, verdictWording } from '../copy.ts';
+import { isReplay, outcomeWording, replayDescription, verdictWording } from '../copy.ts';
 import { DEMO_LABELS } from './copy.ts';
 import {
   asRecord,
@@ -83,6 +83,7 @@ function nameOfRequirement(detail: Named, requirementId: string | null, fallback
 
 function actorFor(event: AuditEntry): string | null {
   if (event.actor === 'ai') {
+    if (isReplay(event.actorId)) return replayDescription(event.actorId);
     return event.actorId === 'mock' ? 'Deterministic demo extraction (no AI model)' : 'Language model';
   }
   if (event.eventType === 'decision_recorded') return 'Demo recruiter';
