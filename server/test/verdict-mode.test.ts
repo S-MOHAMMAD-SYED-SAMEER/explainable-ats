@@ -546,6 +546,9 @@ test('the saved live reply (Haiku 4.5 on cv-02) replays with no request: three v
   const run = spawnSync(process.execPath, ['scripts/live-replay.ts', `--replay=${file.pathname.replace(/^\/([A-Za-z]:)/, '$1')}`], { cwd: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), encoding: 'utf8', env });
   assert.equal(run.status, 0, run.stdout + run.stderr);
   assert.match(run.stdout, /No request is made/);
+  // A replay is recorded as a replay of the saved model, never as the mock stand-in or a live call.
+  assert.match(run.stdout, /extraction recorded as: replay:claude-haiku-4-5-20251001:2026-10-19/);
+  assert.doesNotMatch(run.stdout, /extraction recorded as: mock/);
   assert.match(run.stdout, /routed to review: true/);
   assert.equal((run.stdout.match(/quote shares no words: true/g) ?? []).length, 3, 'all three credited quotes are paraphrases the matcher cannot see');
   for (const requirement of saved.reply.requirements) assert.ok(run.stdout.includes(requirement.reason), `the reason for ${requirement.label} is shown`);

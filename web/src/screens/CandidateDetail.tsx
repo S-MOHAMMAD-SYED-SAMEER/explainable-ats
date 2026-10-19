@@ -14,6 +14,7 @@ import { contextFor, spansFromRequirements } from '../demo/evidence.ts';
 import {
   MIN_REASON_CHARS,
   OUTCOMES,
+  isReplay,
   kindLabel,
   outcomeWording,
   SECOND_OPINION,
@@ -526,7 +527,7 @@ function History({ evaluationId }: { evaluationId: string }): ReactNode {
                 </div>
                 <p className="mt-1 text-meta text-ink-muted">
                   {historyActorLabel(event.actor, event.actorId)}
-                  {event.actorId && event.actorId !== 'mock' ? ` (${event.actorId})` : ''}
+                  {event.actorId && event.actorId !== 'mock' && !isReplay(event.actorId) ? ` (${event.actorId})` : ''}
                   {event.outcome === 'ok' ? '' : ` — ${event.outcome}`}
                 </p>
               </li>

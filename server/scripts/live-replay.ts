@@ -6,7 +6,6 @@ import { createDatabase } from '../src/db/index.ts';
 import { runMigrations } from '../src/db/migrate.ts';
 import { createRepositories } from '../src/db/repositories/index.ts';
 import { createAnthropicProvider } from '../src/adapters/llm/anthropic.ts';
-import { createMockLlmProvider } from '../src/adapters/llm/mock.ts';
 import type { LlmProvider, LlmResponse } from '../src/adapters/llm/types.ts';
 import { createJob, ingestResume } from '../src/agent/ingest.ts';
 import { openEvaluation } from '../src/agent/extract.ts';
@@ -120,18 +119,28 @@ async function main(): Promise<number> {
   } else {
     saved = JSON.parse(fs.readFileSync(replayPath!, 'utf8')) as Saved;
     if (saved.cv.id !== cvId && argValue('--cv') !== undefined) throw new Error(`The saved reply is for ${saved.cv.id}, not ${cvId}.`);
-    const mock = createMockLlmProvider();
-    mock.registerResponder(VERDICT_PURPOSE, (request) => {
-      const parsed = parseExtractionPrompt(request.messages[0]!.content);
-      const byLabel = new Map(saved!.reply.requirements.map((item) => [item.label, item]));
-      return {
-        requirements: parsed.requirements.flatMap((requirement) => {
-          const item = byLabel.get(requirement.label);
-          return item ? [{ requirementId: requirement.id, verdict: item.verdict, passages: item.passages, reason: item.reason }] : [];
-        }),
-      };
-    });
-    provider = mock;
+    // Its own provider, with its own name, and a model id that says what it is: `replay:<model>:<date>`. It is NOT the mock, so the
+    // app's history line says "Replayed from a saved <model> reply (<date>), no new request" and never "Deterministic demo extraction".
+    const replayModel = `replay:${saved.model}:${saved.date}`;
+    provider = {
+      name: 'replay',
+      configured: true,
+      async complete(request) {
+        if (request.purpose !== VERDICT_PURPOSE) throw new Error(`The replay holds only the ${VERDICT_PURPOSE} reply.`);
+        const parsed = parseExtractionPrompt(request.messages[0]!.content);
+        const byLabel = new Map(saved!.reply.requirements.map((item) => [item.label, item]));
+        return {
+          output: {
+            requirements: parsed.requirements.flatMap((requirement) => {
+              const item = byLabel.get(requirement.label);
+              return item ? [{ requirementId: requirement.id, verdict: item.verdict, passages: item.passages, reason: item.reason }] : [];
+            }),
+          },
+          model: replayModel,
+          latencyMs: 0,
+        };
+      },
+    };
     line(`REPLAY of ${path.basename(replayPath!)} (${saved.model}, ${saved.date}). No request is made.`);
   }
 
@@ -193,6 +202,7 @@ async function main(): Promise<number> {
     const scored = await matchAndScore({ repos, matchMode: config.matchMode, verdictMode: 'model_checked' }, evaluation.id);
     const detail = (await handleEvaluationDetail({ repos }, evaluation.id)).body;
     line(`score ${detail.scorePercent} (${scored.breakdown.scoreBasisPoints}), tier ${detail.tier}, routed to review: ${detail.needsReview}, evaluation ${evaluation.id}`);
+    line(`extraction recorded as: ${detail.model ?? 'n/a'}`);
     for (const requirement of detail.requirements) {
       const check = requirement.check;
       line(`- ${requirement.label} [${requirement.kind}]: ${requirement.verdict}  (model: ${check?.modelVerdict ?? 'n/a'}; matcher: ${check?.matcherVerdict ?? 'n/a'}; disagreement: ${check?.disagreement ?? 'n/a'}; quote shares no words: ${check?.quoteNoOverlap ?? 'n/a'})`);
