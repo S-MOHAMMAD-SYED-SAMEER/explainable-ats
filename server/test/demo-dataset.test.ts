@@ -445,11 +445,21 @@ const TIER_PHRASES: Array<[RegExp, 'qualified' | 'gated' | 'needs_review' | 'not
  * What a blurb says about where its candidate is: the tier it names, whether it says "the top of the list", and every
  * "above <name>" / "below <name>". Exported by copy to the portfolio's parity test, which makes the same check on the demo's own text.
  */
-function claimsOf(blurb: string) {
+function claimsOf(blurb: string, known: readonly string[] = []) {
   return {
     tiers: new Set(TIER_PHRASES.filter(([pattern]) => pattern.test(blurb)).map(([, tier]) => tier)),
     top: /\bthe top of the list\b/i.test(blurb),
-    relations: [...blurb.matchAll(/\b(above|below) ([A-Z][a-z]+)\b/g)].map((match) => ({ relation: match[1] as 'above' | 'below', name: match[2] as string })),
+    // "above Marcus", or "above him" / "below her": a pronoun means the last candidate named before it.
+    relations: [...blurb.matchAll(/\b(above|below) ([A-Z][a-z]+|him|her|them)\b/g)].flatMap((match) => {
+      const relation = match[1] as 'above' | 'below';
+      let name = match[2] as string;
+      if (/^[a-z]/.test(name)) {
+        const before = blurb.slice(0, match.index);
+        const named = [...before.matchAll(/\b([A-Z][a-z]+)\b/g)].map((word) => word[1] as string).filter((word) => known.includes(word));
+        name = named[named.length - 1] ?? '';
+      }
+      return name === '' ? [] : [{ relation, name }];
+    }),
   };
 }
 
@@ -462,7 +472,7 @@ test('every blurb is true of the demo: its tier, "the top of the list", and "abo
   for (const candidate of DEMO_CANDIDATES) {
     const entry = byReference.get(candidate.reference);
     assert.ok(entry, `${candidate.displayName} is not in the ranking`);
-    const claims = claimsOf(candidate.expected.demonstrates);
+    const claims = claimsOf(candidate.expected.demonstrates, DEMO_CANDIDATES.map((item) => item.displayName.split(' ')[0] as string));
 
     assert.deepEqual([...claims.tiers], [entry.tier], `${candidate.displayName}: the blurb names the tier ${[...claims.tiers].join(', ') || '(none)'} but the ranking says ${entry.tier}`);
     assert.equal(claims.top, entry.position === 1, `${candidate.displayName}: the blurb ${claims.top ? 'says' : 'does not say'} "the top of the list" but the position is ${entry.position}`);
@@ -484,6 +494,7 @@ test('the check above can fail: a blurb that names the wrong tier, top spot or o
   assert.deepEqual([...claimsOf('Gated (missing an essential).').tiers], ['gated']);
   assert.equal(claimsOf('The top of the list.').top, true);
   assert.equal(claimsOf('Placed below Devi and above Marcus.').relations.length, 2);
+  assert.deepEqual(claimsOf('Same score as Marcus, placed above him.', ['Marcus']).relations, [{ relation: 'above', name: 'Marcus' }]);
   assert.deepEqual(claimsOf('Placed below Devi and above Marcus.').relations, [
     { relation: 'below', name: 'Devi' },
     { relation: 'above', name: 'Marcus' },

@@ -196,7 +196,7 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
       scoreBasisPoints: 7_142,
       verdicts: ['met', 'met', 'not_met'],
       demonstrates:
-        'Qualified: meets both essentials. Mentoring reads "does not meet", but her CV says nothing about mentoring: with word endings folded her job title, "Backend Engineer", shares the word "engineer" with the requirement and was quoted as if it were evidence. That is the matcher\'s cost, not a finding about her. Scores the same as Marcus and is placed above Marcus.',
+        'Qualified: meets both essentials. Her CV says nothing about mentoring, yet it reads "does not meet": with word endings folded, her title "Backend Engineer" shares "engineer" with the requirement. That is the matcher\'s limit, not a finding about her. Same score as Marcus, placed above him.',
     },
     // (3x10000 + 2x5000 + 2x0) / 7
     expectedStrict: { tier: 'gated', scoreBasisPoints: 5_714, verdicts: ['met', 'partial', 'unclear'] },
