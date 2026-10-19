@@ -3,7 +3,7 @@
 Screens a CV against a role and explains every placement with the exact sentences from the CV that earned it: a model proposes each verdict and quotes the CV, code checks every quote and does the arithmetic, and a recruiter decides.
 
 <!-- SCREENSHOT: candidate detail view (score, verdicts, quoted evidence) goes here -->
-<!-- DEMO_VIDEO: 60–90s screen recording of the app running locally goes here -->
+**Demo video (88 seconds, AI-voice narration, English captions):** [watch it on the case study](https://portfolio-azure-six-79.vercel.app/case-study-explainable-ats.html). It is a recording of the real app on live Claude Haiku 4.5 runs over invented CVs. A YouTube copy will be linked here when it exists.
 
 ## Key facts
 
