@@ -147,7 +147,7 @@ The README has a [worked example](../README.md#scoring) you can recompute with a
 |---|---|
 | `qualified` | `mustHavesMet >= mustHavesTotal` |
 | `gated` | At least one must-have is not `met` and was **addressed** (`partial` or `not_met`) |
-| `needs_review` | Every missed must-have is `unclear`: the CV said nothing either way |
+| `needs_review` | Every missed must-have is `unclear` (the CV said nothing either way), **or** a credited must-have has the `quote_no_overlap` flag (its quote shares no word with the requirement). The candidate page and the ranking sentence say which, or both |
 | `not_evaluated` | No evaluation, or one that was never scored |
 
 Candidates sort by tier, then score (highest first), then must-haves met, then evaluation time, then candidate id, which is a stable but arbitrary final tie-break. Candidates who tie on tier, score and must-haves share a competition rank (1, 2, 2, 4) and are reported as tied.

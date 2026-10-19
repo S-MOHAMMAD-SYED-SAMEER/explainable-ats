@@ -86,6 +86,27 @@ export function tierWording(tier: string): Wording {
   return TIER_WORDING[tier as Tier] ?? { label: tier, detail: '', tone: 'neutral' };
 }
 
+/**
+ * Why a candidate is "worth a look" depends on WHY. There are two reasons and they are different facts:
+ *   - the CV says nothing about an essential requirement (a verdict of "not demonstrated"): a gap in the CV;
+ *   - a quote credited on an essential requirement shares no word with it (the flag): a person should check it before the score is relied on.
+ * It can be both. For every other tier the sentence is the tier's own.
+ */
+export const NEEDS_REVIEW_REASONS = {
+  silent: 'The CV says nothing either way about an essential requirement. That is a gap in the CV, not a mark against the candidate.',
+  flagged: 'A quote credited on an essential requirement shares no words with it, so a person should check it before relying on the score.',
+  both: 'The CV says nothing either way about one essential requirement, and a quote credited on another shares no words with it. The first is a gap in the CV, not a mark against the candidate; the second should be checked by a person before the score is relied on.',
+} as const;
+
+export function tierExplanation(tier: string, reasons: { unclearMustHaves?: readonly string[]; flaggedMustHaves?: readonly string[] } = {}): string {
+  if (tier !== 'needs_review') return tierWording(tier).detail;
+  const silent = (reasons.unclearMustHaves?.length ?? 0) > 0;
+  const flagged = (reasons.flaggedMustHaves?.length ?? 0) > 0;
+  if (silent && flagged) return NEEDS_REVIEW_REASONS.both;
+  if (flagged) return NEEDS_REVIEW_REASONS.flagged;
+  return NEEDS_REVIEW_REASONS.silent;
+}
+
 export function verdictWording(verdict: string | null): Wording {
   if (verdict === null) return { label: 'Not assessed', detail: '', tone: 'neutral' };
   return VERDICT_WORDING[verdict as Verdict] ?? { label: verdict, detail: '', tone: 'neutral' };

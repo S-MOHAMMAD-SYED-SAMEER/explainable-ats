@@ -60,7 +60,11 @@ export function routeToReview(ranking: Ranking, routed: ReadonlyMap<string, read
         rationale:
           `${place} Scored ${formatScore(entry.scoreBasisPoints ?? 0)} and meets ${entry.mustHavesMet} of ${entry.mustHavesTotal} must-haves, ` +
           `but on ${labels.map((label) => `"${label}"`).join(', ')} the quote shares no words with the requirement; ` +
-          'a person should check.',
+          'a person should check.' +
+          // A candidate can be worth a look for two reasons at once: say both, not only the flag.
+          (entry.unclearMustHaves.length > 0
+            ? ` The resume also said nothing about ${entry.unclearMustHaves.map((label) => `"${label}"`).join(', ')}, so that is unresolved rather than failed.`
+            : ''),
       };
     }
     return { ...renumbered, rationale: PLACE_SENTENCE.test(entry.rationale) ? entry.rationale.replace(PLACE_SENTENCE, place) : entry.rationale };
