@@ -218,7 +218,7 @@ export async function extractVerdicts(deps: ExtractDeps, evaluationId: string): 
     list.push(entry.finding.quote);
     verifiedByRequirement.set(entry.finding.requirementId, list);
   }
-  const enforced = enforceVerdicts({ requirements, answers, verifiedPassages: verifiedByRequirement, contentText: resume.contentText });
+  const enforced = enforceVerdicts({ requirements, answers, verifiedPassages: verifiedByRequirement });
 
   for (const entry of enforced) {
     await repos.verdictChecks.record({

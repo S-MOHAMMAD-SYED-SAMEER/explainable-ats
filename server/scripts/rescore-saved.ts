@@ -20,7 +20,7 @@ import { passageMetrics, tierAgreement, tierOfVerdicts, verdictAgreement, verdic
 // kind CANNOT be re-scored under `model_checked`, and this script does not pretend to: the first `model_checked` numbers come from a new
 // run (prompt `extract-v3`).
 //
-// The labels it scores against are the main set's: "drafted by ChatGPT, checked by Sameer; full review in progress".
+// The labels it scores against are the main set's: "Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling.".
 
 type SavedRequirement = { requirementId: string; label: string; verifiedSpans: Span[]; goldSpans: Span[]; goldVerdict: LabelVerdict };
 type SavedCv = { id: string; contentSha256: string; result: string; requirements: SavedRequirement[] };

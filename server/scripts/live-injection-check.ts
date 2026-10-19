@@ -4,10 +4,11 @@ import { config } from '../src/config/env.ts';
 import { createAnthropicProvider } from '../src/adapters/llm/anthropic.ts';
 import type { LlmProvider } from '../src/adapters/llm/types.ts';
 import { createJob, ingestResume } from '../src/agent/ingest.ts';
-import { extractEvidence, openEvaluation } from '../src/agent/extract.ts';
+import { openEvaluation } from '../src/agent/extract.ts';
+import { extractVerdicts } from '../src/agent/extractVerdicts.ts';
 import { matchAndScore } from '../src/agent/match.ts';
 import { classify } from '../src/agent/rankRules.ts';
-import { EXTRACTION_PROMPT_VERSION } from '../src/agent/extractionSchema.ts';
+import { VERDICT_PROMPT_VERSION } from '../src/agent/verdictExtraction.ts';
 import { maxTokensFor } from '../src/agent/tokenBudget.ts';
 import { createMemoryLogger } from '../src/lib/logger.ts';
 import { createTestContext } from '../test/helpers.ts';
@@ -26,8 +27,9 @@ import { HOSTILE_CVS, HOSTILE_JOB, type HostileCv, type Verdict } from '../test/
 // only when ANTHROPIC_API_KEY is set and ANTHROPIC_LIVE_TEST is exactly "1".
 //
 // ONE REAL REQUEST PER HOSTILE CV (eight), through the real adapter and the real
-// pipeline: the model proposes quotes, every quote is verified against the CV, and
-// verdicts and the score are computed by code. Retries are off, so the request count is
+// pipeline in `model_checked` mode (prompt extract-v3): the model proposes a verdict and quotes
+// per requirement, every quote is verified against the CV, the code enforces its rules, the
+// matcher (folded) is the second opinion, and the score is computed by code. Retries are off, so the request count is
 // exact. It stops at once on a rejected request (a bad key, a billing problem, a rate
 // limit) and after two outages in a row; it never loops.
 //
@@ -69,6 +71,11 @@ type Row = {
   refusedTooShort: number | null;
   refusedOverMask: number | null;
   droppedUnknownRequirement: number | null;
+  /** Model verdicts the code lowered to unclear because no passage behind them was found in the CV. */
+  downgraded: number | null;
+  /** Requirements whose score was lowered pending review, and whether the candidate was routed to a person because of it. */
+  scoreLowered: number | null;
+  routedToReview: boolean | null;
   verifiedOverlappingAttack: number | null;
   verdicts: Verdict[] | null;
   scoreBasisPoints: number | null;
@@ -142,7 +149,7 @@ async function runOne(cv: HostileCv, apiKey: string): Promise<Row> {
 
   let threw = false;
   try {
-    await extractEvidence({ repos: ctx.repos, provider, logger }, evaluation.id);
+    await extractVerdicts({ repos: ctx.repos, provider, logger }, evaluation.id);
   } catch {
     threw = true;
   }
@@ -170,6 +177,9 @@ async function runOne(cv: HostileCv, apiKey: string): Promise<Row> {
     refusedTooShort: null,
     refusedOverMask: null,
     droppedUnknownRequirement: null,
+    downgraded: null,
+    scoreLowered: null,
+    routedToReview: null,
     verifiedOverlappingAttack: null,
     verdicts: null,
     scoreBasisPoints: null,
@@ -205,7 +215,11 @@ async function runOne(cv: HostileCv, apiKey: string): Promise<Row> {
       spans.some(([start, end]) => evidenceRow.charStart < end && evidenceRow.charEnd > start),
     ).length;
 
-    const scored = await matchAndScore({ repos: ctx.repos }, evaluation.id);
+    const scored = await matchAndScore({ repos: ctx.repos, matchMode: 'folded', verdictMode: 'model_checked' }, evaluation.id);
+    const checks = await ctx.repos.verdictChecks.listForEvaluation(evaluation.id);
+    row.downgraded = checks.filter((check) => check.downgradeReason !== null).length;
+    row.scoreLowered = checks.filter((check) => check.scoredVerdict !== check.enforcedVerdict).length;
+    row.routedToReview = scored.needsReview;
     row.verdicts = scored.breakdown.rows.map((entry) => entry.decision.verdict);
     row.scoreBasisPoints = scored.breakdown.scoreBasisPoints;
     const matches = await ctx.repos.matches.listForEvaluation(evaluation.id);
@@ -245,7 +259,7 @@ async function main(): Promise<number> {
   const selected = HOSTILE_CVS.filter((cv) => wanted === null || wanted.includes(cv.id.split('-')[1] as string));
   showQuotes = process.argv.includes('--show-quotes');
 
-  line(`model ${config.anthropicModel}, tool choice ${config.anthropicToolChoice}, temperature ${config.anthropicTemperature ?? 'not sent'}, prompt ${EXTRACTION_PROMPT_VERSION}`);
+  line(`model ${config.anthropicModel}, tool choice ${config.anthropicToolChoice}, temperature ${config.anthropicTemperature ?? 'not sent'}, prompt ${VERDICT_PROMPT_VERSION}, verdict mode model_checked, match mode folded`);
   line(`hostile CVs: ${selected.length} of ${HOSTILE_CVS.length} (${selected.length} requests, retries off)`);
   const estimatedInput = selected.reduce((sum, cv) => sum + Math.ceil(cv.text.length / 4) + 900, 0);
   line(`estimated input tokens: about ${estimatedInput.toLocaleString('en')}`);
@@ -268,6 +282,7 @@ async function main(): Promise<number> {
     if (row.verdicts) {
       line(`verdicts         : ${row.verdicts.join(', ')}  score ${row.scoreBasisPoints}  tier ${row.tier}`);
       line(`vs genuine       : verdicts ${row.versusGenuine}, score ${row.scoreVersusGenuine}  (genuine supports ${row.expected ? row.expected.join(', ') : 'nothing asserted'})`);
+      line(`code            : lowered ${row.downgraded} unverified verdict(s) to unclear; score lowered pending review on ${row.scoreLowered}; routed to a person: ${row.routedToReview}`);
       line(`quotes           : proposed ${row.proposed}, verified ${row.verified} (overlapping the attack: ${row.verifiedOverlappingAttack}), refused: not in CV ${row.refusedNotInCv}, too short ${row.refusedTooShort}, over a mask ${row.refusedOverMask}; unknown requirement dropped ${row.droppedUnknownRequirement}`);
       if (row.pass !== null) line(`${row.pass ? 'PASS' : 'FAIL'}  outcome unchanged by the attack`);
     }
@@ -310,7 +325,9 @@ async function main(): Promise<number> {
           model: config.anthropicModel,
           toolChoice: config.anthropicToolChoice,
           temperature: config.anthropicTemperature ?? 'unset (not sent: the model does not accept one)',
-          promptVersion: EXTRACTION_PROMPT_VERSION,
+          promptVersion: VERDICT_PROMPT_VERSION,
+          verdictMode: 'model_checked',
+          matchMode: 'folded',
           dataset: 'hostile CVs v1: 8 invented CVs, server/test/hostileCvs.ts, against the demo role',
           retries: 0,
           note: 'Counts and kinds only. No CV text, prompt, reply or quote is stored here.',

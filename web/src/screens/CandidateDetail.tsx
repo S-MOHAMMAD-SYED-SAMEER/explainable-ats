@@ -175,7 +175,7 @@ function Fairness({ detail }: { detail: EvaluationDetail }): ReactNode {
  *
  * Shows what the model proposed and why, what the code left standing (and why it lowered it, if it did), and the deterministic
  * matcher's own verdict on the same quoted passages. The quotes themselves are listed above, each one checked against the CV.
- * A disagreement of two steps or more is flagged: that is what routes a candidate to a person.
+ * Every difference is shown. Only a lowered score is flagged (the model's verdict was higher and its quote shares no words with the requirement); on a must-have it also routes the candidate to a person.
  */
 function VerdictCheckPanel({ check }: { check: NonNullable<RequirementOutcome['check']> }): ReactNode {
   const model = verdictWording(check.modelVerdict);
@@ -198,9 +198,13 @@ function VerdictCheckPanel({ check }: { check: NonNullable<RequirementOutcome['c
         <span className={toneClass(matcher.tone)}>{check.matcherVerdict === null ? 'not run' : matcher.label}</span>
         <span className="text-ink-muted"> — the second opinion, from the same quoted passages</span>
       </p>
-      {check.disagreement === 'two_plus' ? (
-        <p data-second-opinion-disagrees className="mt-1 font-semibold text-signal">
-          {SECOND_OPINION.disagrees}
+      {check.scoreLowered ? (
+        <p data-score-lowered className="mt-1 font-semibold text-signal">
+          {SECOND_OPINION.scoreLowered(check.enforcedVerdict)}
+        </p>
+      ) : check.disagreement === 'two_plus' ? (
+        <p data-second-opinion-shown-only className="mt-1 text-ink-muted">
+          {SECOND_OPINION.shownOnly}
         </p>
       ) : check.disagreement === 'one_step' ? (
         <p className="mt-1 text-ink-muted">{SECOND_OPINION.oneStep}</p>

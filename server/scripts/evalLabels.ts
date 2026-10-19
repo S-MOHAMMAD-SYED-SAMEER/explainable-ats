@@ -13,13 +13,13 @@ export const HELDOUT_DIR = path.join(EVAL_DIR, 'heldout');
 
 /**
  * WHO MADE THE LABELS, said exactly and in one place. Every results file, and every sentence anywhere that says what the labels are,
- * must say this and nothing grander. The main set's 68 labels were DRAFTED BY CHATGPT and then checked and submitted by Sameer: they are
- * not an independent human labelling, and Sameer's full review is in progress. The held-out set is labelled by Sameer alone, without AI,
- * and is never used for tuning prompts, rules, thresholds or matching.
+ * must say this and nothing grander. The main set's 68 labels were DRAFTED BY CHATGPT, reviewed independently by ChatGPT and Claude (who
+ * agreed on 64 of 68 rows), and their final decisions approved by Sameer: they are not an independent human labelling.
+ * The five held-out CVs have no labels: Sameer is not labelling them, they are excluded from every run (including Part C), and nothing is scored against them.
  */
 export const LABELS_PROVENANCE = {
-  main: 'drafted by ChatGPT, checked by Sameer; full review in progress',
-  heldout: 'Sameer, no AI',
+  main: 'Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling.',
+  heldout: 'none: these five CVs are unlabelled and are not used in any run',
 } as const;
 export type LabelSet = keyof typeof LABELS_PROVENANCE;
 
@@ -58,8 +58,8 @@ export function loadDataset(dir = EVAL_DIR): Dataset {
 }
 
 /**
- * The held-out set: five CVs for the same two roles, labelled by Sameer alone, without AI. Its manifest names the roles by the
- * ids in the main dataset, so the requirements are defined once.
+ * The held-out set: five CVs for the same two roles. They have no labels and are not used in any run; the files are kept. Its manifest
+ * names the roles by the ids in the main dataset, so the requirements are defined once.
  */
 export function loadHeldoutDataset(dir = HELDOUT_DIR): Dataset {
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'dataset.json'), 'utf8')) as { version: string; rolesFrom: string; cvs: CvEntry[] };

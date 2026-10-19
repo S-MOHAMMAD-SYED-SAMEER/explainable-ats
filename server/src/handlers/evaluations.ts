@@ -1,5 +1,6 @@
 import { classify, type RankTier } from '../agent/rankRules.ts';
 import { formatScore } from '../agent/score.ts';
+import { routesToReview, scoreLowered } from '../agent/verdictMode.ts';
 import { AppError } from '../lib/errors.ts';
 import { ProblemCollector, requireObject, requireOneOf, requireString } from '../lib/validate.ts';
 import { DECISION_OUTCOMES, type ConfidenceLevel, type DecisionOutcome, type MatchVerdict, type RequirementKind } from '../domain/ats.ts';
@@ -49,10 +50,14 @@ export type VerdictCheckView = {
   enforcedVerdict: MatchVerdict;
   /** Set when the code lowered the model's verdict because no passage it quoted was found in the resume. */
   downgradeReason: 'no_verified_passage' | 'no_answer' | null;
-  /** The matcher's own verdict from the same verified passages, and how it compares: none, one step (shown), two or more (routed to a person). */
+  /** The matcher's own verdict from the same verified passages, and how far apart the two are: none, one step, two or more (always shown). */
   matcherVerdict: MatchVerdict | null;
   matcherMode: 'strict' | 'folded' | null;
   disagreement: 'none' | 'one_step' | 'two_plus';
+  /** True when the score uses a lower verdict than the model's, pending review: the model's verdict was higher and its quote shares no word with the requirement. */
+  scoreLowered: boolean;
+  /** True when this requirement sends the candidate to a person: a must-have whose score was lowered pending review. */
+  routed: boolean;
   /** The verdict the score used. */
   scoredVerdict: MatchVerdict;
 };
@@ -125,7 +130,7 @@ export type EvaluationDetail = {
   extraction: ExtractionView | null;
   /** Who decided the verdicts that were scored: the model, checked by the code and a second opinion, or the matcher alone. */
   verdictMode: 'model_checked' | 'matcher';
-  /** True when the second opinion disagreed by two steps or more on some requirement: this candidate is routed to a person. */
+  /** True when the score of some must-have was lowered pending review: this candidate is routed to a person. */
   needsReview: boolean;
   /**
    * True when the model answered properly and quoted nothing. Every requirement then
@@ -164,8 +169,11 @@ export async function handleEvaluationDetail(
   const classified = classify(evaluation, matches, requirements);
   const { failedMustHaves, unclearMustHaves } = classified;
   const checkByRequirement = new Map(checks.map((check) => [check.requirementId, check]));
-  const needsReview = classified.tier !== 'not_evaluated' && checks.some((check) => check.disagreement === 'two_plus');
-  // The same routing as the ranking (`rankReview.ts`): a two-step disagreement puts the candidate with a person.
+  const kindByRequirement = new Map(requirements.map((requirement) => [requirement.id, requirement.kind]));
+  const isRouted = (check: (typeof checks)[number]): boolean =>
+    routesToReview(kindByRequirement.get(check.requirementId) ?? 'nice_to_have', check.enforcedVerdict, check.scoredVerdict);
+  const needsReview = classified.tier !== 'not_evaluated' && checks.some(isRouted);
+  // The same routing as the ranking (`rankReview.ts`): a must-have whose score was lowered pending review puts the candidate with a person.
   const tier: RankTier = needsReview ? 'needs_review' : classified.tier;
 
   const matchByRequirement = new Map(matches.map((match) => [match.requirementId, match]));
@@ -219,6 +227,8 @@ export async function handleEvaluationDetail(
               matcherVerdict: check.matcherVerdict,
               matcherMode: check.matcherMode,
               disagreement: check.disagreement,
+              scoreLowered: scoreLowered(check.enforcedVerdict, check.scoredVerdict),
+              routed: isRouted(check),
               scoredVerdict: check.scoredVerdict,
             };
           })(),

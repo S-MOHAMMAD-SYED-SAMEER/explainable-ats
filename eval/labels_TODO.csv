@@ -19,7 +19,7 @@ cv-06,demo-postgres,"Backend dev, 4 yrs. Shipped Node.js APIs to production for 
 cv-06,demo-mentoring,,unclear,No mention of mentoring or junior engineers.
 cv-07,demo-node,"Designed and shipped production Node.js services for three retail clients, including a loyalty points platform that handled a quarter of a million transactions on its busiest day.",met,Production Node.js services with a quantified busy-day workload.
 cv-07,demo-postgres,"Designed a document store on top of PostgreSQL that held about two million case files, and wrote the backup and restore procedures for it. || Tuned the database as the volume grew, adding indexes, partitioning the largest tables by year and moving the reporting queries to a replica.",met,Millions of records plus partitioning and replica-based reporting support scale.
-cv-07,demo-mentoring,"Trained new starters on the council's coding standards. || I have mentored eleven women who are changing career into software, meeting each of them monthly for a year. Seven are now working as developers.",partial,"Clear training and mentoring, but the CV does not explicitly establish that these people were junior engineers."
+cv-07,demo-mentoring,"I have mentored eleven women who are changing career into software, meeting each of them monthly for a year. Seven are now working as developers. || Trained new starters on the council's coding standards.",met,"Reviewed by ChatGPT and Claude; Sameer approved: mentoring career changers into developer jobs and training new starters is mentoring junior engineers."
 cv-08,demo-node,"* Designed and shipped production Node.js
 services for a freight tracking product - used by
 about 1,200 drivers every day. Zero downtime

@@ -7,9 +7,9 @@ import { matchAndScore } from '../src/agent/match.ts';
 import { rankJob } from '../src/agent/rank.ts';
 import { scoreEvaluation } from '../src/agent/score.ts';
 import { parseExtractionPrompt } from '../src/agent/extractionPrompt.ts';
-import { cvIsSilent, enforceVerdicts, reconcileWithMatcher, scoreFromVerdicts, type EnforcedVerdict } from '../src/agent/verdictEnforcement.ts';
+import { enforceVerdicts, reconcileWithMatcher, scoreFromVerdicts, type EnforcedVerdict } from '../src/agent/verdictEnforcement.ts';
 import { VERDICT_PROMPT_VERSION, VERDICT_PURPOSE, validateVerdictOutput } from '../src/agent/verdictExtraction.ts';
-import { ROUTING_STEPS, SUPPORT_RANK, disagreementOf, lowerOf, verdictSteps } from '../src/agent/verdictMode.ts';
+import { ROUTING_STEPS, SUPPORT_RANK, disagreementOf, lowerOf, routesToReview, scoreLowered, verdictSteps } from '../src/agent/verdictMode.ts';
 import { handleEvaluationDetail } from '../src/handlers/evaluations.ts';
 import { installDeterministicVerdictExtractor } from '../src/agent/mockVerdictExtractor.ts';
 import { createMockLlmProvider } from '../src/adapters/llm/mock.ts';
@@ -121,56 +121,49 @@ test('the answer is read strictly: a bad entry is dropped with a reason, never r
 // ============================================================================================ the code's rules
 
 const REQ = [
-  { id: 'a', label: 'Node.js', criterion: 'Has shipped production services in Node.js' },
-  { id: 'b', label: 'PostgreSQL', criterion: 'Has run PostgreSQL at scale' },
-  { id: 'c', label: 'Mentoring', criterion: 'Has mentored junior engineers' },
+  { id: 'a', label: 'Node.js', criterion: 'Has shipped production services in Node.js', kind: 'must_have' as const },
+  { id: 'b', label: 'PostgreSQL', criterion: 'Has run PostgreSQL at scale', kind: 'must_have' as const },
+  { id: 'c', label: 'Mentoring', criterion: 'Has mentored junior engineers', kind: 'nice_to_have' as const },
 ];
 
-function enforce(verdict: MatchVerdict | null, passages: string[], contentText: string, requirementIndex = 1): EnforcedVerdict {
+function enforce(verdict: MatchVerdict | null, passages: string[], requirementIndex = 1): EnforcedVerdict {
   return enforceVerdicts({
     requirements: [REQ[requirementIndex]!],
     answers: verdict === null ? new Map() : new Map([[REQ[requirementIndex]!.id, { verdict, reason: 'because' }]]),
     verifiedPassages: new Map([[REQ[requirementIndex]!.id, passages]]),
-    contentText,
   })[0]!;
 }
 
 test('met or partial with no surviving passage is lowered to unclear', () => {
   for (const verdict of ['met', 'partial'] as const) {
-    const result = enforce(verdict, [], STRONG_CV);
+    const result = enforce(verdict, []);
     assert.equal(result.enforcedVerdict, 'unclear');
     assert.equal(result.downgrade, 'no_verified_passage');
     assert.equal(result.modelVerdict, verdict);
   }
   for (const verdict of ['met', 'partial'] as const) {
-    const kept = enforce(verdict, [POSTGRES], STRONG_CV);
+    const kept = enforce(verdict, [POSTGRES]);
     assert.equal(kept.enforcedVerdict, verdict);
     assert.equal(kept.downgrade, null);
   }
 });
 
-test('not_met needs a verified passage (an explicit negative) or a CV that is silent about the requirement', () => {
+test('not_met needs a verified explicit-negative passage; a CV that says nothing is unclear, never not_met', () => {
   // an explicit negative, quoted: stands
   const negative = 'I have never run PostgreSQL in production; my databases were small.';
-  assert.equal(enforce('not_met', [negative], `${STRONG_CV}\n${negative}`).enforcedVerdict, 'not_met');
+  assert.equal(enforce('not_met', [negative]).enforcedVerdict, 'not_met');
 
-  // nothing quoted, and the CV never mentions the subject: stands
-  const silentCv = 'Name: X\nI paint houses and repair roofs for a living.';
-  assert.ok(cvIsSilent(REQ[1]!, silentCv));
-  const silent = enforce('not_met', [], silentCv);
-  assert.equal(silent.enforcedVerdict, 'not_met');
-  assert.equal(silent.downgrade, null);
-
-  // nothing quoted, but the CV does mention the subject: the model has not shown what it relies on
-  const speaks = enforce('not_met', [], STRONG_CV);
-  assert.equal(speaks.enforcedVerdict, 'unclear');
-  assert.equal(speaks.downgrade, 'no_verified_passage');
+  // nothing quoted: unclear, whether the CV is silent about the subject or speaks to it (LABELLING_GUIDE.md: silence is unclear)
+  const nothing = enforce('not_met', []);
+  assert.equal(nothing.enforcedVerdict, 'unclear');
+  assert.equal(nothing.downgrade, 'no_verified_passage');
+  assert.equal(nothing.modelVerdict, 'not_met', 'what the model said is kept');
 });
 
 test('unclear always stands, and no answer is unclear', () => {
-  assert.equal(enforce('unclear', [POSTGRES], STRONG_CV).enforcedVerdict, 'unclear');
-  assert.equal(enforce('unclear', [], STRONG_CV).downgrade, null);
-  const none = enforce(null, [], STRONG_CV);
+  assert.equal(enforce('unclear', [POSTGRES]).enforcedVerdict, 'unclear');
+  assert.equal(enforce('unclear', []).downgrade, null);
+  const none = enforce(null, []);
   assert.equal(none.enforcedVerdict, 'unclear');
   assert.equal(none.downgrade, 'no_answer');
   assert.equal(none.modelVerdict, null);
@@ -179,13 +172,54 @@ test('unclear always stands, and no answer is unclear', () => {
 test('enforcement can only lower a verdict, never raise one: for every verdict and every evidence situation', () => {
   for (const verdict of VERDICTS) {
     for (const passages of [[], [POSTGRES]]) {
-      for (const cv of [STRONG_CV, 'Name: X\nI paint houses.']) {
-        const result = enforce(verdict, passages, cv);
-        assert.ok(result.enforcedVerdict === verdict || result.enforcedVerdict === 'unclear', `${verdict} became ${result.enforcedVerdict}`);
-        if (verdict === 'unclear') assert.equal(result.enforcedVerdict, 'unclear');
+      const result = enforce(verdict, passages);
+      assert.ok(result.enforcedVerdict === verdict || result.enforcedVerdict === 'unclear', `${verdict} became ${result.enforcedVerdict}`);
+      if (verdict === 'unclear') assert.equal(result.enforcedVerdict, 'unclear');
+      if (passages.length === 0) assert.equal(result.enforcedVerdict, 'unclear', 'with nothing quoted, every verdict reads as unclear');
+    }
+  }
+});
+
+test('routing: only a must-have whose score was LOWERED pending review goes to a person', () => {
+  // the score used a lower verdict than the model's, on a must-have: routed
+  assert.equal(routesToReview('must_have', 'met', 'not_met'), true);
+  assert.equal(routesToReview('must_have', 'partial', 'not_met'), true);
+  assert.equal(routesToReview('must_have', 'met', 'unclear'), true);
+  // the score was not lowered (whatever the matcher said): shown, not routed
+  for (const verdict of VERDICTS) assert.equal(routesToReview('must_have', verdict, verdict), false);
+  // a nice-to-have never routes anyone, lowered or not
+  assert.equal(routesToReview('nice_to_have', 'met', 'not_met'), false);
+  for (const model of VERDICTS) for (const scored of VERDICTS) assert.equal(routesToReview('nice_to_have', model, scored), false);
+  // scoreLowered is exactly "scored below enforced"
+  for (const model of VERDICTS) for (const scored of VERDICTS) assert.equal(scoreLowered(model, scored), SUPPORT_RANK[scored] < SUPPORT_RANK[model]);
+});
+
+test('the rule, over every quote and verdict: lowered only if the model is two steps or more higher AND the quote shares no word; routed only if also a must-have', () => {
+  const evidence = (id: string, quote: string) => [{ requirementId: id, quote, verified: true }];
+  const quotes = [NODE, POSTGRES, MENTOR, VAGUE_DB, 'Used PostgreSQL once for a hobby project at home when time allowed.', 'Ran the Postgres fleet for the whole company.'];
+  let lowered = 0;
+  let sharedWordGap = 0;
+  for (const modelVerdict of VERDICTS) {
+    for (const quote of quotes) {
+      for (const requirement of REQ) {
+        for (const mode of ['strict', 'folded'] as const) {
+          const entry: EnforcedVerdict = { requirementId: requirement.id, modelVerdict, modelReason: 'x', enforcedVerdict: modelVerdict, downgrade: null, verifiedPassages: 1 };
+          const result = reconcileWithMatcher([requirement], [entry], evidence(requirement.id, quote), mode)[0]!;
+          const higherBy2 = SUPPORT_RANK[modelVerdict] - SUPPORT_RANK[result.matcher.verdict] >= ROUTING_STEPS;
+          const expectLowered = higherBy2 && result.matcher.matchedTerms.length === 0;
+          assert.equal(result.capped, expectLowered, `${modelVerdict} on "${quote.slice(0, 24)}" for ${requirement.label} (${mode})`);
+          assert.equal(result.routed, expectLowered && requirement.kind === 'must_have');
+          if (expectLowered) lowered += 1;
+          if (higherBy2 && !expectLowered) {
+            sharedWordGap += 1;
+            assert.equal(result.scoredVerdict, modelVerdict, 'a gap on a quote that shares a word is shown and the model\'s verdict is scored');
+          }
+        }
       }
     }
   }
+  assert.ok(lowered > 0, 'the set must exercise the lowering');
+  assert.ok(sharedWordGap > 0, 'and a gap that shares a word, which must not be acted on');
 });
 
 test('reconciling: one step is shown; two steps cap the score at the LOWER verdict; the cap never raises', () => {
@@ -205,12 +239,20 @@ test('reconciling: one step is shown; two steps cap the score at the LOWER verdi
   assert.equal(two.disagreement, 'two_plus');
   assert.equal(two.scoredVerdict, 'not_met');
   assert.equal(two.capped, true);
+  assert.equal(two.routed, true, 'a must-have, the model higher by two steps or more');
 
-  // model harsher than the matcher by two steps or more: the LOWER (the model's) is scored, and the person is told
+  // model harsher than the matcher by two steps or more: the LOWER (the model's) is scored; it is shown, and routes nobody
   const harsh = reconcileWithMatcher([REQ[0]!], [enforced('a', 'not_met')], evidence('a', NODE), 'strict')[0]!;
   assert.equal(harsh.matcher.verdict, 'met');
   assert.equal(harsh.disagreement, 'two_plus');
   assert.equal(harsh.scoredVerdict, 'not_met');
+  assert.equal(harsh.routed, false);
+
+  // the same gap as the first case, on a nice-to-have: capped, shown, and routes nobody
+  const nice = reconcileWithMatcher([REQ[2]!], [enforced('c', 'met')], evidence('c', VAGUE_DB), 'strict')[0]!;
+  assert.equal(nice.disagreement, 'two_plus');
+  assert.equal(nice.capped, true);
+  assert.equal(nice.routed, false);
 
   // for every pair: the scored verdict is never above the enforced one
   for (const modelVerdict of VERDICTS) {
@@ -345,34 +387,64 @@ test('a model that says met on a passage the matcher finds nothing in: two steps
     assert.equal(r.check('PostgreSQL').disagreement, 'two_plus');
     assert.equal(r.check('PostgreSQL').enforcedVerdict, 'met', 'the code let the verdict stand: there was a verified passage');
     assert.equal(r.check('PostgreSQL').scoredVerdict, 'not_met', 'but the score does not');
-    assert.equal(r.matched.needsReview, true);
-    const disagreement = r.events.find((event) => event.eventType === 'verdict_disagreement');
-    assert.ok(disagreement, 'a verdict_disagreement event');
-    assert.equal((disagreement.payload.requirements as Array<{ capped: boolean }>)[0]?.capped, true);
+    assert.equal(r.matched.needsReview, true, 'PostgreSQL is a must-have and its score was lowered pending review');
+    const lowered = r.events.find((event) => event.eventType === 'score_lowered_pending_review');
+    assert.ok(lowered, 'a score_lowered_pending_review event is in the audit trail');
+    assert.equal(lowered.payload.routed, true);
+    const loweredRows = lowered.payload.requirements as Array<{ label: string; enforced: string; scored: string; routed: boolean }>;
+    assert.deepEqual(loweredRows.map((row) => [row.label, row.enforced, row.scored, row.routed]), [['PostgreSQL', 'met', 'not_met', true]]);
+    assert.match(lowered.summary, /Score lowered pending review on 1 requirement\(s\): "PostgreSQL" \(the model said met but the quote shares no words with the requirement\)\. A person should check\./);
     const detail = (await handleEvaluationDetail({ repos: r.ctx.repos }, r.evaluation.id)).body;
     assert.equal(detail.needsReview, true);
     assert.equal(detail.tier, 'needs_review');
     assert.equal(detail.verdictMode, 'model_checked');
     const postgres = detail.requirements.find((entry) => entry.label === 'PostgreSQL');
     assert.equal(postgres?.check?.disagreement, 'two_plus');
+    assert.equal(postgres?.check?.scoreLowered, true);
+    assert.equal(postgres?.check?.routed, true);
     assert.equal(postgres?.check?.modelVerdict, 'met');
     assert.equal(postgres?.check?.matcherVerdict, 'not_met');
     assert.equal(postgres?.check?.scoredVerdict, 'not_met');
     assert.match(postgres?.rationale ?? '', /Model: met/);
-    assert.match(postgres?.rationale ?? '', /two steps or more apart/);
+    assert.match(postgres?.rationale ?? '', /Score lowered pending review: the model said met but the quote shares no words with the requirement\. A person should check\./);
   } finally {
     await r.close();
   }
 });
 
-test('the ranking routes a candidate the second opinion disagreed with to needs_review, and renumbers', async () => {
+test('the same on a nice-to-have lowers the score and is recorded, but nobody is routed', async () => {
+  const r = await run(STRONG_CV, {
+    'Node.js': { verdict: 'met', passages: [NODE] },
+    PostgreSQL: { verdict: 'met', passages: [POSTGRES] },
+    Mentoring: { verdict: 'met', passages: [VAGUE_DB] },
+  });
+  try {
+    assert.equal(r.check('Mentoring').disagreement, 'two_plus');
+    assert.equal(r.check('Mentoring').scoredVerdict, 'not_met', 'the passage shares no word with the requirement, so it cannot raise the score');
+    assert.equal(r.matched.needsReview, false);
+    const lowered = r.events.find((event) => event.eventType === 'score_lowered_pending_review');
+    assert.ok(lowered, 'the lowered score is in the audit trail');
+    assert.equal(lowered.payload.routed, false);
+    const detail = (await handleEvaluationDetail({ repos: r.ctx.repos }, r.evaluation.id)).body;
+    assert.equal(detail.needsReview, false);
+    assert.equal(detail.tier, 'qualified');
+    assert.equal(detail.requirements.find((entry) => entry.label === 'Mentoring')?.check?.scoreLowered, true);
+    assert.equal(detail.requirements.find((entry) => entry.label === 'Mentoring')?.check?.routed, false);
+    const ranking = await rankJob({ repos: r.ctx.repos }, r.job.id);
+    assert.equal(ranking.entries[0]?.tier, 'qualified');
+  } finally {
+    await r.close();
+  }
+});
+
+test('the ranking routes a candidate whose must-have score was lowered pending review to needs_review, and renumbers', async () => {
   const flagged = await run(STRONG_CV, { 'Node.js': { verdict: 'met', passages: [NODE] }, PostgreSQL: { verdict: 'met', passages: [VAGUE_DB] }, Mentoring: { verdict: 'met', passages: [MENTOR] } });
   try {
     const ranking = await rankJob({ repos: flagged.ctx.repos }, flagged.job.id);
     assert.equal(ranking.entries[0]?.tier, 'needs_review');
     assert.equal(ranking.entries[0]?.position, 1);
     assert.equal(ranking.entries[0]?.rank, 1);
-    assert.match(ranking.entries[0]?.rationale ?? '', /disagree by two steps or more on "PostgreSQL"/);
+    assert.match(ranking.entries[0]?.rationale ?? '', /on "PostgreSQL" the score was lowered pending review: the model's quote shares no words with the requirement\. A person should check\./);
     assert.equal(ranking.entries[0]?.scoreBasisPoints, flagged.matched.breakdown.scoreBasisPoints, 'the stored score is never edited');
   } finally {
     await flagged.close();
@@ -388,7 +460,7 @@ test('the ranking routes a candidate the second opinion disagreed with to needs_
   }
 });
 
-test('negation: "I have not used ..." quoted as the evidence for not_met stands, and the matcher, which cannot read it, is outvoted and flagged', async () => {
+test('negation: "I have not used ..." quoted as the evidence for not_met stands, and the matcher, which cannot read it, is outvoted and shown (not routed: the model is the lower one)', async () => {
   const negative = 'I have never run PostgreSQL in production; every database I looked after was small.';
   const cv = `${STRONG_CV}\n${negative}`;
   const r = await run(cv, { PostgreSQL: { verdict: 'not_met', passages: [negative] } });
@@ -398,7 +470,11 @@ test('negation: "I have not used ..." quoted as the evidence for not_met stands,
     assert.notEqual(r.check('PostgreSQL').matcherVerdict, 'not_met');
     assert.equal(r.check('PostgreSQL').disagreement, 'two_plus');
     assert.equal(r.check('PostgreSQL').scoredVerdict, 'not_met', 'the lower verdict is scored: the negation is not credited as a skill');
-    assert.equal(r.matched.needsReview, true);
+    assert.equal(r.matched.needsReview, false, 'the model is lower than the matcher: shown on the page, no one is sent to review');
+    const detail = (await handleEvaluationDetail({ repos: r.ctx.repos }, r.evaluation.id)).body;
+    assert.equal(detail.requirements.find((entry) => entry.label === 'PostgreSQL')?.check?.disagreement, 'two_plus');
+    assert.equal(detail.requirements.find((entry) => entry.label === 'PostgreSQL')?.check?.scoreLowered, false, 'the model is the lower one: its verdict is scored');
+    assert.equal(detail.requirements.find((entry) => entry.label === 'PostgreSQL')?.check?.routed, false);
   } finally {
     await r.close();
   }

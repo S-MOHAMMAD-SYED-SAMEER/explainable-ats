@@ -83,10 +83,10 @@ export async function rankJob(deps: RankDeps, jobId: string, options: RankOption
 
   const ranked = rankCandidates(jobId, requirements, inputs);
 
-  // A candidate whose verdicts the second opinion disagreed with by two steps or more goes to a person (`rankReview.ts`). One more
-  // query, not one per candidate; none when no evaluation was judged by a model.
-  const disagreements = await repos.verdictChecks.disagreementsForEvaluations(current.map((entry) => entry.id));
-  const ranking = routeToReview(ranked, disagreements);
+  // A candidate for whom, on a must-have, the model was two steps or more above the second opinion goes to a person (`rankReview.ts`).
+  // One more query, not one per candidate; none when no evaluation was judged by a model.
+  const routed = await repos.verdictChecks.routedForEvaluations(current.map((entry) => entry.id));
+  const ranking = routeToReview(ranked, routed);
 
   logger?.info('Ranked a job', {
     jobId,

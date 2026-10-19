@@ -1,5 +1,5 @@
-import { criterionTerms, containsTerm, decideMatch, wordsOf, type EvidenceLike, type MatchDecision, type MatchMode } from './matchRules.ts';
-import { disagreementOf, lowerOf, SUPPORT_RANK, type Disagreement } from './verdictMode.ts';
+import { decideMatch, type EvidenceLike, type MatchDecision, type MatchMode } from './matchRules.ts';
+import { disagreementOf, lowerOf, routesToReview, SUPPORT_RANK, type Disagreement } from './verdictMode.ts';
 import { BASIS_POINTS_MAX, VERDICT_BASIS_POINTS, type ConfidenceLevel, type JobRequirement, type MatchVerdict } from '../domain/ats.ts';
 import type { ScoreBreakdown, ScoredRequirement } from './score.ts';
 
@@ -10,19 +10,20 @@ import type { ScoreBreakdown, ScoredRequirement } from './score.ts';
 //   1. ENFORCEMENT. A verdict needs evidence that was found in the CV.
 //        met or partial   needs at least one VERIFIED passage (word for word in the real CV, 15 characters or more),
 //                         otherwise it is lowered to `unclear`.
-//        not_met          needs either a verified passage (an explicit negative, "I have not ...") or a CV that is
-//                         silent about the requirement (none of its words appear), otherwise `unclear`: a model that says
-//                         the CV falls short while quoting nothing, about a CV that does mention the subject, has not
-//                         shown what it is relying on.
+//        not_met          needs a verified passage (an explicit negative, "I have not ..."), otherwise `unclear`. A CV that
+//                         says nothing about a requirement is `unclear`, never `not_met`: silence is not a finding against
+//                         anyone (LABELLING_GUIDE.md).
 //        unclear          always stands.
 //        no answer        for a requirement the model did not answer is `unclear`.
-//   2. THE SECOND OPINION. The deterministic matcher gives its own verdict from the SAME verified passages. One step apart
-//      is shown to the recruiter. Two steps or more (see `verdictMode.ts`) routes the candidate to a person.
+//   2. THE SECOND OPINION. The deterministic matcher gives its own verdict from the SAME verified passages. Every difference is
+//      shown to the recruiter.
 //   3. THE SCORED VERDICT. The enforced verdict, with ONE exception: when the model's verdict is higher than the matcher's by
 //      two steps or more AND not one word of the requirement appears in any passage the model relied on (the matcher found
 //      NOTHING in them), the matcher's verdict is scored instead, until a person decides. A passage that shares no word with the
 //      requirement cannot raise a score: that is what stops a model that was fooled into crediting an attacker's line.
-//      Every other disagreement, however large, is shown and routed to a person but does not change the number: the matcher
+//      That is the ONLY case that is acted on. The score is lowered pending review (audit event `score_lowered_pending_review`),
+//      and if the requirement is a must-have the candidate is routed to `needs_review` (`routesToReview`, `verdictMode.ts`).
+//      Every other disagreement, however large, is shown but changes nothing and routes nobody: the matcher
 //      counts words, so on a passage that really is about the subject it is wrong far more often than it is right (measured:
 //      about 35 to 40% agreement with the labels even when every passage is perfect), and letting it overrule the model
 //      would put the ceiling back where it was.
@@ -42,21 +43,11 @@ export type EnforcedVerdict = {
   verifiedPassages: number;
 };
 
-/** Whether the CV never mentions the requirement: none of its words (folded, so "services" is "service") appear as whole words. */
-export function cvIsSilent(requirement: Pick<JobRequirement, 'label' | 'criterion'>, contentText: string): boolean {
-  const terms = criterionTerms(requirement);
-  // A requirement made only of common words gives nothing to be silent about; claiming silence would be a guess.
-  if (terms.length === 0) return false;
-  const words = wordsOf(contentText, 'folded');
-  return terms.every((term) => !containsTerm(words, term, 'folded'));
-}
-
 export function enforceVerdicts(input: {
   requirements: readonly Pick<JobRequirement, 'id' | 'label' | 'criterion'>[];
   answers: ReadonlyMap<string, ModelAnswer>;
   /** The passages that survived verification, by requirement. */
   verifiedPassages: ReadonlyMap<string, readonly string[]>;
-  contentText: string;
 }): EnforcedVerdict[] {
   return input.requirements.map((requirement) => {
     const answer = input.answers.get(requirement.id);
@@ -69,10 +60,8 @@ export function enforceVerdicts(input: {
     let enforced: MatchVerdict = answer.verdict;
     let downgrade: EnforcedVerdict['downgrade'] = null;
 
-    if ((answer.verdict === 'met' || answer.verdict === 'partial') && passages === 0) {
-      enforced = 'unclear';
-      downgrade = 'no_verified_passage';
-    } else if (answer.verdict === 'not_met' && passages === 0 && !cvIsSilent(requirement, input.contentText)) {
+    // met, partial and not_met all need a passage that was found in the CV; with none, the verdict reads as unclear.
+    if (answer.verdict !== 'unclear' && passages === 0) {
       enforced = 'unclear';
       downgrade = 'no_verified_passage';
     }
@@ -95,6 +84,8 @@ export type Reconciled = EnforcedVerdict & {
   scoredVerdict: MatchVerdict;
   /** True when the scored verdict was lowered below the enforced one because the passages share no word with the requirement. */
   capped: boolean;
+  /** True when this requirement sends the candidate to a person: a must-have whose score was lowered pending review. */
+  routed: boolean;
 };
 
 /**
@@ -103,7 +94,7 @@ export type Reconciled = EnforcedVerdict & {
  * `evidence` is the verified evidence only: the matcher re-checks `verified` itself, as it always does.
  */
 export function reconcileWithMatcher(
-  requirements: readonly Pick<JobRequirement, 'id' | 'label' | 'criterion'>[],
+  requirements: readonly Pick<JobRequirement, 'id' | 'label' | 'criterion' | 'kind'>[],
   enforced: readonly EnforcedVerdict[],
   evidence: readonly EvidenceLike[],
   matchMode: MatchMode,
@@ -117,7 +108,8 @@ export function reconcileWithMatcher(
     const unrelated = matcher.matchedTerms.length === 0;
     const higher = SUPPORT_RANK[mine.enforcedVerdict] > SUPPORT_RANK[matcher.verdict];
     const scoredVerdict = disagreement === 'two_plus' && higher && unrelated ? lowerOf(mine.enforcedVerdict, matcher.verdict) : mine.enforcedVerdict;
-    return { ...mine, matcher, disagreement, scoredVerdict, capped: scoredVerdict !== mine.enforcedVerdict };
+    const routed = routesToReview(requirement.kind, mine.enforcedVerdict, scoredVerdict);
+    return { ...mine, matcher, disagreement, scoredVerdict, capped: scoredVerdict !== mine.enforcedVerdict, routed };
   });
 }
 

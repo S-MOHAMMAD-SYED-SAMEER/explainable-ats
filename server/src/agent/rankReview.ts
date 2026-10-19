@@ -3,9 +3,9 @@ import type { RankedCandidate, Ranking } from './rankRules.ts';
 
 // A candidate the second opinion disagreed with goes to a person.
 //
-// In `model_checked` mode the deterministic matcher checks the model's verdicts. When they differ by two steps or more on some
-// requirement (see `verdictMode.ts`), the candidate is routed to `needs_review`: the same tier the ranking already uses for
-// "worth a human look". The ranking itself (`rankRules.ts`, shared with the portfolio sites and not changed) knows nothing of
+// In `model_checked` mode the deterministic matcher checks the model's verdicts. When the score of a must-have was lowered pending
+// review (the model's verdict was higher and its quote shares no word with the requirement: `routesToReview`, `verdictMode.ts`), the
+// candidate is routed to `needs_review`: the same tier the ranking already uses for "worth a human look". Any other disagreement routes nobody. The ranking itself (`rankRules.ts`, shared with the portfolio sites and not changed) knows nothing of
 // this; this module applies it afterwards, to the finished ranking, and renumbers it.
 //
 // The score is never touched: it is exactly what the evaluation stored. Only the tier, the order that follows from it, the
@@ -23,8 +23,8 @@ function placeOf(entry: Pick<RankedCandidate, 'rank' | 'tiedWith'>, total: numbe
 
 const PLACE_SENTENCE = /^(Not ranked\.|Ranked \d+ of \d+(, tied with \d+ others?)?\.)/;
 
-export function routeToReview(ranking: Ranking, disagreements: ReadonlyMap<string, readonly string[]>): Ranking {
-  const flagged = ranking.entries.filter((entry) => entry.evaluationId !== null && entry.tier !== 'not_evaluated' && disagreements.has(entry.evaluationId));
+export function routeToReview(ranking: Ranking, routed: ReadonlyMap<string, readonly string[]>): Ranking {
+  const flagged = ranking.entries.filter((entry) => entry.evaluationId !== null && entry.tier !== 'not_evaluated' && routed.has(entry.evaluationId));
   if (flagged.length === 0) return ranking;
 
   const moved = ranking.entries.map((entry) => ({
@@ -53,14 +53,14 @@ export function routeToReview(ranking: Ranking, disagreements: ReadonlyMap<strin
     const tie = entry.tier === 'not_evaluated' ? null : ranks.get(tieKey(entry));
     const renumbered = { ...entry, position: index + 1, rank: tie?.rank ?? null, tiedWith: tie ? tie.size - 1 : 0 };
     const place = placeOf(renumbered, rankable.length);
-    const labels = entry.evaluationId === null ? undefined : disagreements.get(entry.evaluationId);
+    const labels = entry.evaluationId === null ? undefined : routed.get(entry.evaluationId);
     if (flagged.some((candidate) => candidate.candidateId === entry.candidateId) && labels) {
       return {
         ...renumbered,
         rationale:
           `${place} Scored ${formatScore(entry.scoreBasisPoints ?? 0)} and meets ${entry.mustHavesMet} of ${entry.mustHavesTotal} must-haves, ` +
-          `but the model and the second check disagree by two steps or more on ${labels.map((label) => `"${label}"`).join(', ')}, ` +
-          'so this is for a person to look at. Where the model was higher the score uses the lower verdict until a person decides.',
+          `but on ${labels.map((label) => `"${label}"`).join(', ')} the score was lowered pending review: the model's quote shares no words with the requirement. ` +
+          'A person should check.',
       };
     }
     return { ...renumbered, rationale: PLACE_SENTENCE.test(entry.rationale) ? entry.rationale.replace(PLACE_SENTENCE, place) : entry.rationale };

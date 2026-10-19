@@ -94,8 +94,11 @@ export type VerdictCheck = {
   downgradeReason: 'no_verified_passage' | 'no_answer' | null;
   matcherVerdict: string | null;
   matcherMode: 'strict' | 'folded' | null;
-  /** none: agree. one_step: differ, shown only. two_plus: routed to a person. */
+  /** How far apart the model and the matcher are: none, one_step, two_plus. Always shown. */
   disagreement: 'none' | 'one_step' | 'two_plus';
+  /** True when this requirement sends the candidate to a person: a must-have where the model is two steps or more above the matcher. */
+  scoreLowered: boolean;
+  routed: boolean;
   /** The verdict the score used. */
   scoredVerdict: string;
 };
@@ -164,7 +167,7 @@ export type EvaluationDetail = {
   modelFoundNothing: boolean;
   /** Who decided the verdicts that were scored. Absent means the matcher alone. */
   verdictMode?: 'model_checked' | 'matcher';
-  /** The second opinion disagreed by two steps or more on some requirement: a person should look. */
+  /** On some must-have the model was two steps or more above the second opinion: a person should look. */
   needsReview?: boolean;
   decision: Decision | null;
   createdAt: string;

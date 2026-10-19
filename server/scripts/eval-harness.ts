@@ -49,15 +49,16 @@ import { PRICES_SOURCE, costOf, formatDollars } from './pricing.ts';
 //   node scripts/eval-harness.ts --oracle       runs the whole pipeline with a stand-in that returns the labeller's own verdicts and
 //                                               passages: free, and checks the harness itself
 //
-// Options: --set=dev|heldout|both (default both)  --repeats=N (default 1)  --cvs=cv-01,cv-02  --budget=D  --prior-spend=D
+// Options: --set=dev|heldout|both (default dev)  --repeats=N (default 1)  --cvs=cv-01,cv-02  --budget=D  --prior-spend=D
 //
 // ONE REAL REQUEST PER CV PER REPEAT. Through the real adapter and the real pipeline (prompt `extract-v3`: the model proposes a verdict
 // per requirement with its passages, the code enforces the rules, the matcher is a second opinion). Retries are off, so the request count
 // is exact. It never loops, and it stops at once on a refused request (bad key, no credit, a setting), on a 401, 402, 403, 429 or 529,
 // after two outages in a row, or when the next request could take total spend past the budget.
 //
-// THE TWO SETS ARE REPORTED SEPARATELY. `dev` is the twenty CVs whose labels were drafted by ChatGPT and checked by Sameer; `heldout` is the
-// five CVs labelled by Sameer alone, without AI, never used for tuning. Each result block says which labels it was scored against.
+// THE TWO SETS ARE REPORTED SEPARATELY. `dev` is the twenty CVs whose labels carry the provenance in LABELS_PROVENANCE.main (drafted by ChatGPT, reviewed by ChatGPT and Claude, approved
+// by Sameer; `heldout` is the five CVs that have no labels: Sameer is not labelling them, so the default run leaves them out, and a run that
+// asks for them is told they cannot be scored. Each result block says which labels it was scored against.
 //
 // BOTH VERDICT MODES, BOTH MATCH MODES, FROM ONE EXTRACTION. `model_checked` scores the verdicts after the code's rules and the second opinion;
 // `matcher` scores the matcher alone judging the same verified passages (the old behaviour). The match mode only changes how words are
@@ -171,7 +172,7 @@ async function main(): Promise<number> {
   const budget = Number(argValue('--budget') ?? BUDGET_DEFAULT);
   const priorSpend = Number(argValue('--prior-spend') ?? PRIOR_SPEND_DEFAULT);
   const repeats = Math.max(1, Math.floor(Number(argValue('--repeats') ?? 1)));
-  const setArg = argValue('--set') ?? 'both';
+  const setArg = argValue('--set') ?? 'dev';
   if (!['dev', 'heldout', 'both'].includes(setArg)) {
     line(`--set must be dev, heldout or both, not "${setArg}".`);
     return 1;
@@ -421,12 +422,15 @@ async function main(): Promise<number> {
         const goldTier = tierOfVerdicts(requirementList, goldVerdicts);
         const tier = { gold: goldTier } as CvRow['tier'];
         const routedToReview = {} as Record<MatchMode, boolean>;
+        // Which requirements sent the candidate to a person, for the run's own printout: label, model vs matcher, and whether the score was lowered too.
+        const routedOn = {} as Record<MatchMode, string[]>;
         for (const combo of combos) {
           tier[combo] = tierOfVerdicts(requirementList, verdictMaps[combo]);
           tiers[id]![combo].push({ gold: goldTier, predicted: tier[combo] as Tier });
         }
         for (const mode of MATCH_MODES) {
-          routedToReview[mode] = reconciled[mode].some((entry) => entry.disagreement === 'two_plus');
+          routedToReview[mode] = reconciled[mode].some((entry) => entry.routed);
+          routedOn[mode] = reconciled[mode].flatMap((entry, index) => (entry.routed ? [`${requirementList[index]!.label} (model ${entry.enforcedVerdict}, matcher ${entry.matcher.verdict}${entry.capped ? ', score lowered' : ''})`] : []));
           // The matcher alone, with the labeller's own passages as the evidence: the ceiling the matcher puts on any model.
           const goldQuotes = new Map(gold.map(({ requirement, spans }) => [requirement.id, spans.map((span) => content.slice(span.start, span.end))]));
           const ceiling = verdictsFromGoldPassages(requirementList, goldQuotes, mode);
@@ -475,7 +479,7 @@ async function main(): Promise<number> {
             `  ${row.inputTokens ?? '-'} in / ${row.outputTokens ?? '-'} out, ${row.latencyMs ?? '-'} ms, ${cost === null ? '-' : formatDollars(cost)}` +
             `  passages ${row.proposedValidShape ?? '-'} proposed, ${row.verified ?? '-'} verified, ${row.refusedNotInCv ?? '-'} not in CV` +
             `  verdicts checked ${MATCH_MODES.map((mode) => agree(`model_checked/${mode}`)).join(' ')}; matcher ${MATCH_MODES.map((mode) => agree(`matcher/${mode}`)).join(' ')} (${MATCH_MODES.join(' ')})` +
-            `  tier gold ${goldTier} / checked ${MATCH_MODES.map((mode) => tier[`model_checked/${mode}`]).join(' ')}${routedToReview.folded || routedToReview.strict ? '  ROUTED' : ''}`,
+            `  tier gold ${goldTier} / checked ${MATCH_MODES.map((mode) => tier[`model_checked/${mode}`]).join(' ')}${routedToReview.folded || routedToReview.strict ? `  ROUTED [strict: ${routedOn.strict.join('; ') || 'no'}] [folded: ${routedOn.folded.join('; ') || 'no'}]` : ''}`,
         );
 
         if (!oracle) {
@@ -648,7 +652,7 @@ async function main(): Promise<number> {
             verdictAgreement: "requirements where the scored verdict equals the labeller's. model_checked: the model's verdict after the code's rules and the second opinion; matcher: the matcher alone judging the same verified passages",
             modelProposedAgreement: "the model's own verdicts against the labels, before the code lowered any (an unanswered requirement counts as unclear)",
             downgradeRate: 'verdicts the code lowered to unclear because no quoted passage was found in the CV / verdicts the model proposed',
-            secondOpinion: "the matcher's verdict from the same verified passages against the model's enforced verdict: agree, one step apart (shown), two steps or more (the candidate is routed to a person and the score uses the lower verdict)",
+            secondOpinion: "the matcher's verdict from the same verified passages against the model's enforced verdict: agree, one step apart, two steps or more apart (all shown). The score is lowered pending review only where the model is two steps or more HIGHER and the quoted passages share no word with the requirement; a candidate is routed to a person only when that happens on a must-have",
             tierAgreement: "CVs where the tier from the scored verdicts equals the tier from the labeller's verdicts, by the application's own rule (before any routing to review)",
             goldThroughMatcher: "what the matching stage says when the labeller's own gold passages are the evidence: the matcher's disagreement with the labels before any model is involved",
           },
