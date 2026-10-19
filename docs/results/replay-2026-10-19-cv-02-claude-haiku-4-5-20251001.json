@@ -1,0 +1,85 @@
+{
+  "kind": "recorded model reply",
+  "date": "2026-10-19",
+  "note": "One live request on an invented CV from eval/. The reply is kept so a screenshot can be replayed with `scripts/live-replay.ts --replay=<this file>`, with no request. It holds the model's verdicts, one-line reasons and quotes from the invented CV; no key, no prompt.",
+  "model": "claude-haiku-4-5-20251001",
+  "toolChoice": "forced",
+  "temperature": 0,
+  "promptVersion": "extract-v3",
+  "verdictMode": "model_checked",
+  "matchMode": "folded",
+  "retries": 0,
+  "requestsMade": 1,
+  "cv": {
+    "id": "cv-02",
+    "role": "demo",
+    "chars": 1267,
+    "contentSha256": "4661540ec0aca4299daba4bf932b4ef9193cd3800db018678419aa7a1f8e6041"
+  },
+  "labelsProvenance": "not applicable: this run is for a screenshot and was not scored against the evaluation labels",
+  "usage": {
+    "inputTokens": 2037,
+    "outputTokens": 449
+  },
+  "latencyMs": 4293,
+  "reply": {
+    "requirements": [
+      {
+        "label": "Node.js",
+        "verdict": "met",
+        "passages": [
+          "Built the server-side JavaScript APIs, on the V8 runtime that most people just call Node, that carry live traffic for an airline booking site. They have been live since 2017 and take bookings every minute of every day.",
+          "Wrote the fare search backend. Originally in PHP; I moved it to server-side JavaScript in 2013."
+        ],
+        "reason": "The candidate has built and shipped production Node.js services handling live traffic for airline booking platforms since 2017."
+      },
+      {
+        "label": "PostgreSQL",
+        "verdict": "met",
+        "passages": [
+          "Responsible for the Postgres fleet: fourteen clusters, the largest around six terabytes, with replicas in three regions.",
+          "Looked after the MySQL and later Postgres databases behind it."
+        ],
+        "reason": "The candidate has operated PostgreSQL at significant scale, managing fourteen clusters with the largest at six terabytes across three regions."
+      },
+      {
+        "label": "Mentoring",
+        "verdict": "met",
+        "passages": [
+          "Coached apprentices and recent graduates, and ran a weekly clinic where newer team members could bring any problem. Four of the people I coached now lead teams of their own."
+        ],
+        "reason": "The candidate has mentored junior engineers through coaching apprentices and recent graduates, with measurable outcomes of mentees advancing to leadership roles."
+      }
+    ]
+  },
+  "rawOutput": {
+    "requirements": [
+      {
+        "requirementId": "540deba2-e6e7-493c-a57d-15f43d52d87a",
+        "verdict": "met",
+        "passages": [
+          "Built the server-side JavaScript APIs, on the V8 runtime that most people just call Node, that carry live traffic for an airline booking site. They have been live since 2017 and take bookings every minute of every day.",
+          "Wrote the fare search backend. Originally in PHP; I moved it to server-side JavaScript in 2013."
+        ],
+        "reason": "The candidate has built and shipped production Node.js services handling live traffic for airline booking platforms since 2017."
+      },
+      {
+        "requirementId": "e34ea992-9e70-4152-b40f-c4cafe9cb236",
+        "verdict": "met",
+        "passages": [
+          "Responsible for the Postgres fleet: fourteen clusters, the largest around six terabytes, with replicas in three regions.",
+          "Looked after the MySQL and later Postgres databases behind it."
+        ],
+        "reason": "The candidate has operated PostgreSQL at significant scale, managing fourteen clusters with the largest at six terabytes across three regions."
+      },
+      {
+        "requirementId": "4e07896b-a03f-4cef-986d-8f2ea6252719",
+        "verdict": "met",
+        "passages": [
+          "Coached apprentices and recent graduates, and ran a weekly clinic where newer team members could bring any problem. Four of the people I coached now lead teams of their own."
+        ],
+        "reason": "The candidate has mentored junior engineers through coaching apprentices and recent graduates, with measurable outcomes of mentees advancing to leadership roles."
+      }
+    ]
+  }
+}

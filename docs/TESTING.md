@@ -8,13 +8,13 @@ Run from a clean checkout, with the two portfolio repositories checked out besid
 
 | Suite | `npm test` reports | Test cases | Passed | Failed | Skipped |
 |---|---|---|---|---|---|
-| Server (`server/test/`) | 671 | 666 | 671 | 0 | 0 |
+| Server (`server/test/`) | 672 | 667 | 672 | 0 | 0 |
 | Web (`web/test/`) | 211 | 210 | 211 | 0 | 0 |
-| **Total** | **882** | **876** | **882** | **0** | **0** |
+| **Total** | **883** | **877** | **883** | **0** | **0** |
 
-In a standalone clone, with no portfolio repository beside it, the same commands report 882 with **870 passed and 12 skipped** (11 server parity tests and 1 web test that read the portfolio's code). Nothing fails: the skipped tests say where they looked.
+In a standalone clone, with no portfolio repository beside it, the same commands report 883 with **871 passed and 12 skipped** (11 server parity tests and 1 web test that read the portfolio's code). Nothing fails: the skipped tests say where they looked.
 
-Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Six such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts`, `portfolioFixture.ts` and `hostileCvs.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 666 and 210, so 876.
+Node's runner treats every `.ts` file under `test/` as a test file and counts a helper module that loads cleanly as one passing test. Six such modules (`fixtures.ts`, `helpers.ts`, `demoHarness.ts`, `portfolioFixture.ts` and `hostileCvs.ts` on the server, `jsxScan.ts` on the web side) are in the reported totals. The real number of test cases is 667 and 210, so 877.
 
 Typecheck, lint and the web build also pass. There are no browser or end-to-end tests: the web tests run as plain Node, over pure modules and static scans of the source.
 
@@ -61,13 +61,13 @@ Fifty-two test files (39 server, 13 web), in eight groups.
 |---|---|---|
 | [Trust and safety](#trust-and-safety) | 6 | 71 |
 | [Pipeline stages](#pipeline-stages) | 9 | 144 |
-| [Verdict checking and evaluation](#verdict-checking-and-evaluation) | 5 | 62 |
+| [Verdict checking and evaluation](#verdict-checking-and-evaluation) | 5 | 63 |
 | [Data integrity](#data-integrity) | 4 | 53 |
 | [API and auth](#api-and-auth) | 5 | 89 |
 | [LLM provider behaviour](#llm-provider-behaviour) | 3 | 93 |
 | [Demo and UI](#demo-and-ui) | 19 (6 server, 13 web) | 349 |
 | [Repo hygiene](#repo-hygiene) | 1 | 15 |
-| **Total** | **52** | **876** |
+| **Total** | **52** | **877** |
 
 ### Trust and safety
 
@@ -102,7 +102,7 @@ These protect the second half of the design (the model proposes, the code checks
 
 | File | Tests | What it proves | Why it matters |
 |---|---|---|---|
-| `verdict-mode.test.ts` | 22 | The scale (`met` 3, `partial` 2, `unclear` 1, `not_met` 0). The model's answer is read strictly. A verdict with no verified passage reads `unclear`; `not_met` needs a verified explicit negative and silence is never `not_met`. Enforcement can only lower a verdict. Nothing the matcher says changes the verdict. A credited quote that shares no word with the requirement is flagged, and routes the candidate only on a must-have. The score from verdicts equals the matcher's scorer on all 50 evaluation-CV and mode combinations. Negation, keyword stuffing, and the eight hostile CVs (the guarantees that hold, and the one that does not any more). | The model's verdict is checked by code, and the change in what is guaranteed is written down in a test. |
+| `verdict-mode.test.ts` | 23 | The scale (`met` 3, `partial` 2, `unclear` 1, `not_met` 0). The model's answer is read strictly. A verdict with no verified passage reads `unclear`; `not_met` needs a verified explicit negative and silence is never `not_met`. Enforcement can only lower a verdict. Nothing the matcher says changes the verdict. A credited quote that shares no word with the requirement is flagged, and routes the candidate only on a must-have. The score from verdicts equals the matcher's scorer on all 50 evaluation-CV and mode combinations. Negation, keyword stuffing, the eight hostile CVs (the guarantees that hold, and the one that does not any more), and the saved live reply, which replays with no request. | The model's verdict is checked by code, and the change in what is guaranteed is written down in a test. |
 | `eval-set.test.ts` | 16 | The set is twenty invented CVs over two roles, in files that exist, carrying only reserved contact details. Redaction masks every one. The labels file has the five columns and one row for each pair, and the validator catches each kind of mistake. | The yardstick is well-formed before anything is scored against it. |
 | `eval-heldout.test.ts` | 11 | The five held-out CVs are invented and masked, the held-out labels file is empty and stays empty, and the validator treats it as such. Every results file must carry the exact label provenance, and a reworded or missing one fails. | The held-out set is never labelled by accident, and no result can claim stronger labels than it has. |
 | `evalMetrics.test.ts` | 9 | Passage overlap and the two hit rules, recall and precision (a verified passage for a requirement with no gold passage is a miss), empty denominators as null, verdict agreement and which way the misses go, tiers by the application's own rule. | The numbers in the evaluation are computed by code that is itself tested. |

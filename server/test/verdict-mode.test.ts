@@ -531,6 +531,26 @@ test('the quotes-only path is untouched: an evaluation extracted without verdict
   }
 });
 
+// ============================================================================================ the recorded live reply
+
+test('the saved live reply (Haiku 4.5 on cv-02) replays with no request: three verdicts, their reasons, the matcher and the flag', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const file = new URL('../../docs/results/replay-2026-10-19-cv-02-claude-haiku-4-5-20251001.json', import.meta.url);
+  const saved = JSON.parse((await import('node:fs')).readFileSync(file, 'utf8')) as { model: string; requestsMade: number; reply: { requirements: Array<{ label: string; reason: string }> } };
+  assert.equal(saved.model, 'claude-haiku-4-5-20251001');
+  assert.equal(saved.requestsMade, 1);
+
+  // No key in the environment, and the script's replay path has no provider that could use one.
+  const env = { ...process.env };
+  delete env.ANTHROPIC_API_KEY;
+  const run = spawnSync(process.execPath, ['scripts/live-replay.ts', `--replay=${file.pathname.replace(/^\/([A-Za-z]:)/, '$1')}`], { cwd: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), encoding: 'utf8', env });
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.match(run.stdout, /No request is made/);
+  assert.match(run.stdout, /routed to review: true/);
+  assert.equal((run.stdout.match(/quote shares no words: true/g) ?? []).length, 3, 'all three credited quotes are paraphrases the matcher cannot see');
+  for (const requirement of saved.reply.requirements) assert.ok(run.stdout.includes(requirement.reason), `the reason for ${requirement.label} is shown`);
+});
+
 // ============================================================================================ hostile CVs
 
 async function runHostile(cvText: string, injected: readonly string[], behave: 'honest' | 'obeying' | 'empty') {

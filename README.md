@@ -12,7 +12,7 @@ Screens a CV against a role and explains every placement with the exact sentence
 - **Nothing counts until it is checked.** Every quote is looked up verbatim in the original CV. A quote that isn't there is stored as rejected and never shown or scored, and a `met`, `partial` or `not_met` verdict left with no verified quote reads `unclear`. A CV that says nothing about a requirement is `unclear`, never `not_met`.
 - **Everything after the verdicts is reproducible.** Scores are integers you can recompute by hand, rankings are derived on every read, and an append-only audit trail records each step. A rule-based matcher reads the same verified quotes as a second opinion: it is shown to the recruiter and never changes a score. A credited verdict whose quote shares no word with the requirement is flagged, and on a must-have it sends the candidate to `needs_review`.
 - **Stack.** Node 24 and TypeScript (run directly, no build step), Express 5, SQLite or PostgreSQL behind one interface, React 19 with Vite and Tailwind. The server has three runtime dependencies: `express`, `pg` and the Anthropic SDK.
-- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 882 passing, 0 failing and 0 skipped (671 server, 211 web). Six of those are helper modules the runner counts, so there are 876 test cases. In a standalone clone the parity tests, which need the portfolio sites, are skipped. [What they protect](docs/TESTING.md).
+- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 883 passing, 0 failing and 0 skipped (672 server, 211 web). Six of those are helper modules the runner counts, so there are 877 test cases. In a standalone clone the parity tests, which need the portfolio sites, are skipped. [What they protect](docs/TESTING.md).
 - **Where it stands.** A portfolio project. The public demo uses the deterministic mock extractor, a keyword matcher, in place of the model, on five invented candidates. The running app calls the real model when a signed-in recruiter starts an assessment, and it has been evaluated once, on invented data: on 2026-10-19 Claude Haiku 4.5 read twenty invented CVs and its verdicts agreed with 86.8% of 68 labels (Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling.) One model, one run. See [Evaluation](#evaluation) for the numbers and what they do not show, and [Limitations](#limitations).
 
 ## Run it locally
@@ -103,6 +103,11 @@ The detail, with a diagram of each stage's inputs and outputs, the data model, r
 - **Every verdict shows its quote.** Each requirement on a candidate's page carries its verdict, a confidence (`high`, `medium` or `low`), a rationale, and the verified passages with their positions in the CV. In `model_checked` mode it also shows the model's verdict and one-line reason, what the code left standing (and why it lowered a verdict, if it did), the matcher's verdict beside it, and, where it applies, "Quote shares no words with the requirement; a person should check."
 - **Only verified passages are ever sent to the browser.** Rejected quotes are kept in the audit trail so a fabrication stays visible, but `server/src/handlers/evaluations.ts` never sends them.
 - **The audit trail tells the whole story.** One ordered history merges the resume's events (ingestion, redaction) with the evaluation's (extraction, verification, matching, scoring, the decision). The score event carries every input, so the number can be recomputed from the trail alone.
+- **A model's verdict is shown beside the rule-based check.** For a candidate scored in `model_checked` mode the page shows the model's verdict and its one-line reason, the verified quote, the matcher's second opinion, and the flag where a credited quote shares no word with the requirement:
+
+  ![A candidate page: 100% score, "Worth a look", the flag "Quote shares no words with the requirement; a person should check", and two requirements each with the model's verdict and reason, the matcher's verdict and the flag](docs/images/model-checked-candidate.png)
+
+  *One live run of Claude Haiku 4.5 on an invented CV (cv-02), 2026-10-19.* The model's reply is kept in `docs/results/replay-2026-10-19-cv-02-claude-haiku-4-5-20251001.json`, and `server/scripts/live-replay.ts --replay=<that file>` runs it through the pipeline again with no request, so the page can be shown again without calling the model. All three flags are paraphrases the word-counting check cannot see ("the V8 runtime that most people just call Node" for Node.js, "Postgres" for PostgreSQL, "coached" for mentored); the labels say `met` for all three, so here the flag is the matcher's blind spot, shown for a person to glance at, not a mistake by the model.
 - **A ranking explains itself.** Each entry carries a sentence: *"Scored 71% and meets 1 of 2 must-haves. The evidence found does not demonstrate "PostgreSQL". Placed below every candidate who meets all of them, however high that score is — the score itself is unchanged."*
 
 ## Privacy and redaction
@@ -242,7 +247,7 @@ A demo decision is recorded as the fixed actor `demo-visitor` and reuses the rec
 Tests use Node's built-in runner on both sides. No test needs a credential, a network or a database server. [docs/TESTING.md](docs/TESTING.md) explains what each group of tests protects and walks through eight of them.
 
 ```bash
-cd server && npm test        # 671 reported: 666 test cases and 5 helper modules
+cd server && npm test        # 672 reported: 667 test cases and 5 helper modules
 cd web && npm test           # 211 reported: 210 test cases and 1 helper module
 ```
 
@@ -367,6 +372,8 @@ Key files:
 | `server/scripts/live-smoke-anthropic.ts` | An opt-in, by-hand check of the real Anthropic adapter, never in CI |
 | `server/scripts/live-injection-check.ts` | An opt-in, by-hand run of eight hostile CVs against the real API, saving counts to `docs/results/`, never in CI |
 | `server/scripts/eval-harness.ts` | An opt-in, by-hand evaluation of the real model against the labels in `eval/`, never in CI |
+| `server/scripts/live-replay.ts` | One recorded live request on an invented CV, and a replay of the saved reply with no request (for screenshots) |
+| `server/scripts/export-demo-fixtures.ts` | Writes the vendored files and the demo dataset into the two portfolio sites, and `--check` fails on drift |
 | `server/scripts/rescore-saved.ts` | Re-scores a saved evaluation offline, with no request |
 | `server/scripts/validate-labels.ts` | Checks the label files in `eval/` |
 | `server/scripts/live-failure-check.ts` | An opt-in, by-hand check of the cut-off, timeout and long-CV paths against the real API, never in CI |
