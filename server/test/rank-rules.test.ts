@@ -399,11 +399,11 @@ test('every rationale states the tier it was actually given', () => {
 
   const byId = new Map(result.entries.map((entry) => [entry.candidateId, entry]));
 
-  assert.match(byId.get('c-clean')?.rationale ?? '', /Ranked 1 of 3\. Meets all 2 must-haves, scoring 70%\./);
-  assert.match(byId.get('c-review')?.rationale ?? '', /Ranked 2 of 3\./);
+  assert.match(byId.get('c-clean')?.rationale ?? '', /Ranked 1 of 3 assessed candidates\. Meets all 2 must-haves, scoring 70%\./);
+  assert.match(byId.get('c-review')?.rationale ?? '', /Ranked 2 of 3 assessed candidates\./);
   assert.match(byId.get('c-review')?.rationale ?? '', /said nothing about "PostgreSQL"/);
   assert.match(byId.get('c-review')?.rationale ?? '', /unresolved rather than failed/);
-  assert.match(byId.get('c-gated')?.rationale ?? '', /Ranked 3 of 3\./);
+  assert.match(byId.get('c-gated')?.rationale ?? '', /Ranked 3 of 3 assessed candidates\./);
   assert.match(byId.get('c-gated')?.rationale ?? '', /does not demonstrate "PostgreSQL"/);
 });
 
@@ -423,7 +423,7 @@ test('the rationale never claims a rank the entry does not have', () => {
       assert.match(entry.rationale, /^Not ranked\./);
       continue;
     }
-    assert.match(entry.rationale, new RegExp(`^Ranked ${entry.rank} of ${result.rankedCount}[.,]`));
+    assert.match(entry.rationale, new RegExp(`^Ranked ${entry.rank} of ${result.rankedCount} assessed candidates?[.,]`));
 
     if (entry.tiedWith > 0) assert.match(entry.rationale, /tied with/);
     else assert.ok(!/tied with/.test(entry.rationale), 'an untied entry must not claim a tie');

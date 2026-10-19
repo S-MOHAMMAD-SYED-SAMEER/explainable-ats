@@ -562,7 +562,7 @@ parityTest('the demo reproduces every outcome the dataset says it will', async (
   const demo = await runDemo();
 
   for (const candidate of DEMO_CANDIDATES) {
-    const want = parityMode === 'folded' ? candidate.expectedFolded : candidate.expected;
+    const want = parityMode === 'strict' ? candidate.expectedStrict : candidate.expected;
     const entry = demo.ranking.entries.find((item) => item.reference === candidate.reference);
     assert.ok(entry, `${candidate.displayName} is missing from the demo ranking`);
 

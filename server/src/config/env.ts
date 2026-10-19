@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { DEFAULT_MATCH_MODE, MATCH_MODES, type MatchMode } from '../agent/matchRules.ts';
+import { MATCH_MODES, type MatchMode } from '../agent/matchRules.ts';
 import { DEFAULT_VERDICT_MODE, VERDICT_MODES, type VerdictMode } from '../agent/verdictMode.ts';
 import { fileURLToPath } from 'node:url';
 import type { LogLevel } from '../lib/logger.ts';
@@ -318,8 +318,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ConfigResult {
         ),
         anthropicToolChoice: readEnum('ANTHROPIC_TOOL_CHOICE', ANTHROPIC_TOOL_CHOICES, 'forced', problems),
         anthropicTemperature: readTemperature('ANTHROPIC_TEMPERATURE', 0, problems),
-        // Folded outside the demo. The demo keeps the library default (strict) because the portfolio copies of its fixtures were recorded with it.
-        matchMode: readEnum('MATCH_MODE', MATCH_MODES, isDemo ? DEFAULT_MATCH_MODE : 'folded', problems),
+        // Folded everywhere, the demo included: it is the setting the evaluation used, and the demo's blurbs and fixtures describe it.
+        // (The library default in matchRules.ts stays strict; it is in a file the portfolio sites copy.)
+        matchMode: readEnum('MATCH_MODE', MATCH_MODES, 'folded', problems),
         verdictMode: readEnum('VERDICT_MODE', VERDICT_MODES, DEFAULT_VERDICT_MODE, problems),
         operatorPasswordHash,
         sessionTtlHours: readInt('SESSION_TTL_HOURS', 12, problems),

@@ -17,11 +17,11 @@ function placeOf(entry: Pick<RankedCandidate, 'rank' | 'tiedWith'>, total: numbe
   return entry.rank === null
     ? 'Not ranked.'
     : entry.tiedWith > 0
-      ? `Ranked ${entry.rank} of ${total}, tied with ${entry.tiedWith} other${entry.tiedWith === 1 ? '' : 's'}.`
-      : `Ranked ${entry.rank} of ${total}.`;
+      ? `Ranked ${entry.rank} of ${total} assessed candidate${total === 1 ? '' : 's'}, tied with ${entry.tiedWith} other${entry.tiedWith === 1 ? '' : 's'}.`
+      : `Ranked ${entry.rank} of ${total} assessed candidate${total === 1 ? '' : 's'}.`;
 }
 
-const PLACE_SENTENCE = /^(Not ranked\.|Ranked \d+ of \d+(, tied with \d+ others?)?\.)/;
+const PLACE_SENTENCE = /^(Not ranked\.|Ranked \d+ of \d+ assessed candidates?(, tied with \d+ others?)?\.)/;
 
 export function routeToReview(ranking: Ranking, routed: ReadonlyMap<string, readonly string[]>): Ranking {
   const flagged = ranking.entries.filter((entry) => entry.evaluationId !== null && entry.tier !== 'not_evaluated' && routed.has(entry.evaluationId));

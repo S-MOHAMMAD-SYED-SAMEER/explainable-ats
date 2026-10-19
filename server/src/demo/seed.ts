@@ -1,4 +1,4 @@
-import { DEMO_JOB, DEMO_CANDIDATES, ingestInputFor, type DemoCandidate } from './dataset.ts';
+import { DEMO_JOB, DEMO_CANDIDATES, DEMO_MATCH_MODE, ingestInputFor, type DemoCandidate } from './dataset.ts';
 import { createJob, ingestResume } from '../agent/ingest.ts';
 import { openEvaluation, extractEvidence } from '../agent/extract.ts';
 import { matchAndScore } from '../agent/match.ts';
@@ -113,10 +113,10 @@ async function seedCandidate(
   }
 
   const provider = createMockLlmProvider();
-  installDeterministicExtractor(provider, deps.matchMode ? { matchMode: deps.matchMode } : {});
+  installDeterministicExtractor(provider, { matchMode: deps.matchMode ?? DEMO_MATCH_MODE });
 
   await extractEvidence({ repos, provider, logger: deps.logger }, evaluation.id);
-  await matchAndScore({ repos, logger: deps.logger, ...(deps.matchMode ? { matchMode: deps.matchMode } : {}) }, evaluation.id);
+  await matchAndScore({ repos, logger: deps.logger, matchMode: deps.matchMode ?? DEMO_MATCH_MODE }, evaluation.id);
 
   return {
     reference: candidate.reference,
