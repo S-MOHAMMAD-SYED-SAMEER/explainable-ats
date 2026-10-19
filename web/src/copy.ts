@@ -115,11 +115,12 @@ export function kindLabel(kind: string): string {
 
 // --- the model's verdict and the second opinion ----------------------------------------------------------------------------------
 
-/** What a recruiter reads about a requirement's second opinion. One step is shown only; two or more is what routes a candidate to a person. */
+/** What a recruiter reads about a requirement's second opinion. Every difference is shown; only a must-have where the model is two steps or more above the matcher routes a candidate to a person. */
 export const SECOND_OPINION = {
   banner:
-    'Second opinion disagrees. The model and the deterministic check read the same quoted passages differently by two steps or more on at least one requirement, so a person should look. Where the passages it quoted share no word with the requirement, the score uses the matcher\'s lower verdict until you decide.',
+    'Second opinion disagrees. On at least one must-have the model rated the requirement two steps or more above what the deterministic check made of the same quoted passages, so a person should look. Where the passages it quoted share no word with the requirement, the score uses the matcher\'s lower verdict until you decide.',
   disagrees: 'Second opinion disagrees. A person should look at this one.',
+  shownOnly: 'The two differ by two steps or more. Shown, not routed: only a must-have where the model is the higher one sends a candidate to a person.',
   oneStep: 'The two differ by one step. Shown, not acted on.',
   lowered: (verdictLabel: string): string => `Lowered to ${verdictLabel.toLowerCase()} by the code: no passage the model quoted for this was found in the CV.`,
 } as const;

@@ -41,7 +41,7 @@ export type MatchOutcome = {
   evidenceIgnored: number;
   /** The mode that produced the verdicts that were scored. */
   verdictMode: VerdictMode;
-  /** True when the second opinion disagreed by two steps or more on some requirement: the candidate is routed to a person. */
+  /** True when, on some must-have, the model's verdict was two steps or more above the second opinion's: the candidate is routed to a person. */
   needsReview: boolean;
 };
 
@@ -119,7 +119,7 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
   } else {
     breakdown = scoreEvaluation(requirements, verified, matchMode);
   }
-  const needsReview = reconciled.some((entry) => entry.disagreement === 'two_plus');
+  const needsReview = reconciled.some((entry) => entry.routed);
 
   // Matches and the score land together. A score without the matches behind it
   // is an unexplainable number, and an explanation without its score is a page
@@ -215,7 +215,8 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
   });
 
   if (needsReview) {
-    const disagreeing = reconciled.filter((entry) => entry.disagreement === 'two_plus');
+    const disagreeing = reconciled.filter((entry) => entry.routed);
+    const shownOnly = reconciled.filter((entry) => entry.disagreement === 'two_plus' && !entry.routed).length;
     await repos.audit.append({
       correlationId: evaluation.id,
       stage: 'match',
@@ -223,10 +224,12 @@ export async function matchAndScore(deps: MatchDeps, evaluationId: string): Prom
       actor: 'system',
       outcome: 'blocked',
       summary:
-        `The model and the second opinion disagree by two steps or more on ${disagreeing.length} requirement(s), ` +
+        `On ${disagreeing.length} must-have requirement(s) the model's verdict is two steps or more above the second opinion's, ` +
         "so this candidate is routed to a person. Where the passages quoted share no word with the requirement, the score uses the matcher's lower verdict until a person decides.",
       payload: {
         matchMode,
+        // Other two-step disagreements (the model lower than the matcher, or a nice-to-have) are recorded in the checks and route nobody.
+        shownOnly,
         requirements: disagreeing.map((entry) => ({
           requirementId: entry.requirementId,
           model: entry.modelVerdict,
@@ -297,7 +300,8 @@ function modelCheckedRationale(entry: Reconciled, matchMode: MatchMode): string 
       ? ` Second opinion (matcher, ${matchMode}): ${matcher}, which agrees.`
       : entry.disagreement === 'one_step'
         ? ` Second opinion (matcher, ${matchMode}): ${matcher}, one step apart. Shown, not acted on.`
-        : ` Second opinion (matcher, ${matchMode}): ${matcher}, two steps or more apart, so a person should look.` +
+        : ` Second opinion (matcher, ${matchMode}): ${matcher}, two steps or more apart, ` +
+          (entry.routed ? 'so a person should look.' : 'shown, not routed: only a must-have where the model is the higher one is sent to a person.') +
           (entry.capped ? ` No word of the requirement appears in the passages quoted, so the matcher's lower verdict (${entry.scoredVerdict.replace('_', ' ')}) is scored until then.` : '');
   return `${model}${code}${second}`;
 }

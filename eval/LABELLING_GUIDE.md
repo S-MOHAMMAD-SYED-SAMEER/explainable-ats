@@ -4,7 +4,7 @@ You are writing down, for each CV and each requirement, **what a careful human r
 
 So label what you actually think. Do not try to predict what the system will do, and do not make your answers match its wording. If you read "ran the Postgres fleet" as meeting "has run PostgreSQL at scale", say so, even though the words differ. How well the system copes with that is the thing being measured.
 
-*This paragraph was written before the first run on the main set. It still holds for the held-out CVs (see the last section), which nothing has ever been run on: keep it that way until they are labelled, and do not run the app or the scripts on them.*
+*This paragraph was written before the first run on the main set. It still holds for the held-out CVs (see the last section), which nothing has ever been run on: they are unlabelled and excluded from every run, so keep it that way.*
 
 There are 68 rows (20 CVs, 3 or 4 requirements each). Plan on two to three hours.
 
@@ -143,16 +143,16 @@ You may edit `notes` as much as you like. It is never scored, and it is the plac
 
 | Set | Labels | Provenance |
 |---|---|---|
-| Main set (20 CVs, 68 rows, `eval/labels_TODO.csv`) | passages and verdicts | **drafted by ChatGPT, checked by Sameer; full review in progress.** Not an independent human labelling. |
-| Held-out set (5 CVs, 17 rows, `eval/labels_heldout_TODO.csv`) | passages and verdicts | **Sameer, no AI.** |
+| Main set (20 CVs, 68 rows, `eval/labels_TODO.csv`) | passages and verdicts | **drafted by ChatGPT, reviewed by ChatGPT and Claude, final decisions approved by Sameer.** Not an independent human labelling. |
+| Held-out set (5 CVs, 17 rows, `eval/labels_heldout_TODO.csv`) | none | **Unlabelled. Sameer is not labelling these; they are excluded from every run.** |
 
 Say exactly that wherever the labels are used. Every results file records it as `labelsProvenance`, and a test fails if it is missing.
 
-## The five held-out CVs (labelled by Sameer alone, without AI)
+## The five held-out CVs (unlabelled, excluded from every run)
 
-`eval/heldout/cv-h1.txt` to `cv-h5.txt` are five more invented CVs for the same two roles, with a realistic mix, and `eval/labels_heldout_TODO.csv` has one row per CV and requirement (17), with **the three label columns empty: nothing is suggested**.
+`eval/heldout/cv-h1.txt` to `cv-h5.txt` are five more invented CVs for the same two roles, with a realistic mix, and `eval/labels_heldout_TODO.csv` has one row per CV and requirement (17), with **the three label columns empty: nothing is suggested**. Sameer has decided not to label them, so they are left as they are: the files are kept, no run uses them, and no result is scored against them.
 
-- **Sameer labels these alone, without AI.** No assistant drafts, suggests, checks or comments on them. The rules above (the four verdicts, the passages, torn between two choose the lower) apply unchanged.
+- **Nobody is labelling these.** No assistant drafts, suggests, checks or comments on them. If they are ever labelled, the rules above (the four verdicts, the passages, torn between two choose the lower) apply unchanged.
 - **They are never used for tuning**: not prompts, not rules, not thresholds, not matching modes, not wording. If a result on them looks wrong, the fix is not to change the system until they look right; it is to report them as they are.
-- **Nothing has been run on them.** Do not run the app or the scripts on them until the labels are finished.
-- Check the file with `node server/scripts/validate-labels.ts --heldout`. An empty file is reported as waiting; a half-filled one is an error.
+- **Nothing has been run on them.** Do not run the app or the scripts on them.
+- Check the file with `node server/scripts/validate-labels.ts --heldout`. An empty file is reported as empty and fine; a half-filled one is an error.

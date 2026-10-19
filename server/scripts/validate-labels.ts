@@ -23,8 +23,8 @@ import {
 // It reads two things, the labels file and the CVs, and writes nothing. Exit code 0 means
 // the file is complete and consistent; 1 means there is something to fix.
 //
-// A held-out file with no labels at all is not an error: it is waiting for Sameer, who labels it alone and
-// without AI. A held-out file with SOME labels, or any mistake, is.
+// A held-out file with no labels at all is not an error: Sameer is not labelling these five CVs, and they are excluded from every run.
+// A held-out file with SOME labels, or any mistake, is.
 
 type Outcome = { ok: boolean };
 
@@ -59,7 +59,7 @@ function check(set: LabelSet, file: string, dataset: Dataset, cvDir: string, all
   for (const warning of report.warnings) console.log(`warning (line ${warning.line}): ${warning.message}`);
 
   if (waiting) {
-    console.log(`OK (waiting for labels): the structure is right and no row is labelled yet.`);
+    console.log(`OK (empty): the structure is right and no row is labelled. This set is not being labelled and is not used in any run.`);
     return { ok: true };
   }
   const clean = report.problems.length === 0;

@@ -18,6 +18,8 @@ test('the wording says what a disagreement is and what happens to the score', ()
   assert.match(SECOND_OPINION.banner, /two steps or more/);
   assert.match(SECOND_OPINION.banner, /score uses the matcher.s lower verdict/);
   assert.match(SECOND_OPINION.disagrees, /A person should look/);
+  assert.match(SECOND_OPINION.shownOnly, /Shown, not routed/);
+  assert.match(SECOND_OPINION.banner, /must-have/);
   assert.match(SECOND_OPINION.oneStep, /one step/);
   assert.match(SECOND_OPINION.oneStep, /not acted on/i);
   assert.equal(SECOND_OPINION.lowered('Unclear'), 'Lowered to unclear by the code: no passage the model quoted for this was found in the CV.');
@@ -33,6 +35,8 @@ test('the page shows, for each requirement, the model\'s verdict and reason, the
   assert.match(detail, /Matcher&apos;s verdict/);
   assert.match(detail, /check\.modelReason/);
   assert.match(detail, /data-second-opinion-disagrees/);
+  assert.match(detail, /data-second-opinion-shown-only/);
+  assert.match(detail, /check\.routed/);
   assert.match(detail, /data-second-opinion-banner/);
   assert.match(detail, /detail\.needsReview/);
   assert.match(detail, /requirement\.check \? <VerdictCheckPanel check=\{requirement\.check\} \/> : null/, 'nothing is drawn for an assessment the matcher alone judged');
@@ -45,4 +49,5 @@ test('the types say the new fields are optional, so an assessment made the old w
   assert.match(types, /needsReview\?: boolean/);
   assert.match(types, /verdictMode\?: 'model_checked' \| 'matcher'/);
   assert.match(types, /disagreement: 'none' \| 'one_step' \| 'two_plus'/);
+  assert.match(types, /routed: boolean/);
 });

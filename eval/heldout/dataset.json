@@ -1,8 +1,8 @@
 {
   "version": "heldout-v1",
-  "note": "Five invented CVs, held out. They are labelled by Sameer alone, without AI, and are never used for tuning prompts, rules, thresholds or matching. Every person, employer, address, email and phone number is invented; emails use the reserved .invalid top level and phone numbers come from the range set aside for fiction. The CVs were written by an AI. The roles and requirement ids are the ones in ../dataset.json.",
+  "note": "Five invented CVs, held out. They have no labels: Sameer is not labelling them, they are excluded from every run, and they are never used for tuning prompts, rules, thresholds or matching. Every person, employer, address, email and phone number is invented; emails use the reserved .invalid top level and phone numbers come from the range set aside for fiction. The CVs were written by an AI. The roles and requirement ids are the ones in ../dataset.json.",
   "rolesFrom": "../dataset.json",
-  "labelsProvenance": "Sameer, no AI",
+  "labelsProvenance": "none: these five CVs are unlabelled and are not used in any run",
   "cvs": [
     {
       "id": "cv-h1",
