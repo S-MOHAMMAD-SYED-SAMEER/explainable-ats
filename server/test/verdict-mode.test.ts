@@ -531,6 +531,53 @@ test('the quotes-only path is untouched: an evaluation extracted without verdict
   }
 });
 
+// ============================================================================================ why "worth a look"
+
+test('"worth a look" has two reasons and the detail names which: a silent must-have, a flagged must-have, or both', async () => {
+  // 1. A must-have the CV is silent about (the model says unclear). No flag.
+  const silent = await run(STRONG_CV, { 'Node.js': { verdict: 'met', passages: [NODE] }, PostgreSQL: { verdict: 'unclear', passages: [] } });
+  try {
+    const detail = (await handleEvaluationDetail({ repos: silent.ctx.repos }, silent.evaluation.id)).body;
+    assert.equal(detail.tier, 'needs_review');
+    assert.deepEqual(detail.unclearMustHaves, ['PostgreSQL']);
+    assert.deepEqual(detail.flaggedMustHaves, []);
+    const ranking = await rankJob({ repos: silent.ctx.repos }, silent.job.id);
+    assert.match(ranking.entries[0]?.rationale ?? '', /said nothing about "PostgreSQL"/);
+    assert.doesNotMatch(ranking.entries[0]?.rationale ?? '', /shares no words/);
+  } finally {
+    await silent.close();
+  }
+
+  // 2. A must-have credited on a quote that shares no word with it. Nothing is silent.
+  const flagged = await run(STRONG_CV, { 'Node.js': { verdict: 'met', passages: [NODE] }, PostgreSQL: { verdict: 'met', passages: [VAGUE_DB] }, Mentoring: { verdict: 'met', passages: [MENTOR] } });
+  try {
+    const detail = (await handleEvaluationDetail({ repos: flagged.ctx.repos }, flagged.evaluation.id)).body;
+    assert.equal(detail.tier, 'needs_review');
+    assert.deepEqual(detail.unclearMustHaves, [], 'the CV is not silent about any essential requirement');
+    assert.deepEqual(detail.flaggedMustHaves, ['PostgreSQL']);
+    const ranking = await rankJob({ repos: flagged.ctx.repos }, flagged.job.id);
+    assert.match(ranking.entries[0]?.rationale ?? '', /on "PostgreSQL" the quote shares no words with the requirement; a person should check\.$/);
+    assert.doesNotMatch(ranking.entries[0]?.rationale ?? '', /said nothing/);
+  } finally {
+    await flagged.close();
+  }
+
+  // 3. Both at once: one must-have flagged, another silent.
+  const both = await run(STRONG_CV, { 'Node.js': { verdict: 'met', passages: [VAGUE_DB] }, PostgreSQL: { verdict: 'unclear', passages: [] } });
+  try {
+    const detail = (await handleEvaluationDetail({ repos: both.ctx.repos }, both.evaluation.id)).body;
+    assert.equal(detail.tier, 'needs_review');
+    assert.deepEqual(detail.flaggedMustHaves, ['Node.js']);
+    assert.deepEqual(detail.unclearMustHaves, ['PostgreSQL']);
+    const ranking = await rankJob({ repos: both.ctx.repos }, both.job.id);
+    const sentence = ranking.entries[0]?.rationale ?? '';
+    assert.match(sentence, /on "Node\.js" the quote shares no words with the requirement; a person should check\./);
+    assert.match(sentence, /also said nothing about "PostgreSQL", so that is unresolved rather than failed\./);
+  } finally {
+    await both.close();
+  }
+});
+
 // ============================================================================================ the recorded live reply
 
 test('the saved live reply (Haiku 4.5 on cv-02) replays with no request: three verdicts, their reasons, the matcher and the flag', async () => {

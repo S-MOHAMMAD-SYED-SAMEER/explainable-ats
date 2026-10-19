@@ -117,6 +117,8 @@ export type EvaluationDetail = {
   tier: RankTier;
   failedMustHaves: string[];
   unclearMustHaves: string[];
+  /** Essential requirements whose credited quote shares no word with them (`quote_no_overlap_flagged`): the other reason a candidate is "worth a look". */
+  flaggedMustHaves: string[];
   requirements: RequirementOutcome[];
   /** Categories and a count. Never a value — there is none stored. */
   protectedAttributes: { categories: string[]; count: number };
@@ -173,6 +175,7 @@ export async function handleEvaluationDetail(
   const needsReview = classified.tier !== 'not_evaluated' && checks.some(isRouted);
   // The same routing as the ranking (`rankReview.ts`): a credited must-have whose quote shares no word with the requirement puts the candidate with a person.
   const tier: RankTier = needsReview ? 'needs_review' : classified.tier;
+  const flaggedMustHaves = needsReview ? requirements.filter((requirement) => checks.some((check) => check.requirementId === requirement.id && isRouted(check))).map((requirement) => requirement.label) : [];
 
   const matchByRequirement = new Map(matches.map((match) => [match.requirementId, match]));
   const evidenceByRequirement = new Map<string, EvidenceView[]>();
@@ -200,6 +203,7 @@ export async function handleEvaluationDetail(
       tier,
       failedMustHaves,
       unclearMustHaves,
+      flaggedMustHaves,
       requirements: requirements.map((requirement) => {
         const match = matchByRequirement.get(requirement.id) ?? null;
         return {

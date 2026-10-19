@@ -18,6 +18,7 @@ import {
   kindLabel,
   outcomeWording,
   SECOND_OPINION,
+  tierExplanation,
   tierWording,
   toneClass,
   verdictWording,
@@ -69,7 +70,9 @@ function Headline({ detail, demo = false }: { detail: EvaluationDetail; demo?: b
         ) : null}
       </div>
 
-      <p className={`mt-2 text-small ${toneClass(wording.tone)}`}>{wording.detail}</p>
+      <p data-tier-explanation className={`mt-2 text-small ${toneClass(wording.tone)}`}>
+        {tierExplanation(detail.tier, { unclearMustHaves: detail.unclearMustHaves, flaggedMustHaves: detail.flaggedMustHaves ?? [] })}
+      </p>
 
       {detail.needsReview ? (
         <p data-second-opinion-banner className="mt-3 rounded-control bg-signal-tint px-3 py-2 text-small text-signal">

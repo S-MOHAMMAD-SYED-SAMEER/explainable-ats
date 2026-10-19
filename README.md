@@ -12,7 +12,7 @@ Screens a CV against a role and explains every placement with the exact sentence
 - **Nothing counts until it is checked.** Every quote is looked up verbatim in the original CV. A quote that isn't there is stored as rejected and never shown or scored, and a `met`, `partial` or `not_met` verdict left with no verified quote reads `unclear`. A CV that says nothing about a requirement is `unclear`, never `not_met`.
 - **Everything after the verdicts is reproducible.** Scores are integers you can recompute by hand, rankings are derived on every read, and an append-only audit trail records each step. A rule-based matcher reads the same verified quotes as a second opinion: it is shown to the recruiter and never changes a score. A credited verdict whose quote shares no word with the requirement is flagged, and on a must-have it sends the candidate to `needs_review`.
 - **Stack.** Node 24 and TypeScript (run directly, no build step), Express 5, SQLite or PostgreSQL behind one interface, React 19 with Vite and Tailwind. The server has three runtime dependencies: `express`, `pg` and the Anthropic SDK.
-- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 883 passing, 0 failing and 0 skipped (672 server, 211 web). Six of those are helper modules the runner counts, so there are 877 test cases. In a standalone clone the parity tests, which need the portfolio sites, are skipped. [What they protect](docs/TESTING.md).
+- **Tests.** With the two portfolio repositories checked out beside this one (as CI does), `npm test` reports 886 passing, 0 failing and 0 skipped (673 server, 213 web). Six of those are helper modules the runner counts, so there are 880 test cases. In a standalone clone the parity tests, which need the portfolio sites, are skipped. [What they protect](docs/TESTING.md).
 - **Where it stands.** A portfolio project. The public demo uses the deterministic mock extractor, a keyword matcher, in place of the model, on five invented candidates. The running app calls the real model when a signed-in recruiter starts an assessment, and it has been evaluated once, on invented data: on 2026-10-19 Claude Haiku 4.5 read twenty invented CVs and its verdicts agreed with 86.8% of 68 labels (Labels drafted by ChatGPT; reviewed independently by ChatGPT and Claude (agreed on 64 of 68 rows); final decisions approved by Sameer. Not an independent human labelling.) One model, one run. See [Evaluation](#evaluation) for the numbers and what they do not show, and [Limitations](#limitations).
 
 ## Run it locally
@@ -80,7 +80,7 @@ The code uses one set of words and the screens use another. This is the mapping 
 | `not_met` | The CV speaks to it and falls short, with the quote that shows it (an explicit "I have not ..." in `model_checked` mode) | **Does not meet** |
 | `unclear` | No verified quote at all. The CV is silent either way. A verdict whose quotes were not found in the CV also reads `unclear` | **Not demonstrated** |
 | `qualified` | Every must-have is `met` | **Meets every must-have** |
-| `needs_review` | No must-have failed, but at least one was `unclear` | **Worth a look** |
+| `needs_review` | No must-have failed, but at least one was `unclear`, or a credited must-have quote shares no word with its requirement (the flag). The page says which | **Worth a look** |
 | `gated` | A must-have was addressed and is `partial` or `not_met` | **Missing an essential** |
 | `not_evaluated` | No scored evaluation for this job | **Not assessed yet** |
 | `shortlist` | Decision: move the candidate forward | **Shortlist** |
@@ -107,7 +107,7 @@ The detail, with a diagram of each stage's inputs and outputs, the data model, r
 
   ![A candidate page: 100% score, "Worth a look", the flag "Quote shares no words with the requirement; a person should check", and two requirements each with the model's verdict and reason, the matcher's verdict and the flag](docs/images/model-checked-candidate.png)
 
-  *One live run of Claude Haiku 4.5 on an invented CV (cv-02), 2026-10-19.* The model's reply is kept in `docs/results/replay-2026-10-19-cv-02-claude-haiku-4-5-20251001.json`, and `server/scripts/live-replay.ts --replay=<that file>` runs it through the pipeline again with no request, so the page can be shown again without calling the model. All three flags are paraphrases the word-counting check cannot see ("the V8 runtime that most people just call Node" for Node.js, "Postgres" for PostgreSQL, "coached" for mentored); the labels say `met` for all three, so here the flag is the matcher's blind spot, shown for a person to glance at, not a mistake by the model.
+  *One live run of Claude Haiku 4.5 on an invented CV (cv-02), 2026-10-19, shown again from the saved reply with no new request.* The model's reply is kept in `docs/results/replay-2026-10-19-cv-02-claude-haiku-4-5-20251001.json`, and `server/scripts/live-replay.ts --replay=<that file>` runs it through the pipeline again with no request, so the page can be shown again without calling the model. All three flags are paraphrases the word-counting check cannot see ("the V8 runtime that most people just call Node" for Node.js, "Postgres" for PostgreSQL, "coached" for mentored); the labels say `met` for all three, so here the flag is the matcher's blind spot, shown for a person to glance at, not a mistake by the model.
 - **A ranking explains itself.** Each entry carries a sentence: *"Scored 71% and meets 1 of 2 must-haves. The evidence found does not demonstrate "PostgreSQL". Placed below every candidate who meets all of them, however high that score is — the score itself is unchanged."*
 
 ## Privacy and redaction
@@ -247,8 +247,8 @@ A demo decision is recorded as the fixed actor `demo-visitor` and reuses the rec
 Tests use Node's built-in runner on both sides. No test needs a credential, a network or a database server. [docs/TESTING.md](docs/TESTING.md) explains what each group of tests protects and walks through eight of them.
 
 ```bash
-cd server && npm test        # 672 reported: 667 test cases and 5 helper modules
-cd web && npm test           # 211 reported: 210 test cases and 1 helper module
+cd server && npm test        # 673 reported: 668 test cases and 5 helper modules
+cd web && npm test           # 213 reported: 212 test cases and 1 helper module
 ```
 
 `server/test/demo-parity.test.ts` compares this pipeline with the browser-demo runner in the separate `sameer-3d-portfolio` repository, and with the copy of that runner in the `portfolio` repository (the 2D site). Each comparison runs against every copy it can find. It finds the 3D runner through `PORTFOLIO_DEMO_DIR`, then `../sameer-3d-portfolio/src/demo/p3`, then `../../sameer-3d-portfolio/sameer-3d-portfolio/src/demo/p3`. The 2D copy is looked for at `../portfolio/src/demo/p3`, or at `PORTFOLIO_2D_DEMO_DIR` if that is set. If no copy holds `run.ts` the 11 parity tests are reported as skipped, as they are in a standalone clone. CI (`.github/workflows/ci.yml`, two jobs on Node 24, no secrets) checks both portfolio repositories out first (the branch of the same name if there is one, otherwise `main`), runs `npm audit --audit-level=high`, and treats a missing sibling as a failure, not a skip, so nothing is skipped there.

@@ -153,6 +153,8 @@ export type EvaluationDetail = {
   tier: string;
   failedMustHaves: string[];
   unclearMustHaves: string[];
+  /** Essential requirements whose credited quote shares no word with them. Absent from older replies. */
+  flaggedMustHaves?: string[];
   requirements: RequirementOutcome[];
   /** Categories and a count. There is no value to send. */
   protectedAttributes: { categories: string[]; count: number };
