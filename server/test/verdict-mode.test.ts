@@ -146,8 +146,8 @@ test('met or partial with no surviving passage is lowered to unclear', () => {
   }
 });
 
-test('not_met needs a verified explicit-negative passage; a CV that says nothing is unclear, never not_met', () => {
-  // an explicit negative, quoted: stands
+test('not_met needs a verified quoted passage; a CV that says nothing is unclear, never not_met', () => {
+  // a verified quote, here one that is also a negative: stands (the code only requires the quote to be verified)
   const negative = 'I have never run PostgreSQL in production; my databases were small.';
   assert.equal(enforce('not_met', [negative]).enforcedVerdict, 'not_met');
 
@@ -246,7 +246,7 @@ test('reconciling: every difference is shown, none changes the verdict; only a c
   assert.equal(nice.routed, false);
   assert.equal(nice.enforcedVerdict, 'met');
 
-  // not_met on a quote that shares no word (an explicit negative about something else) is not a credit, so it is not flagged
+  // not_met on a quote that shares no word (a quote about something else) is not a credit, so it is not flagged
   const negative = reconcileWithMatcher([REQ[1]!], [enforced('b', 'not_met')], evidence('b', VAGUE_DB), 'strict')[0]!;
   assert.equal(negative.quoteNoOverlap, false);
 });
@@ -456,7 +456,7 @@ test('negation: "I have not used ..." quoted as the evidence for not_met stands,
   const cv = `${STRONG_CV}\n${negative}`;
   const r = await run(cv, { PostgreSQL: { verdict: 'not_met', passages: [negative] } });
   try {
-    assert.equal(r.check('PostgreSQL').enforcedVerdict, 'not_met', 'a verified explicit negative is evidence');
+    assert.equal(r.check('PostgreSQL').enforcedVerdict, 'not_met', 'a verified quote is evidence, here one that is also a negative');
     // The matcher counts words, so it reads the negative as support for the requirement.
     assert.notEqual(r.check('PostgreSQL').matcherVerdict, 'not_met');
     assert.equal(r.check('PostgreSQL').disagreement, 'two_plus');

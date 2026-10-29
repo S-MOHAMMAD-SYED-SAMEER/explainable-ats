@@ -100,7 +100,7 @@ Each row below names the file, what the stage reads and writes, and what it guar
 `VERDICT_MODE=model_checked`, the default. The model returns, for each requirement, a verdict (`met`, `partial`, `not_met` or `unclear`), up to four passages and a one-line reason. The code then does four things (`agent/extractVerdicts.ts`, `agent/verdictEnforcement.ts`, `agent/match.ts`):
 
 1. **Verify every passage**, as in the Verify row: verbatim in the original CV, at least 15 characters, not over a mask. A passage that fails is stored unverified and dropped.
-2. **Enforce.** `met`, `partial` and `not_met` each need at least one verified passage. With none, the verdict reads `unclear` (audit event `verdict_downgraded_no_evidence`). A CV that says nothing is `unclear`, never `not_met`: `not_met` needs a verified explicit negative ("I have not ..."). A requirement the model did not answer is `unclear`. Enforcement can only lower a verdict. The model's reason is shown to a person and never used as evidence.
+2. **Enforce.** `met`, `partial` and `not_met` each need at least one verified passage. With none, the verdict reads `unclear` (audit event `verdict_downgraded_no_evidence`). A CV that says nothing is `unclear`, not `not_met`: the prompt asks the model to use `not_met` only when the CV speaks to the requirement and falls short, or says outright that the person has not done it ("I have not ..."), and the code checks that a verified quote exists (it does not test that the quote is a negative). A requirement the model did not answer is `unclear`. Enforcement can only lower a verdict. The model's reason is shown to a person and never used as evidence.
 3. **Take a second opinion.** The matcher below judges the same verified passages and the two verdicts are compared on a scale (`met` 3, `partial` 2, `unclear` 1, `not_met` 0). Every difference is shown on the candidate page, and **none changes the score**: the model's verified verdict is what is scored.
 4. **Flag one thing.** A credited verdict (`met` or `partial`) whose verified passages share no word with the requirement is flagged: "Quote shares no words with the requirement; a person should check", audit event `quote_no_overlap_flagged`. If the requirement is a must-have the candidate is placed in `needs_review`. The flag changes no number.
 
@@ -445,7 +445,7 @@ Each decision below: what I chose, why, and what it costs.
 ### `unclear` is not `not_met`
 
 - **Decision.** "The CV says nothing about this" and "the CV says something that falls short" are separate verdicts, and separate tiers (`needs_review` and `gated`).
-- **Why.** Reporting an absence of evidence as evidence of absence is how a good candidate gets silently filtered out. The same rule binds the model: a `not_met` needs a verified explicit negative, and a CV that says nothing is `unclear`.
+- **Why.** Reporting an absence of evidence as evidence of absence is how a good candidate gets silently filtered out. The same rule is put to the model in the prompt: use `not_met` only when the CV speaks to the requirement and falls short, and say `unclear` when it says nothing. The code checks that a verified quote exists behind a `not_met`; it does not test that the quote is a negative.
 - **Trade-off.** More states to explain on screen, which is why `web/src/copy.ts` exists.
 
 ### The demo is a separate mode, not a flag

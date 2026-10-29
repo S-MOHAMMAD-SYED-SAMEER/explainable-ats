@@ -10,7 +10,9 @@ import type { ScoreBreakdown, ScoredRequirement } from './score.ts';
 //   1. ENFORCEMENT. A verdict needs evidence that was found in the CV.
 //        met or partial   needs at least one VERIFIED passage (word for word in the real CV, 15 characters or more),
 //                         otherwise it is lowered to `unclear`.
-//        not_met          needs a verified passage (an explicit negative, "I have not ..."), otherwise `unclear`. A CV that
+//        not_met          needs a verified passage (word for word in the real CV), otherwise `unclear`. The code checks that the quote
+//                         is really in the CV, not that it reads as a negative; the prompt asks for `not_met` only where the CV
+//                         speaks to the requirement and falls short, or says outright it was not done. A CV that
 //                         says nothing about a requirement is `unclear`, never `not_met`: silence is not a finding against
 //                         anyone (LABELLING_GUIDE.md).
 //        unclear          always stands.
